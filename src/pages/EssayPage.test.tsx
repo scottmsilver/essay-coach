@@ -21,7 +21,7 @@ const mockEval: Evaluation = {
 
 let mockEssayState = {
   essay: { id: 'e1', title: 'Test Essay', writingType: 'argumentative', currentDraftNumber: 1, createdAt: new Date(), updatedAt: new Date(), assignmentPrompt: 'Prompt' },
-  drafts: [{ id: 'd1', draftNumber: 1, content: 'Essay text', submittedAt: new Date(), evaluation: mockEval as Evaluation | null, revisionStage: null }],
+  drafts: [{ id: 'd1', draftNumber: 1, content: 'Essay text with sample quoted here', submittedAt: new Date(), evaluation: mockEval as Evaluation | null, revisionStage: null }],
   loading: false,
 };
 
@@ -42,18 +42,19 @@ describe('EssayPage', () => {
     expect(screen.getByText('Test Essay')).toBeInTheDocument();
   });
 
-  it('renders all 7 trait cards', () => {
+  it('renders all 7 trait score badges', () => {
     renderWithRouter(<EssayPage />);
-    expect(screen.getByText('Ideas')).toBeInTheDocument();
-    expect(screen.getByText('Organization')).toBeInTheDocument();
-    expect(screen.getByText('Voice')).toBeInTheDocument();
-    expect(screen.getByText('Word Choice')).toBeInTheDocument();
-    expect(screen.getByText('Sentence Fluency')).toBeInTheDocument();
-    expect(screen.getByText('Conventions')).toBeInTheDocument();
-    expect(screen.getByText('Presentation')).toBeInTheDocument();
+    // Trait names may appear in both score badges and sidebar comments
+    expect(screen.getAllByText('Ideas').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Organization').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Voice').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Word Choice').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Sentence Fluency').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Conventions').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Presentation').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders revision plan banner', () => {
+  it('renders revision plan', () => {
     renderWithRouter(<EssayPage />);
     expect(screen.getByText(/fix conventions/i)).toBeInTheDocument();
   });
@@ -68,10 +69,19 @@ describe('EssayPage', () => {
     expect(screen.getByText(/start revising/i)).toBeInTheDocument();
   });
 
-  it('shows error state when evaluation is null', () => {
+  it('shows loading state for recent draft with null evaluation', () => {
     mockEssayState = {
       ...mockEssayState,
-      drafts: [{ ...mockEssayState.drafts[0], evaluation: null }],
+      drafts: [{ ...mockEssayState.drafts[0], evaluation: null, submittedAt: new Date() }],
+    };
+    renderWithRouter(<EssayPage />);
+    expect(screen.getByText(/evaluating/i)).toBeInTheDocument();
+  });
+
+  it('shows error state for old draft with null evaluation', () => {
+    mockEssayState = {
+      ...mockEssayState,
+      drafts: [{ ...mockEssayState.drafts[0], evaluation: null, submittedAt: new Date(Date.now() - 300000) }],
     };
     renderWithRouter(<EssayPage />);
     expect(screen.getAllByText(/failed|retry/i).length).toBeGreaterThan(0);

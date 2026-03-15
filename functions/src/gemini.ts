@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { SYSTEM_PROMPT } from './prompt';
+import type { DocumentReference } from 'firebase-admin/firestore';
 
 const EVALUATION_SCHEMA = {
   type: 'object' as const,
@@ -52,24 +53,55 @@ const EVALUATION_SCHEMA = {
 
 export async function evaluateWithGemini(
   apiKey: string,
-  userPrompt: string
+  userPrompt: string,
+  progressRef?: DocumentReference,
 ): Promise<Record<string, unknown>> {
   const ai = new GoogleGenAI({ apiKey });
 
-  const response = await ai.models.generateContent({
+  const stream = await ai.models.generateContentStream({
     model: 'gemini-3.1-pro-preview',
     contents: userPrompt,
     config: {
       systemInstruction: SYSTEM_PROMPT,
       responseMimeType: 'application/json',
       responseSchema: EVALUATION_SCHEMA,
+      thinkingConfig: { includeThoughts: true },
     },
   });
 
-  const text = response.text;
-  if (!text) {
+  let outputText = '';
+  let stage: 'thinking' | 'generating' = 'thinking';
+  let lastProgressWrite = 0;
+  const PROGRESS_THROTTLE_MS = 2000;
+
+  for await (const chunk of stream) {
+    const parts = chunk.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.thought) {
+        if (progressRef) {
+          const now = Date.now();
+          if (now - lastProgressWrite >= PROGRESS_THROTTLE_MS) {
+            const lines = (part.text || '').trim().split('\n');
+            const headline = lines[0]?.replace(/^\*+|\*+$/g, '').trim() || 'Thinking...';
+            await progressRef.update({ evaluationStatus: { stage: 'thinking', message: headline } });
+            lastProgressWrite = now;
+          }
+        }
+      } else {
+        if (stage === 'thinking') {
+          stage = 'generating';
+          if (progressRef) {
+            await progressRef.update({ evaluationStatus: { stage: 'generating', message: 'Writing feedback...' } });
+          }
+        }
+        outputText += part.text || '';
+      }
+    }
+  }
+
+  if (!outputText) {
     throw new Error('Gemini returned an empty response');
   }
 
-  return JSON.parse(text);
+  return JSON.parse(outputText);
 }

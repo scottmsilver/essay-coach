@@ -9,7 +9,7 @@ import { evaluateWithGemini } from './gemini';
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 export const submitEssay = onCall(
-  { timeoutSeconds: 120, secrets: [geminiApiKey] },
+  { timeoutSeconds: 180, secrets: [geminiApiKey] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Must be signed in');
@@ -50,20 +50,22 @@ export const submitEssay = onCall(
 
     try {
       const prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
-      const evaluation = await evaluateWithGemini(geminiApiKey.value(), prompt);
-      await draftRef.update({ evaluation });
+      const evaluation = await evaluateWithGemini(geminiApiKey.value(), prompt, draftRef);
+      await draftRef.update({ evaluation, evaluationStatus: null });
       return { essayId: essayRef.id, evaluation };
     } catch (error) {
       if (error instanceof SyntaxError) {
         try {
           const prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
-          const evaluation = await evaluateWithGemini(geminiApiKey.value(), prompt);
-          await draftRef.update({ evaluation });
+          const evaluation = await evaluateWithGemini(geminiApiKey.value(), prompt, draftRef);
+          await draftRef.update({ evaluation, evaluationStatus: null });
           return { essayId: essayRef.id, evaluation };
         } catch {
+          await draftRef.update({ evaluationStatus: { stage: 'error', message: 'Evaluation failed' } });
           throw new HttpsError('internal', 'Failed to evaluate essay. Please try again.');
         }
       }
+      await draftRef.update({ evaluationStatus: { stage: 'error', message: 'Evaluation failed' } });
       throw new HttpsError('internal', 'Failed to evaluate essay. Please try again.');
     }
   }

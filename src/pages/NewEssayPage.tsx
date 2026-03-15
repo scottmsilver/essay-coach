@@ -21,7 +21,7 @@ export default function NewEssayPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const submitEssay = httpsCallable(functions, 'submitEssay');
+      const submitEssay = httpsCallable(functions, 'submitEssay', { timeout: 180000 });
       const result = await submitEssay({ title, assignmentPrompt, writingType, content });
       const { essayId } = result.data as { essayId: string };
       navigate(`/essay/${essayId}`);

@@ -53,12 +53,41 @@ export interface Evaluation {
   comparisonToPrevious: Comparison | null;
 }
 
+export interface SentenceTransition {
+  paragraph: number;
+  fromSentence: number;
+  toSentence: number;
+  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
+  comment: string;
+}
+
+export interface ParagraphTransition {
+  fromParagraph: number;
+  toParagraph: number;
+  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
+  comment: string;
+}
+
+export interface TransitionAnalysis {
+  sentenceTransitions: SentenceTransition[];
+  paragraphTransitions: ParagraphTransition[];
+  summary: string;
+}
+
+export interface EvaluationStatus {
+  stage: 'thinking' | 'generating' | 'error';
+  message: string;
+}
+
 export interface Draft {
   id: string;
   draftNumber: number;
   content: string;
   submittedAt: Date;
   evaluation: Evaluation | null;
+  evaluationStatus?: EvaluationStatus | null;
+  transitionAnalysis?: TransitionAnalysis | null;
+  transitionStatus?: EvaluationStatus | null;
   revisionStage: number | null;
 }
 

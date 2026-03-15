@@ -34,7 +34,7 @@ body {
 }
 
 .nav-content {
-  max-width: 960px;
+  max-width: 1120px;
   margin: 0 auto;
   width: 100%;
   display: flex;
@@ -75,7 +75,7 @@ body {
 .sign-out-btn:hover { background: var(--color-bg); }
 
 /* Main content */
-.main-content { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+.main-content { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
 
 /* Buttons */
 .btn-primary {
@@ -180,7 +180,230 @@ body {
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-/* Trait cards */
+/* ═══ Essay Page ═══ */
+.essay-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.essay-page-title { font-size: 22px; margin-bottom: 4px; }
+
+/* Score strip — compact horizontal trait badges */
+.score-strip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.score-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.score-badge:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.score-badge.active { border-color: var(--color-primary); background: rgba(79, 70, 229, 0.06); }
+.score-badge-label { color: var(--color-text-secondary); font-weight: 500; }
+.score-badge-value {
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+}
+.score-badge.low .score-badge-value { color: var(--color-red); }
+.score-badge.mid .score-badge-value { color: var(--color-yellow); }
+.score-badge.high .score-badge-value { color: var(--color-green); }
+.score-badge-delta { font-size: 11px; font-weight: 600; }
+.score-badge-delta.up { color: var(--color-green); }
+.score-badge-delta.down { color: var(--color-red); }
+.score-badge-priority {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-primary);
+  opacity: 0.7;
+}
+
+/* Trait feedback panel — shows when a trait badge is clicked */
+.trait-feedback-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.trait-feedback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.trait-feedback-score { font-weight: 700; font-size: 16px; }
+.trait-feedback-text { color: var(--color-text-secondary); }
+
+/* ═══ Annotated essay — Google Docs-style with comment sidebar ═══ */
+.annotated-essay {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 0;
+  margin-bottom: 24px;
+}
+.essay-text {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 32px;
+  font-size: 15px;
+  line-height: 2;
+  color: var(--color-text);
+}
+
+/* Comment sidebar — right column, comments positioned to align with marks */
+.comment-sidebar {
+  position: relative;
+  padding-left: 16px;
+}
+.sidebar-comment {
+  position: absolute;
+  left: 16px;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sidebar-comment.suggestion:hover {
+  border-color: rgba(79, 70, 229, 0.4);
+}
+.sidebar-comment.suggestion.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+}
+.sidebar-comment.praise {
+  border-left: 3px solid rgba(5, 150, 105, 0.3);
+}
+.sidebar-comment.praise:hover {
+  border-color: rgba(5, 150, 105, 0.5);
+}
+.sidebar-comment.praise.active {
+  border-color: var(--color-green);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+}
+.sidebar-comment-trait {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-primary);
+  margin-bottom: 3px;
+}
+.sidebar-comment.praise .sidebar-comment-trait {
+  color: var(--color-green);
+}
+.sidebar-comment-text {
+  display: block;
+  color: var(--color-text-secondary);
+}
+.sidebar-comment.active .sidebar-comment-text {
+  color: var(--color-text);
+}
+
+/* Annotation marks in the essay text */
+.annotation-mark {
+  padding: 2px 0;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+/* Suggestions (has a question — things to work on) */
+.annotation-mark.suggestion {
+  background: rgba(79, 70, 229, 0.10);
+  border-bottom: 2px solid rgba(79, 70, 229, 0.25);
+}
+.annotation-mark.suggestion:hover { background: rgba(79, 70, 229, 0.20); }
+.annotation-mark.suggestion.selected {
+  background: rgba(79, 70, 229, 0.22);
+  border-bottom-color: var(--color-primary);
+}
+/* Praise (what's working well) */
+.annotation-mark.praise {
+  background: rgba(5, 150, 105, 0.08);
+  border-bottom: 2px solid rgba(5, 150, 105, 0.20);
+}
+.annotation-mark.praise:hover { background: rgba(5, 150, 105, 0.16); }
+.annotation-mark.praise.selected {
+  background: rgba(5, 150, 105, 0.18);
+  border-bottom-color: var(--color-green);
+}
+
+/* On narrow screens, stack comments below the essay */
+@media (max-width: 900px) {
+  .annotated-essay {
+    grid-template-columns: 1fr;
+  }
+  .comment-sidebar {
+    position: static;
+    padding-left: 0;
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sidebar-comment {
+    position: static;
+  }
+}
+
+/* ═══ Essay footer — overall feedback, revision plan ═══ */
+.essay-footer {
+  display: grid;
+  gap: 16px;
+}
+.overall-feedback, .revision-plan, .comparison-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.overall-feedback h3, .revision-plan h3, .comparison-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--color-text);
+}
+.overall-feedback p { font-size: 14px; line-height: 1.6; color: var(--color-text-secondary); }
+.revision-plan ol {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+.revision-plan ol li { margin-bottom: 4px; }
+.comparison-section ul {
+  list-style: none;
+  padding: 0;
+  font-size: 14px;
+  color: var(--color-green);
+}
+.comparison-section ul li::before { content: '+ '; font-weight: 600; }
+.comparison-section.remaining ul { color: var(--color-yellow); }
+.comparison-section.remaining ul li::before { content: '- '; }
+
+/* ═══ Legacy trait cards (still used on RevisionPage) ═══ */
 .trait-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .trait-card {
   background: var(--color-surface);
@@ -199,7 +422,7 @@ body {
 .trait-card-score { font-size: 18px; font-weight: 700; }
 .trait-card-feedback { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
 
-/* Annotations */
+/* Annotations in trait cards */
 .annotation { background: var(--color-bg); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
 .annotation-quote { font-style: italic; font-size: 13px; margin-bottom: 4px; color: var(--color-text); }
 .annotation-comment { font-size: 13px; color: var(--color-text-secondary); }
@@ -225,6 +448,16 @@ body {
 
 /* Loading */
 .loading-state { text-align: center; padding: 40px; }
+.progress-message {
+  font-size: 14px;
+  color: var(--color-text);
+  transition: opacity 0.3s;
+}
+.progress-stage {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
 .spinner {
   width: 32px; height: 32px;
   border: 3px solid var(--color-border);
@@ -252,7 +485,54 @@ body {
 }
 .essay-editor:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
 
-/* Side by side */
+/* Revision layout — editor left, annotations right */
+.revision-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.revision-editor .essay-editor {
+  min-height: 500px;
+}
+.revision-annotations {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.revision-annotations-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+.revision-plan-inline {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.revision-plan-inline strong {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.revision-plan-inline ol {
+  padding-left: 20px;
+  margin-top: 6px;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 900px) {
+  .revision-layout { grid-template-columns: 1fr; }
+}
+
+/* Legacy side by side (unused but kept for compat) */
 .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 @media (max-width: 768px) { .side-by-side { grid-template-columns: 1fr; } }
 
@@ -274,3 +554,195 @@ mark {
   padding: 2px 0;
   border-radius: 2px;
 }
+
+/* ═══ View toggle — Feedback / Transitions tabs ═══ */
+.view-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+}
+.view-toggle-btn {
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--color-surface);
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all 0.15s;
+}
+.view-toggle-btn:not(:last-child) {
+  border-right: 1px solid var(--color-border);
+}
+.view-toggle-btn:hover { background: var(--color-bg); }
+.view-toggle-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* ═══ Transition View — heatmap overlay ═══ */
+.transition-view {
+  margin-bottom: 24px;
+}
+
+/* Summary bar */
+.transition-summary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.transition-summary-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-border);
+  margin-bottom: 10px;
+}
+.transition-bar-segment {
+  transition: width 0.3s;
+}
+.transition-bar-segment.smooth { background: var(--color-green); }
+.transition-bar-segment.adequate { background: var(--color-text-secondary); }
+.transition-bar-segment.weak { background: var(--color-yellow); }
+.transition-bar-segment.missing { background: var(--color-red); }
+
+.transition-summary-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-dot.smooth { background: var(--color-green); }
+.legend-dot.adequate { background: var(--color-text-secondary); }
+.legend-dot.weak { background: var(--color-yellow); }
+.legend-dot.missing { background: var(--color-red); }
+
+.transition-summary-text {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* The essay with heatmap markers */
+.transition-essay {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 32px;
+  font-size: 15px;
+  line-height: 2;
+}
+
+.transition-sentence {
+  /* Sentences render inline */
+}
+
+/* Sentence transition dot — inline between sentences */
+.transition-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 3px;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.transition-dot:hover {
+  transform: scale(1.4);
+}
+.transition-dot.active {
+  transform: scale(1.5);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+}
+.transition-dot.smooth { background: var(--color-green); }
+.transition-dot.adequate { background: var(--color-text-secondary); }
+.transition-dot.weak { background: var(--color-yellow); }
+.transition-dot.missing { background: var(--color-red); }
+
+/* Paragraph transition marker — full-width bar between paragraphs */
+.transition-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  margin: 12px 0;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.transition-marker:hover {
+  background: rgba(0,0,0,0.03);
+}
+.transition-marker.active {
+  background: rgba(0,0,0,0.05);
+}
+.transition-marker-line {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+}
+.transition-marker.smooth .transition-marker-line { background: var(--color-green); }
+.transition-marker.adequate .transition-marker-line { background: var(--color-text-secondary); }
+.transition-marker.weak .transition-marker-line { background: var(--color-yellow); }
+.transition-marker.missing .transition-marker-line { background: var(--color-red); }
+
+.transition-marker-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.transition-marker-quality {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.transition-marker.smooth .transition-marker-quality { color: var(--color-green); background: rgba(5, 150, 105, 0.08); }
+.transition-marker.adequate .transition-marker-quality { color: var(--color-text-secondary); background: rgba(107, 114, 128, 0.08); }
+.transition-marker.weak .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
+.transition-marker.missing .transition-marker-quality { color: var(--color-red); background: rgba(220, 38, 38, 0.08); }
+
+/* Transition comment — inline popup */
+.transition-comment {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 6px 0;
+}
+.transition-comment.inline {
+  display: block;
+  margin: 4px 0 8px 0;
+}
+.transition-comment.smooth { border-left: 3px solid var(--color-green); }
+.transition-comment.adequate { border-left: 3px solid var(--color-text-secondary); }
+.transition-comment.weak { border-left: 3px solid var(--color-yellow); }
+.transition-comment.missing { border-left: 3px solid var(--color-red); }

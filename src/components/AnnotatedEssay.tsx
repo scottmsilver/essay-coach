@@ -1,48 +1,172 @@
-import { useMemo } from 'react';
-import type { Annotation } from '../types';
+import { useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react';
+import type { Annotation, TraitKey } from '../types';
+
+export interface TraitAnnotation extends Annotation {
+  traitKey: TraitKey;
+  traitLabel: string;
+}
 
 interface Props {
   content: string;
-  annotations: Annotation[];
-  onChange: (content: string) => void;
+  annotations: TraitAnnotation[];
+  onChange?: (content: string) => void;
   readOnly?: boolean;
+  activeTrait?: TraitKey | null;
 }
 
-export default function AnnotatedEssay({ content, annotations, onChange, readOnly }: Props) {
-  const highlightedHtml = useMemo(() => {
-    if (annotations.length === 0) return escapeHtml(content);
-    let html = escapeHtml(content);
-    const sorted = [...annotations].sort((a, b) => b.quotedText.length - a.quotedText.length);
-    for (const ann of sorted) {
-      const escaped = escapeHtml(ann.quotedText);
-      const idx = html.indexOf(escaped);
-      if (idx !== -1) {
-        html = html.slice(0, idx) +
-          `<mark title="${escapeAttr(ann.comment)}">${escaped}</mark>` +
-          html.slice(idx + escaped.length);
-      }
-    }
-    return html.replace(/\n/g, '<br/>');
-  }, [content, annotations]);
+interface AnnotationMarker {
+  start: number;
+  end: number;
+  annotation: TraitAnnotation;
+  id: string;
+  kind: 'praise' | 'suggestion';
+}
 
-  if (readOnly) {
+// Annotations that ask questions are suggestions; pure statements of what works are praise
+function classifyAnnotation(comment: string): 'praise' | 'suggestion' {
+  return comment.includes('?') ? 'suggestion' : 'praise';
+}
+
+export default function AnnotatedEssay({ content, annotations, onChange, readOnly = true, activeTrait }: Props) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [commentPositions, setCommentPositions] = useState<Record<string, number>>({});
+  const essayRef = useRef<HTMLDivElement>(null);
+
+  // Filter annotations by active trait if set
+  const filteredAnnotations = useMemo(() => {
+    if (!activeTrait) return annotations;
+    return annotations.filter(a => a.traitKey === activeTrait);
+  }, [annotations, activeTrait]);
+
+  // Find all annotation positions in the escaped content
+  const markers = useMemo(() => {
+    const escaped = escapeHtml(content);
+    const found: AnnotationMarker[] = [];
+    const sorted = [...filteredAnnotations].sort((a, b) => b.quotedText.length - a.quotedText.length);
+    const used = new Set<number>();
+
+    for (const ann of sorted) {
+      const needle = escapeHtml(ann.quotedText);
+      const idx = escaped.indexOf(needle);
+      if (idx === -1) continue;
+
+      let overlaps = false;
+      for (let i = idx; i < idx + needle.length; i++) {
+        if (used.has(i)) { overlaps = true; break; }
+      }
+      if (overlaps) continue;
+
+      for (let i = idx; i < idx + needle.length; i++) used.add(i);
+      const id = `ann-${idx}`;
+      found.push({ start: idx, end: idx + needle.length, annotation: ann, id, kind: classifyAnnotation(ann.comment) });
+    }
+
+    return found.sort((a, b) => a.start - b.start);
+  }, [content, filteredAnnotations]);
+
+  // Measure mark positions and lay out comments on the right
+  useLayoutEffect(() => {
+    if (!essayRef.current || markers.length === 0) return;
+
+    const measure = () => {
+      const container = essayRef.current;
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      const positions: Record<string, number> = {};
+      let lastBottom = 0;
+
+      for (const m of markers) {
+        const markEl = container.querySelector(`[data-ann-id="${m.id}"]`);
+        if (!markEl) continue;
+
+        const markRect = markEl.getBoundingClientRect();
+        const idealTop = markRect.top - containerRect.top;
+        // Push down if would overlap the previous comment
+        const top = Math.max(idealTop, lastBottom + 8);
+        positions[m.id] = top;
+
+        // Estimate comment height (will be refined by the browser, but good enough for layout)
+        const commentEl = container.querySelector(`[data-comment-id="${m.id}"]`) as HTMLElement | null;
+        const commentHeight = commentEl ? commentEl.offsetHeight : 60;
+        lastBottom = top + commentHeight;
+      }
+
+      setCommentPositions(positions);
+    };
+
+    // Measure after render
+    measure();
+    // Re-measure on resize
+    const observer = new ResizeObserver(measure);
+    observer.observe(essayRef.current);
+    return () => observer.disconnect();
+  }, [markers]);
+
+  const handleMarkClick = useCallback((id: string) => {
+    setActiveId(prev => prev === id ? null : id);
+  }, []);
+
+  if (!readOnly) {
     return (
-      <div className="essay-preview" style={{ padding: 16, lineHeight: 1.8, fontSize: 14 }}
-        dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+      <div>
+        <textarea className="essay-editor" value={content} onChange={(e) => onChange?.(e.target.value)} />
+      </div>
+    );
+  }
+
+  // Build segments: alternating plain text and annotated spans
+  const escaped = escapeHtml(content);
+  const segments: React.ReactNode[] = [];
+  let pos = 0;
+
+  for (let i = 0; i < markers.length; i++) {
+    const m = markers[i];
+    if (m.start > pos) {
+      segments.push(
+        <span key={`t${i}`} dangerouslySetInnerHTML={{ __html: escaped.slice(pos, m.start).replace(/\n/g, '<br/>') }} />
+      );
+    }
+    const isActive = activeId === m.id;
+    segments.push(
+      <mark
+        key={`m${i}`}
+        data-ann-id={m.id}
+        className={`annotation-mark ${m.kind} ${isActive ? 'selected' : ''}`}
+        onClick={() => handleMarkClick(m.id)}
+        role="button"
+        tabIndex={0}
+      >
+        <span dangerouslySetInnerHTML={{ __html: escaped.slice(m.start, m.end).replace(/\n/g, '<br/>') }} />
+      </mark>
+    );
+    pos = m.end;
+  }
+  if (pos < escaped.length) {
+    segments.push(
+      <span key="end" dangerouslySetInnerHTML={{ __html: escaped.slice(pos).replace(/\n/g, '<br/>') }} />
     );
   }
 
   return (
-    <div>
-      <textarea className="essay-editor" value={content} onChange={(e) => onChange(e.target.value)} />
-      {annotations.length > 0 && (
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ fontSize: 13, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
-            Show highlighted passages
-          </summary>
-          <div style={{ padding: 16, background: 'var(--color-surface)', borderRadius: 6, marginTop: 8, lineHeight: 1.8, fontSize: 14 }}
-            dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
-        </details>
+    <div className="annotated-essay" ref={essayRef}>
+      <div className="essay-text">
+        {segments}
+      </div>
+      {markers.length > 0 && (
+        <div className="comment-sidebar">
+          {markers.map((m) => (
+            <div
+              key={m.id}
+              data-comment-id={m.id}
+              className={`sidebar-comment ${m.kind} ${activeId === m.id ? 'active' : ''}`}
+              style={{ top: commentPositions[m.id] ?? 0 }}
+              onClick={() => handleMarkClick(m.id)}
+            >
+              <span className="sidebar-comment-trait">{m.annotation.traitLabel}</span>
+              <span className="sidebar-comment-text">{m.annotation.comment}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -50,8 +174,4 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function escapeAttr(text: string): string {
-  return escapeHtml(text).replace(/'/g, '&#39;');
 }

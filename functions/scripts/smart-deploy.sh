@@ -29,12 +29,14 @@ done
 declare -A FILE_TO_FUNCTIONS=(
   ["src/submitEssay.ts"]="submitEssay"
   ["src/resubmitDraft.ts"]="resubmitDraft"
+  ["src/analyzeTransitions.ts"]="analyzeTransitions"
   ["src/deleteAccount.ts"]="deleteAccount"
   ["src/prompt.ts"]="submitEssay resubmitDraft"
   ["src/gemini.ts"]="submitEssay resubmitDraft"
-  ["src/allowlist.ts"]="submitEssay resubmitDraft"
+  ["src/transitions.ts"]="analyzeTransitions"
+  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions"
   ["src/validation.ts"]="submitEssay resubmitDraft"
-  ["src/index.ts"]="submitEssay resubmitDraft deleteAccount"
+  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions deleteAccount"
 )
 
 # Files that trigger a full deploy if changed
@@ -50,7 +52,7 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
   if [[ -z "$LAST_SHA" ]] && ! $FORCE_ALL; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
-  DEPLOY_TARGETS="submitEssay resubmitDraft deleteAccount"
+  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions deleteAccount"
 else
   # Get changed files since last deploy
   CHANGED_FILES=$(git diff --name-only "$LAST_SHA" -- . 2>/dev/null || echo "")
@@ -75,7 +77,7 @@ else
   done
 
   if $NEED_FULL; then
-    DEPLOY_TARGETS="submitEssay resubmitDraft deleteAccount"
+    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions deleteAccount"
   else
     # Map changed files to affected functions
     DEPLOY_SET=""

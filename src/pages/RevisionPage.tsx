@@ -1,29 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
-import AnnotatedEssay from '../components/AnnotatedEssay';
+import type { TraitAnnotation } from '../components/AnnotatedEssay';
 
 export default function RevisionPage() {
   const { essayId } = useParams<{ essayId: string }>();
   const navigate = useNavigate();
   const { essay, drafts, loading } = useEssay(essayId);
-  const [selectedTrait, setSelectedTrait] = useState<TraitKey>('conventions');
+  const [selectedTrait, setSelectedTrait] = useState<TraitKey | null>(null);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const initialized = useRef(false);
 
   const latestDraft = drafts[0];
 
+  // Initialize content ONCE from localStorage or draft — not on every snapshot
   useEffect(() => {
-    if (!latestDraft) return;
+    if (!latestDraft || initialized.current) return;
+    initialized.current = true;
     const saved = localStorage.getItem(`essaycoach_autosave_${essayId}`);
     setContent(saved ?? latestDraft.content);
-    // Set selected trait to first revision priority
     if (latestDraft.evaluation) {
       const prioritized = TRAIT_KEYS
         .filter((t) => latestDraft.evaluation!.traits[t].revisionPriority !== null)
@@ -31,6 +33,20 @@ export default function RevisionPage() {
       if (prioritized.length > 0) setSelectedTrait(prioritized[0]);
     }
   }, [latestDraft, essayId]);
+
+  // Collect all annotations with trait info for the sidebar
+  const allAnnotations = useMemo(() => {
+    if (!latestDraft?.evaluation) return [];
+    const result: TraitAnnotation[] = [];
+    for (const traitKey of TRAIT_KEYS) {
+      const trait = latestDraft.evaluation.traits[traitKey];
+      if (!trait?.annotations) continue;
+      for (const ann of trait.annotations) {
+        result.push({ ...ann, traitKey, traitLabel: TRAIT_LABELS[traitKey] });
+      }
+    }
+    return result;
+  }, [latestDraft]);
 
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
@@ -42,12 +58,12 @@ export default function RevisionPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const resubmitDraft = httpsCallable(functions, 'resubmitDraft');
+      const resubmitDraft = httpsCallable(functions, 'resubmitDraft', { timeout: 180000 });
       await resubmitDraft({ essayId, content });
       localStorage.removeItem(`essaycoach_autosave_${essayId}`);
       navigate(`/essay/${essayId}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to resubmit. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to resubmit. Please try again.');
       setRetryCount((c) => c + 1);
       setSubmitting(false);
     }
@@ -57,53 +73,99 @@ export default function RevisionPage() {
   if (!essay || !latestDraft?.evaluation) return <div>Essay not found or not yet evaluated.</div>;
 
   const evaluation = latestDraft.evaluation;
-  const traitEval = evaluation.traits[selectedTrait];
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2>{essay.title} — Revision</h2>
+    <div className="essay-page">
+      {/* Header */}
+      <div className="essay-page-header">
+        <div>
+          <h2 className="essay-page-title">{essay.title} — Revision</h2>
+        </div>
         <button onClick={handleResubmit} className="btn-primary" disabled={submitting || retryCount >= 3}>
-          {submitting ? 'Resubmitting...' : 'Resubmit'}
+          {submitting ? 'Evaluating...' : 'Resubmit'}
         </button>
-      </div>
-
-      <div className="trait-selector">
-        {TRAIT_KEYS.map((trait) => (
-          <button key={trait} className={selectedTrait === trait ? 'active' : ''}
-            onClick={() => setSelectedTrait(trait)}>
-            {TRAIT_LABELS[trait]}
-            {evaluation.traits[trait].revisionPriority && ` (${evaluation.traits[trait].revisionPriority})`}
-          </button>
-        ))}
       </div>
 
       {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
 
-      <div className="side-by-side">
-        <div>
-          <AnnotatedEssay
-            content={content}
-            annotations={traitEval.annotations}
-            onChange={handleContentChange}
+      {/* Score strip — same as EssayPage, click to filter annotations */}
+      <div className="score-strip">
+        {TRAIT_KEYS.map((trait) => {
+          const score = evaluation.traits[trait].score;
+          const isActive = selectedTrait === trait;
+          const priority = evaluation.traits[trait].revisionPriority;
+          return (
+            <button
+              key={trait}
+              className={`score-badge ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
+              onClick={() => setSelectedTrait(isActive ? null : trait)}
+              title={evaluation.traits[trait].feedback}
+            >
+              <span className="score-badge-label">{TRAIT_LABELS[trait]}</span>
+              <span className="score-badge-value">{score}</span>
+              {priority && <span className="score-badge-priority">#{priority}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Trait feedback panel */}
+      {selectedTrait && (
+        <div className="trait-feedback-panel">
+          <div className="trait-feedback-header">
+            <strong>{TRAIT_LABELS[selectedTrait]}</strong>
+            <span className="trait-feedback-score" style={{ color: scoreColor(evaluation.traits[selectedTrait].score) }}>
+              {evaluation.traits[selectedTrait].score}/6
+            </span>
+          </div>
+          <p className="trait-feedback-text">{evaluation.traits[selectedTrait].feedback}</p>
+        </div>
+      )}
+
+      {/* Revision plan */}
+      {evaluation.revisionPlan.length > 0 && (
+        <div className="revision-plan-inline">
+          <strong>Focus on:</strong>
+          <ol>
+            {evaluation.revisionPlan.map((step, i) => <li key={i}>{step}</li>)}
+          </ol>
+        </div>
+      )}
+
+      {/* Essay editor with annotation sidebar for reference */}
+      <div className="revision-layout">
+        <div className="revision-editor">
+          <textarea
+            className="essay-editor"
+            value={content}
+            onChange={(e) => handleContentChange(e.target.value)}
           />
         </div>
-        <div>
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16 }}>
-            <h3 style={{ fontSize: 15, marginBottom: 4 }}>{TRAIT_LABELS[selectedTrait]}</h3>
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: traitEval.score <= 2 ? 'var(--color-red)' : traitEval.score === 3 ? 'var(--color-yellow)' : 'var(--color-green)' }}>
-              {traitEval.score}/6
+        <div className="revision-annotations">
+          <div className="revision-annotations-header">Feedback</div>
+          {(selectedTrait
+            ? allAnnotations.filter(a => a.traitKey === selectedTrait)
+            : allAnnotations
+          ).map((ann, i) => (
+            <div key={i} className={`sidebar-comment ${ann.comment.includes('?') ? 'suggestion' : 'praise'}`} style={{ position: 'static' }}>
+              <span className="sidebar-comment-trait">{ann.traitLabel}</span>
+              <span className="sidebar-comment-text">{ann.comment}</span>
             </div>
-            <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>{traitEval.feedback}</p>
-            {traitEval.annotations.map((ann, i) => (
-              <div key={i} className="annotation">
-                <div className="annotation-quote">"{ann.quotedText}"</div>
-                <div className="annotation-comment">{ann.comment}</div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
     </div>
   );
+}
+
+function scoreLevel(score: number): string {
+  if (score <= 2) return 'low';
+  if (score === 3) return 'mid';
+  return 'high';
+}
+
+function scoreColor(score: number): string {
+  if (score <= 2) return 'var(--color-red)';
+  if (score === 3) return 'var(--color-yellow)';
+  return 'var(--color-green)';
 }

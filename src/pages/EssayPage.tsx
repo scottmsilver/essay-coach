@@ -1,22 +1,64 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
-import { TRAIT_KEYS } from '../types';
-import type { TraitKey } from '../types';
-import TraitCard from '../components/TraitCard';
-import RevisionPlanBanner from '../components/RevisionPlanBanner';
+import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
+import type { TraitKey, TransitionAnalysis } from '../types';
+import type { TraitAnnotation } from '../components/AnnotatedEssay';
+import AnnotatedEssay from '../components/AnnotatedEssay';
+import TransitionView from '../components/TransitionView';
 import DraftSelector from '../components/DraftSelector';
-import ScoreDelta from '../components/ScoreDelta';
 
 export default function EssayPage() {
   const { essayId } = useParams<{ essayId: string }>();
   const { essay, drafts, loading } = useEssay(essayId);
-  const [expandedTrait, setExpandedTrait] = useState<TraitKey | null>(null);
+  const [activeTrait, setActiveTrait] = useState<TraitKey | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [retrying, setRetrying] = useState(false);
+  const [activeView, setActiveView] = useState<'feedback' | 'transitions'>('feedback');
+  const [transitionLoading, setTransitionLoading] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+
+  // Collect all annotations with trait info
+  const allAnnotations = useMemo(() => {
+    const activeDraftId = selectedDraftId ?? drafts[0]?.id;
+    const activeDraft = drafts.find((d) => d.id === activeDraftId) ?? drafts[0];
+    if (!activeDraft?.evaluation) return [];
+
+    const result: TraitAnnotation[] = [];
+    for (const traitKey of TRAIT_KEYS) {
+      const trait = activeDraft.evaluation.traits[traitKey];
+      if (!trait?.annotations) continue;
+      for (const ann of trait.annotations) {
+        result.push({ ...ann, traitKey, traitLabel: TRAIT_LABELS[traitKey] });
+      }
+    }
+    return result;
+  }, [drafts, selectedDraftId]);
+
+  const handleTransitionsTab = useCallback(async () => {
+    setActiveView('transitions');
+    const activeDraftId_ = selectedDraftId ?? drafts[0]?.id;
+    const activeDraft_ = drafts.find((d) => d.id === activeDraftId_) ?? drafts[0];
+    if (!activeDraft_ || activeDraft_.transitionAnalysis) return;
+
+    setTransitionLoading(true);
+    setTransitionError(null);
+    try {
+      const analyzeTransitions = httpsCallable<
+        { essayId: string; draftId: string },
+        TransitionAnalysis
+      >(functions, 'analyzeTransitions', { timeout: 180000 });
+      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft_.id });
+      // Firestore listener will update the draft with transitionAnalysis
+    } catch {
+      setTransitionError('Failed to analyze transitions. Please try again.');
+    } finally {
+      setTransitionLoading(false);
+    }
+  }, [drafts, selectedDraftId, essayId]);
 
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
   if (!essay || drafts.length === 0) return <div>Essay not found.</div>;
@@ -29,7 +71,7 @@ export default function EssayPage() {
     if (retryCount >= 3) return;
     setRetrying(true);
     try {
-      const submitEssay = httpsCallable(functions, 'submitEssay');
+      const submitEssay = httpsCallable(functions, 'submitEssay', { timeout: 180000 });
       await submitEssay({
         title: essay.title,
         assignmentPrompt: essay.assignmentPrompt,
@@ -44,6 +86,29 @@ export default function EssayPage() {
   };
 
   if (!activeDraft.evaluation) {
+    const status = activeDraft.evaluationStatus;
+    // If we have a live status from the function, or draft is recent, show progress
+    const age = Date.now() - activeDraft.submittedAt.getTime();
+    const isRecent = age < 180000;
+    if (status?.stage === 'error') {
+      // Fall through to the error/retry UI below
+    } else if (status || isRecent) {
+      return (
+        <div>
+          <h2>{essay.title}</h2>
+          <div className="loading-state" style={{ marginTop: 24 }}>
+            <div className="spinner" />
+            <p className="progress-message">{status?.message || 'Evaluating your essay...'}</p>
+            {status?.stage === 'thinking' && (
+              <p className="progress-stage">Gemini is thinking...</p>
+            )}
+            {status?.stage === 'generating' && (
+              <p className="progress-stage">Writing your feedback...</p>
+            )}
+          </div>
+        </div>
+      );
+    }
     return (
       <div>
         <h2>{essay.title}</h2>
@@ -65,62 +130,165 @@ export default function EssayPage() {
   const comparison = evaluation.comparisonToPrevious;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2>{essay.title}</h2>
+    <div className="essay-page">
+      {/* Header */}
+      <div className="essay-page-header">
+        <div>
+          <h2 className="essay-page-title">{essay.title}</h2>
+          <DraftSelector drafts={drafts} selectedDraftId={activeDraftId} onChange={setSelectedDraftId} />
+        </div>
         {isLatestDraft && (
           <Link to={`/essay/${essayId}/revise`} className="btn-primary">Start Revising</Link>
         )}
       </div>
 
-      <DraftSelector drafts={drafts} selectedDraftId={activeDraftId} onChange={setSelectedDraftId} />
+      {/* Score strip */}
+      <div className="score-strip">
+        {TRAIT_KEYS.map((trait) => {
+          const score = evaluation.traits[trait].score;
+          const isActive = activeTrait === trait;
+          const change = comparison?.scoreChanges[trait];
+          return (
+            <button
+              key={trait}
+              className={`score-badge ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveTrait(isActive ? null : trait)}
+              title={evaluation.traits[trait].feedback}
+            >
+              <span className="score-badge-label">{TRAIT_LABELS[trait]}</span>
+              <span className="score-badge-value">{score}</span>
+              {change && change.delta !== 0 && (
+                <span className={`score-badge-delta ${change.delta > 0 ? 'up' : 'down'}`}>
+                  {change.delta > 0 ? '+' : ''}{change.delta}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-      <RevisionPlanBanner revisionPlan={evaluation.revisionPlan} />
-
-      {comparison && (
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 24 }}>
-          <h3 style={{ fontSize: 15, marginBottom: 12 }}>Draft Comparison</h3>
-          {Object.entries(comparison.scoreChanges).map(([trait, change]) => (
-            <div key={trait} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 14 }}>{trait}:</span>
-              <ScoreDelta previous={change!.previous} current={change!.current} />
-            </div>
-          ))}
-          {comparison.improvements.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <strong style={{ fontSize: 13 }}>Improvements:</strong>
-              <ul style={{ fontSize: 13, color: 'var(--color-green)', paddingLeft: 20 }}>
-                {comparison.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
-              </ul>
-            </div>
-          )}
-          {comparison.remainingIssues.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <strong style={{ fontSize: 13 }}>Remaining Issues:</strong>
-              <ul style={{ fontSize: 13, color: 'var(--color-yellow)', paddingLeft: 20 }}>
-                {comparison.remainingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
-              </ul>
-            </div>
-          )}
+      {/* Active trait feedback panel */}
+      {activeTrait && (
+        <div className="trait-feedback-panel">
+          <div className="trait-feedback-header">
+            <strong>{TRAIT_LABELS[activeTrait]}</strong>
+            <span className="trait-feedback-score" style={{ color: scoreColor(evaluation.traits[activeTrait].score) }}>
+              {evaluation.traits[activeTrait].score}/6
+            </span>
+          </div>
+          <p className="trait-feedback-text">{evaluation.traits[activeTrait].feedback}</p>
         </div>
       )}
 
-      <div className="trait-grid">
-        {TRAIT_KEYS.map((trait) => (
-          <TraitCard
-            key={trait}
-            traitKey={trait}
-            evaluation={evaluation.traits[trait]}
-            expanded={expandedTrait === trait}
-            onClick={() => setExpandedTrait(expandedTrait === trait ? null : trait)}
-          />
-        ))}
+      {/* View toggle: Feedback / Transitions */}
+      <div className="view-toggle">
+        <button
+          className={`view-toggle-btn ${activeView === 'feedback' ? 'active' : ''}`}
+          onClick={() => setActiveView('feedback')}
+        >
+          Feedback
+        </button>
+        <button
+          className={`view-toggle-btn ${activeView === 'transitions' ? 'active' : ''}`}
+          onClick={handleTransitionsTab}
+        >
+          Transitions
+        </button>
       </div>
 
-      <div style={{ marginTop: 24, padding: 16, background: 'var(--color-surface)', borderRadius: 10, border: '1px solid var(--color-border)' }}>
-        <h3 style={{ fontSize: 15, marginBottom: 8 }}>Overall Feedback</h3>
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-secondary)' }}>{evaluation.overallFeedback}</p>
+      {/* Essay with inline annotations — the main event */}
+      {activeView === 'feedback' && (
+        <AnnotatedEssay
+          content={activeDraft.content}
+          annotations={allAnnotations}
+          readOnly
+          activeTrait={activeTrait}
+        />
+      )}
+
+      {/* Transition heatmap view */}
+      {activeView === 'transitions' && (
+        <>
+          {activeDraft.transitionAnalysis ? (
+            <TransitionView
+              content={activeDraft.content}
+              analysis={activeDraft.transitionAnalysis}
+            />
+          ) : transitionError ? (
+            <div className="error-state">
+              <p>{transitionError}</p>
+              <button className="btn-primary" style={{ marginTop: 8 }} onClick={handleTransitionsTab}>
+                Retry
+              </button>
+            </div>
+          ) : transitionLoading || activeDraft.transitionStatus ? (
+            <div className="loading-state">
+              <div className="spinner" />
+              <p className="progress-message">
+                {activeDraft.transitionStatus?.message || 'Analyzing transitions...'}
+              </p>
+              {activeDraft.transitionStatus?.stage === 'thinking' && (
+                <p className="progress-stage">Gemini is thinking...</p>
+              )}
+              {activeDraft.transitionStatus?.stage === 'generating' && (
+                <p className="progress-stage">Writing analysis...</p>
+              )}
+            </div>
+          ) : (
+            <div className="loading-state">
+              <p>Click the Transitions tab to analyze this essay's transitions.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Overall feedback + revision plan */}
+      <div className="essay-footer">
+        {evaluation.overallFeedback && (
+          <div className="overall-feedback">
+            <h3>Overall</h3>
+            <p>{evaluation.overallFeedback}</p>
+          </div>
+        )}
+
+        {evaluation.revisionPlan.length > 0 && (
+          <div className="revision-plan">
+            <h3>Revision Plan</h3>
+            <ol>
+              {evaluation.revisionPlan.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
+          </div>
+        )}
+
+        {comparison && comparison.improvements.length > 0 && (
+          <div className="comparison-section">
+            <h3>Improvements</h3>
+            <ul>
+              {comparison.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+            </ul>
+          </div>
+        )}
+        {comparison && comparison.remainingIssues.length > 0 && (
+          <div className="comparison-section remaining">
+            <h3>Still to Work On</h3>
+            <ul>
+              {comparison.remainingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+function scoreLevel(score: number): string {
+  if (score <= 2) return 'low';
+  if (score === 3) return 'mid';
+  return 'high';
+}
+
+function scoreColor(score: number): string {
+  if (score <= 2) return 'var(--color-red)';
+  if (score === 3) return 'var(--color-yellow)';
+  return 'var(--color-green)';
 }
