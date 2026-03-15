@@ -9,6 +9,8 @@ import type { TraitAnnotation } from '../components/AnnotatedEssay';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import DraftSelector from '../components/DraftSelector';
+import GrammarView from '../components/GrammarView';
+import type { GrammarAnalysis } from '../types';
 
 export default function EssayPage() {
   const { essayId } = useParams<{ essayId: string }>();
@@ -17,9 +19,11 @@ export default function EssayPage() {
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [retrying, setRetrying] = useState(false);
-  const [activeView, setActiveView] = useState<'feedback' | 'transitions'>('feedback');
+  const [activeView, setActiveView] = useState<'feedback' | 'transitions' | 'grammar'>('feedback');
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [grammarLoading, setGrammarLoading] = useState(false);
+  const [grammarError, setGrammarError] = useState<string | null>(null);
 
   // Collect all annotations with trait info
   const allAnnotations = useMemo(() => {
@@ -57,6 +61,28 @@ export default function EssayPage() {
       setTransitionError('Failed to analyze transitions. Please try again.');
     } finally {
       setTransitionLoading(false);
+    }
+  }, [drafts, selectedDraftId, essayId]);
+
+  const handleGrammarTab = useCallback(async () => {
+    setActiveView('grammar');
+    const activeDraftId_ = selectedDraftId ?? drafts[0]?.id;
+    const activeDraft_ = drafts.find((d) => d.id === activeDraftId_) ?? drafts[0];
+    if (!activeDraft_ || activeDraft_.grammarAnalysis) return;
+    if (activeDraft_.grammarStatus && activeDraft_.grammarStatus.stage !== 'error') return;
+
+    setGrammarLoading(true);
+    setGrammarError(null);
+    try {
+      const analyzeGrammar = httpsCallable<
+        { essayId: string; draftId: string },
+        GrammarAnalysis
+      >(functions, 'analyzeGrammar', { timeout: 180000 });
+      await analyzeGrammar({ essayId: essayId!, draftId: activeDraft_.id });
+    } catch {
+      setGrammarError('Failed to analyze grammar. Please try again.');
+    } finally {
+      setGrammarLoading(false);
     }
   }, [drafts, selectedDraftId, essayId]);
 
@@ -194,6 +220,12 @@ export default function EssayPage() {
         >
           Transitions
         </button>
+        <button
+          className={`view-toggle-btn ${activeView === 'grammar' ? 'active' : ''}`}
+          onClick={handleGrammarTab}
+        >
+          Grammar
+        </button>
       </div>
 
       {/* Essay with inline annotations — the main event */}
@@ -237,6 +269,42 @@ export default function EssayPage() {
           ) : (
             <div className="loading-state">
               <p>Click the Transitions tab to analyze this essay's transitions.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Grammar analysis view */}
+      {activeView === 'grammar' && (
+        <>
+          {activeDraft.grammarAnalysis ? (
+            <GrammarView
+              content={activeDraft.content}
+              analysis={activeDraft.grammarAnalysis}
+            />
+          ) : grammarError ? (
+            <div className="error-state">
+              <p>{grammarError}</p>
+              <button className="btn-primary" style={{ marginTop: 8 }} onClick={handleGrammarTab}>
+                Retry
+              </button>
+            </div>
+          ) : grammarLoading || activeDraft.grammarStatus ? (
+            <div className="loading-state">
+              <div className="spinner" />
+              <p className="progress-message">
+                {activeDraft.grammarStatus?.message || 'Analyzing grammar...'}
+              </p>
+              {activeDraft.grammarStatus?.stage === 'thinking' && (
+                <p className="progress-stage">Gemini is thinking...</p>
+              )}
+              {activeDraft.grammarStatus?.stage === 'generating' && (
+                <p className="progress-stage">Writing analysis...</p>
+              )}
+            </div>
+          ) : (
+            <div className="loading-state">
+              <p>Click the Grammar tab to analyze this essay's grammar.</p>
             </div>
           )}
         </>
