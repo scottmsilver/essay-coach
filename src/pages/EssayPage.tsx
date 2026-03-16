@@ -2,14 +2,16 @@ import { useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc } from 'firebase/firestore';
+import { Button, Select, Group } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreLevel, scoreColor, relativeTime, collectAnnotations } from '../utils';
-import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
+import { scoreColor, relativeTime, collectAnnotations } from '../utils';
+import { TRAIT_LABELS } from '../types';
 import type { TraitKey, TransitionAnalysis, GrammarAnalysis } from '../types';
 import DocBar from '../components/DocBar';
+import ScorePillBar from '../components/ScorePillBar';
 import AnalysisPanel from '../components/AnalysisPanel';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
@@ -105,13 +107,8 @@ export default function EssayPage() {
     if (retryCount >= 3) return;
     setRetrying(true);
     try {
-      const submitEssay = httpsCallable(functions, 'submitEssay', { timeout: 180000 });
-      await submitEssay({
-        title: essay.title,
-        assignmentPrompt: essay.assignmentPrompt,
-        writingType: essay.writingType,
-        content: activeDraft.content,
-      });
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      await evaluateEssay({ essayId: essayId!, draftId: activeDraft.id });
     } catch {
       setRetryCount((c) => c + 1);
     } finally {
@@ -148,9 +145,9 @@ export default function EssayPage() {
         <div className="error-state" style={{ marginTop: 24 }}>
           <p>Evaluation failed. Your essay has been saved.</p>
           {!ownerUid && retryCount < 3 ? (
-            <button onClick={handleRetry} className="btn-primary" style={{ marginTop: 12 }} disabled={retrying}>
-              {retrying ? 'Retrying...' : 'Retry'}
-            </button>
+            <Button onClick={handleRetry} size="sm" mt={12} disabled={retrying} loading={retrying}>
+              Retry
+            </Button>
           ) : ownerUid ? (
             <p style={{ marginTop: 8 }}>Only the essay owner can retry evaluation.</p>
           ) : (
@@ -168,98 +165,85 @@ export default function EssayPage() {
     <div className="essay-page">
       <DocBar title={essay.title}>
         {drafts.length > 1 && (
-          <select
-            className="doc-bar-draft"
+          <Select
+            size="xs"
             value={activeDraft.id}
-            onChange={(e) => setSelectedDraftId(e.target.value)}
-          >
-            {drafts.map((d) => (
-              <option key={d.id} value={d.id}>
-                Rev {d.draftNumber} — {relativeTime(d.submittedAt)}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => val && setSelectedDraftId(val)}
+            data={drafts.map((d) => ({ value: d.id, label: `Rev ${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
+            styles={{ input: { minWidth: 180 } }}
+          />
         )}
       </DocBar>
 
       {/* Row 2 — Analysis bar */}
       <div className="analysis-bar">
         <div className="analysis-bar-left">
-          <select
-            className="view-dropdown"
+          <Select
+            size="xs"
             value={activeView}
-            onChange={(e) => {
-              const view = e.target.value as 'feedback' | 'transitions' | 'grammar';
+            onChange={(val) => {
+              const view = val as 'feedback' | 'transitions' | 'grammar';
               if (view === 'transitions') handleTransitionsTab();
               else if (view === 'grammar') handleGrammarTab();
               else setActiveView('feedback');
             }}
-          >
-            <option value="feedback">Overall</option>
-            <option value="transitions">Transitions</option>
-            <option value="grammar">Grammar</option>
-          </select>
+            data={[
+              { value: 'feedback', label: 'Overall' },
+              { value: 'transitions', label: 'Transitions' },
+              { value: 'grammar', label: 'Grammar' },
+            ]}
+            styles={{ input: { minWidth: 130 } }}
+          />
         </div>
         {activeView === 'feedback' && (
-          <div className="analysis-bar-scores">
-            {TRAIT_KEYS.map((trait) => {
-              const score = evaluation.traits[trait].score;
-              const isActive = activeTrait === trait;
-              const change = comparison?.scoreChanges[trait];
-              return (
-                <div key={trait} style={{ position: 'relative' }}>
-                  <button
-                    className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
-                    onClick={() => setActiveTrait(isActive ? null : trait)}
-                  >
-                    <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>
-                    <span className="score-pill-value">{score}</span>
-                    {change && change.delta !== 0 && (
-                      <span className={`score-pill-delta ${change.delta > 0 ? 'up' : 'down'}`}>
-                        {change.delta > 0 ? '+' : ''}{change.delta}
-                      </span>
-                    )}
-                  </button>
-                  {isActive && (
-                    <div className="trait-popover" ref={popoverRef}>
-                      <div className="trait-popover-header">
-                        <strong>{TRAIT_LABELS[trait]}</strong>
-                        <span style={{ color: scoreColor(score), fontWeight: 700 }}>{score}/6</span>
-                      </div>
-                      <p className="trait-popover-text">{evaluation.traits[trait].feedback}</p>
-                    </div>
-                  )}
+          <div style={{ position: 'relative', display: 'contents' }}>
+            <ScorePillBar
+              evaluation={evaluation}
+              activeKey={activeTrait}
+              onSelect={setActiveTrait}
+              scoreChanges={comparison?.scoreChanges}
+            />
+            {activeTrait && (
+              <div className="trait-popover" ref={popoverRef}>
+                <div className="trait-popover-header">
+                  <strong>{TRAIT_LABELS[activeTrait]}</strong>
+                  <span style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}>
+                    {evaluation.traits[activeTrait].score}/6
+                  </span>
                 </div>
-              );
-            })}
+                <p className="trait-popover-text">{evaluation.traits[activeTrait].feedback}</p>
+              </div>
+            )}
           </div>
         )}
-        <div className="analysis-bar-right">
-          <button
+        <Group className="analysis-bar-right" gap="xs">
+          <Button
+            size="compact-sm"
+            variant="default"
             onClick={
               activeView === 'grammar' ? handleGrammarReanalyze
               : activeView === 'transitions' ? handleTransitionsTab
               : handleRetry
             }
-            className="btn-compact"
             disabled={
               activeView === 'grammar' ? grammarLoading
               : activeView === 'transitions' ? transitionLoading
               : retrying || retryCount >= 3
             }
+            loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
           >
-            {(activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying)
-              ? 'Rerunning...' : 'Rerun'}
-          </button>
+            Rerun
+          </Button>
           {isLatestDraft && (
-            <Link
+            <Button
+              size="compact-sm"
+              component={Link}
               to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
-              className="btn-compact primary"
             >
               Revise
-            </Link>
+            </Button>
           )}
-        </div>
+        </Group>
       </div>
 
       {/* Essay with inline annotations — the main event */}

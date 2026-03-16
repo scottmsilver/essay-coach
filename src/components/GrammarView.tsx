@@ -208,7 +208,7 @@ export default function GrammarView({ content, analysis }: Props) {
           <div className="comment-sidebar">
             {matches.map((m) => {
               const isActive = activeIssueKey === m.id;
-              const severityClass = m.issue.severity === 'error' ? 'suggestion' : m.issue.severity === 'warning' ? 'suggestion' : 'praise';
+              const severityClass = m.issue.severity === 'pattern' ? 'praise' : 'suggestion';
               return (
                 <div
                   key={m.id}

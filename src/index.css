@@ -104,17 +104,6 @@ body {
   margin: 0;
   letter-spacing: 0.01em;
 }
-.doc-bar-draft {
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: 400;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  white-space: nowrap;
-}
 .doc-bar-right {
   display: flex;
   align-items: center;
@@ -206,19 +195,6 @@ body {
   align-items: center;
 }
 
-/* View dropdown */
-.view-dropdown {
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 400;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  letter-spacing: 0.02em;
-}
-
 /* Score pills — muted, lightweight */
 .score-pill {
   display: inline-flex;
@@ -286,43 +262,6 @@ body {
   color: var(--color-text-secondary);
 }
 
-/* Toolbar buttons — compact, consistent sizing */
-.btn-compact {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--font-family);
-  letter-spacing: 0.02em;
-  border-radius: 6px;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-.btn-compact:hover {
-  background: var(--color-bg);
-  border-color: var(--color-text-secondary);
-}
-.btn-compact:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-compact.primary {
-  background: var(--color-primary);
-  color: white;
-  border-color: var(--color-primary);
-}
-.btn-compact.primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
 /* Main content */
 .main-content { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
 
@@ -336,37 +275,6 @@ body {
 .essay-page > .revision-layout {
   padding: 16px 24px;
 }
-
-/* Buttons */
-.btn-primary {
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-  transition: background 0.2s;
-}
-.btn-primary:hover { background: var(--color-primary-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-.btn-secondary:hover { background: var(--color-bg); }
 
 /* Login Page */
 .login-page {
@@ -420,25 +328,6 @@ body {
   transition: border-color 0.2s;
 }
 .essay-list-item:hover { border-color: var(--color-primary); }
-
-/* Form */
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
-.input, .form-group input, .form-group select, .form-group textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: var(--font-family);
-  background: var(--color-surface);
-}
-.form-group textarea { resize: vertical; min-height: 60px; }
-.input:focus, .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
 
 /* ═══ Essay Page ═══ */
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Button } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import DocBar from '../components/DocBar';
@@ -9,7 +10,8 @@ import { useEssay } from '../hooks/useEssay';
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { handleRichPaste } from '../utils/pasteHandler';
-import { scoreLevel, scoreColor, collectAnnotations, classifyAnnotation } from '../utils';
+import { scoreColor, collectAnnotations, classifyAnnotation } from '../utils';
+import ScorePillBar from '../components/ScorePillBar';
 
 export default function RevisionPage() {
   const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
@@ -50,11 +52,11 @@ export default function RevisionPage() {
   }, [essayId]);
 
   const handleResubmit = async () => {
-    if (retryCount >= 3 || !essayId || !user || !latestDraft) return;
+    if (retryCount >= 3 || !essayId || !user || !latestDraft || ownerUid) return;
     setSubmitting(true);
     setError(null);
     try {
-      const uid = ownerUid ?? user.uid;
+      const uid = user.uid;
       const newDraftNumber = (essay?.currentDraftNumber ?? latestDraft.draftNumber) + 1;
       const essayRef = doc(db, `users/${uid}/essays/${essayId}`);
       const draftRef = doc(collection(db, `users/${uid}/essays/${essayId}/drafts`));
@@ -72,7 +74,7 @@ export default function RevisionPage() {
       ]);
 
       localStorage.removeItem(`essaycoach_autosave_${essayId}`);
-      navigate(ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`);
+      navigate(`/essay/${essayId}`);
 
       const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
       evaluateEssay({ essayId, draftId: draftRef.id }).catch((err) => {
@@ -98,29 +100,18 @@ export default function RevisionPage() {
 
       {/* Row 2 — Score pills + Resubmit */}
       <div className="analysis-bar">
-        <div className="analysis-bar-scores">
-          {TRAIT_KEYS.map((trait) => {
-            const score = evaluation.traits[trait].score;
-            const isActive = selectedTrait === trait;
-            const priority = evaluation.traits[trait].revisionPriority;
-            return (
-              <button
-                key={trait}
-                className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
-                onClick={() => setSelectedTrait(isActive ? null : trait)}
-                title={evaluation.traits[trait].feedback}
-              >
-                <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>
-                <span className="score-pill-value">{score}</span>
-                {priority !== null && <span className="score-pill-priority">#{priority}</span>}
-              </button>
-            );
-          })}
-        </div>
+        <ScorePillBar
+          evaluation={evaluation}
+          activeKey={selectedTrait}
+          onSelect={setSelectedTrait}
+          showPriority
+        />
         <div className="analysis-bar-right">
-          <button onClick={handleResubmit} className="btn-compact" disabled={submitting || retryCount >= 3}>
-            {submitting ? 'Evaluating...' : 'Resubmit'}
-          </button>
+          {!ownerUid && (
+            <Button size="compact-sm" onClick={handleResubmit} disabled={submitting || retryCount >= 3} loading={submitting}>
+              Resubmit
+            </Button>
+          )}
         </div>
       </div>
 

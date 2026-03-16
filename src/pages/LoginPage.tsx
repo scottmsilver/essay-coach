@@ -1,9 +1,10 @@
-import { useAuth } from '../hooks/useAuth';
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { signInWithCustomToken } from 'firebase/auth';
+import { Button, Stack } from '@mantine/core';
+import { useAuth } from '../hooks/useAuth';
 import { functions, auth } from '../firebase';
-import { useState } from 'react';
 
 const DEV_USERS = [
   { email: 'dev-alice@essaycoach.test', label: 'Alice (Dev)' },
@@ -37,26 +38,29 @@ export default function LoginPage() {
       {user && allowed === false ? (
         <div className="access-denied">
           <p>You don't have access yet. Contact the administrator.</p>
-          <button onClick={logOut}>Sign out</button>
+          <Button variant="default" onClick={logOut}>Sign out</Button>
         </div>
       ) : (
         <>
-          <button className="google-sign-in" onClick={signIn}>
+          <Button className="google-sign-in" onClick={signIn} size="lg" fullWidth>
             Sign in with Google
-          </button>
+          </Button>
           {import.meta.env.DEV && (
             <div style={{ marginTop: 24, padding: 16, border: '1px dashed var(--color-text-secondary)', borderRadius: 8 }}>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Dev Login</div>
-              {DEV_USERS.map((u) => (
-                <button
-                  key={u.email}
-                  onClick={() => handleDevSignIn(u.email)}
-                  disabled={devLoading}
-                  style={{ display: 'block', width: '100%', marginBottom: 8, padding: '8px 16px', cursor: 'pointer' }}
-                >
-                  {u.label}
-                </button>
-              ))}
+              <Stack gap="xs">
+                {DEV_USERS.map((u) => (
+                  <Button
+                    key={u.email}
+                    variant="default"
+                    fullWidth
+                    onClick={() => handleDevSignIn(u.email)}
+                    disabled={devLoading}
+                  >
+                    {u.label}
+                  </Button>
+                ))}
+              </Stack>
             </div>
           )}
         </>

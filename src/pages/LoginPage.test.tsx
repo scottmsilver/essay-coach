@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { MantineProvider } from '@mantine/core';
 
 // Override mock for LoginPage-specific tests
 const mockSignIn = vi.fn();
@@ -29,9 +30,11 @@ import LoginPage from './LoginPage';
 
 function renderLogin() {
   return render(
-    <MemoryRouter>
-      <LoginPage />
-    </MemoryRouter>
+    <MantineProvider>
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    </MantineProvider>
   );
 }
 

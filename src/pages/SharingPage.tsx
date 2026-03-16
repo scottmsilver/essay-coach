@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
+import { Button, TextInput } from '@mantine/core';
 import { functions } from '../firebase';
 import { useMyShares } from '../hooks/useMyShares';
 import { useSharedWithMe } from '../hooks/useSharedWithMe';
@@ -59,19 +60,18 @@ export default function SharingPage() {
       {/* Share my essays */}
       <section style={{ marginBottom: 32 }}>
         <h3>Share My Essays</h3>
-        <form onSubmit={handleShare} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <input
+        <form onSubmit={handleShare} style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'flex-end' }}>
+          <TextInput
             type="email"
             placeholder="Enter email address"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="input"
+            onChange={(e) => setEmail(e.currentTarget.value)}
             style={{ flex: 1 }}
             disabled={sharing}
           />
-          <button type="submit" className="btn-primary" disabled={sharing || !email.trim()}>
-            {sharing ? 'Sharing...' : 'Share'}
-          </button>
+          <Button type="submit" disabled={sharing || !email.trim()} loading={sharing}>
+            Share
+          </Button>
         </form>
 
         {message && (
@@ -88,13 +88,13 @@ export default function SharingPage() {
                   {share.sharedWithEmail}
                   {share.pending && <span style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginLeft: 8 }}>(pending sign-up)</span>}
                 </span>
-                <button
+                <Button
+                  size="compact-sm"
+                  variant="default"
                   onClick={() => handleUnshare(share.sharedWithEmail)}
-                  className="btn-secondary"
-                  style={{ fontSize: 13 }}
                 >
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -111,13 +111,13 @@ export default function SharingPage() {
             {sharedWithMe.map((share) => (
               <li key={share.ownerUid} className="essay-list-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>{share.ownerEmail}</span>
-                <button
+                <Button
+                  size="compact-sm"
+                  variant="default"
                   onClick={() => handleRemoveSharedWithMe(share.ownerUid)}
-                  className="btn-secondary"
-                  style={{ fontSize: 13 }}
                 >
                   Remove
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

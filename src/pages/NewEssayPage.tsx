@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Button, Select, TextInput, Textarea } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { WRITING_TYPES, type WritingType } from '../types';
@@ -54,8 +55,8 @@ export default function NewEssayPage() {
       evaluateEssay({ essayId: essayRef.id, draftId: draftRef.id }).catch((err) => {
         console.error('Background evaluation failed:', err);
       });
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit essay. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit essay. Please try again.');
       setSubmitting(false);
     }
   };
@@ -64,36 +65,49 @@ export default function NewEssayPage() {
     <div>
       <h2>New Essay</h2>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-        <div className="form-group">
-          <label htmlFor="title">Title</label>
-          <input id="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-            maxLength={200} required placeholder="e.g., Hamlet Analysis" />
-        </div>
-        <div className="form-group">
-          <label htmlFor="writingType">Writing Type</label>
-          <select id="writingType" value={writingType} onChange={(e) => setWritingType(e.target.value as WritingType)}>
-            {WRITING_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label htmlFor="prompt">Assignment Prompt</label>
-          <textarea id="prompt" value={assignmentPrompt} onChange={(e) => setAssignmentPrompt(e.target.value)}
-            maxLength={2000} required placeholder="Paste the assignment prompt here..." rows={3} />
-          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>{assignmentPrompt.length}/2,000 characters</div>
-        </div>
-        <div className="form-group">
-          <label htmlFor="essay">Your Essay</label>
-          <textarea id="essay" value={content} onChange={(e) => setContent(e.target.value)}
-            onPaste={(e) => handleRichPaste(e, setContent)}
-            required placeholder="Paste or type your essay here..." rows={16} />
-          <div style={{ fontSize: 12, color: wordCount > 10000 ? 'var(--color-red)' : 'var(--color-text-secondary)', marginTop: 4 }}>
-            {wordCount.toLocaleString()} / 10,000 words
-          </div>
-        </div>
+        <TextInput
+          label="Title"
+          value={title}
+          onChange={(e) => setTitle(e.currentTarget.value)}
+          maxLength={200}
+          required
+          placeholder="e.g., Hamlet Analysis"
+          mb="md"
+        />
+        <Select
+          label="Writing Type"
+          value={writingType}
+          onChange={(val) => val && setWritingType(val as WritingType)}
+          data={WRITING_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+          mb="md"
+        />
+        <Textarea
+          label="Assignment Prompt"
+          value={assignmentPrompt}
+          onChange={(e) => setAssignmentPrompt(e.currentTarget.value)}
+          maxLength={2000}
+          required
+          placeholder="Paste the assignment prompt here..."
+          rows={3}
+          description={`${assignmentPrompt.length}/2,000 characters`}
+          mb="md"
+        />
+        <Textarea
+          label="Your Essay"
+          value={content}
+          onChange={(e) => setContent(e.currentTarget.value)}
+          onPaste={(e) => handleRichPaste(e, setContent)}
+          required
+          placeholder="Paste or type your essay here..."
+          rows={16}
+          description={`${wordCount.toLocaleString()} / 10,000 words`}
+          error={wordCount > 10000 ? 'Essay exceeds 10,000 word limit' : undefined}
+          mb="md"
+        />
         {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
-        <button type="submit" className="btn-primary" disabled={submitting || !title || !assignmentPrompt || !content || wordCount > 10000}>
-          {submitting ? 'Submitting...' : 'Submit for Feedback'}
-        </button>
+        <Button type="submit" disabled={submitting || !title || !assignmentPrompt || !content || wordCount > 10000} loading={submitting}>
+          Submit for Feedback
+        </Button>
       </form>
     </div>
   );

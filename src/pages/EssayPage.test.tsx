@@ -64,9 +64,7 @@ describe('EssayPage', () => {
 
   it('renders view type dropdown', () => {
     const { container } = renderWithRouter(<EssayPage />);
-    const dropdown = container.querySelector('.view-dropdown');
-    expect(dropdown).toBeInTheDocument();
-    expect(dropdown?.textContent).toContain('Overall');
+    expect(container.querySelector('.mantine-Select-input')).toBeInTheDocument();
   });
 
   it('renders revision plan', () => {

@@ -27,6 +27,54 @@ type TransitionItem = {
   label: string;
 };
 
+interface TransitionSlot {
+  type: 'paragraph' | 'sentence';
+  id: string;
+  item: TransitionItem;
+  sentenceIndex: number; // index in parsed.sentences where this transition precedes
+}
+
+/** Single traversal that identifies all transition slots in document order */
+function collectTransitionSlots(
+  sentences: ParsedSentence[],
+  paragraphTransitionMap: Map<number, ParagraphTransition>,
+  sentenceTransitionMap: Map<string, SentenceTransition>,
+): TransitionSlot[] {
+  const slots: TransitionSlot[] = [];
+  let currentParagraph = 0;
+
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    if (s.paragraphIndex !== currentParagraph) {
+      if (currentParagraph > 0) {
+        const pTransition = paragraphTransitionMap.get(currentParagraph);
+        if (pTransition) {
+          const id = `p-${pTransition.fromParagraph}`;
+          slots.push({
+            type: 'paragraph', id, sentenceIndex: i,
+            item: { id, quality: pTransition.quality, comment: pTransition.comment,
+              label: `¶${pTransition.fromParagraph} → ¶${pTransition.toParagraph}` },
+          });
+        }
+      }
+      currentParagraph = s.paragraphIndex;
+    }
+    if (i > 0 && sentences[i - 1].paragraphIndex === s.paragraphIndex) {
+      const key = `${s.paragraphIndex}-${s.sentenceIndex - 1}-${s.sentenceIndex}`;
+      const sTransition = sentenceTransitionMap.get(key);
+      if (sTransition) {
+        const id = `s-${key}`;
+        slots.push({
+          type: 'sentence', id, sentenceIndex: i,
+          item: { id, quality: sTransition.quality, comment: sTransition.comment,
+            label: `S${sTransition.fromSentence} → S${sTransition.toSentence}` },
+        });
+      }
+    }
+  }
+  return slots;
+}
+
 export default function TransitionView({ content, analysis }: Props) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [commentPosition, setCommentPosition] = useState<number>(0);
@@ -76,35 +124,17 @@ export default function TransitionView({ content, analysis }: Props) {
 
   const total = counts.smooth + counts.adequate + counts.weak + counts.missing;
 
-  // Collect transition items for lookup
+  // Single traversal for all transition data
+  const slots = useMemo(
+    () => collectTransitionSlots(parsed.sentences, paragraphTransitionMap, sentenceTransitionMap),
+    [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap],
+  );
+
   const transitionItemMap = useMemo(() => {
     const map = new Map<string, TransitionItem>();
-    let currentParagraph = 0;
-    for (let i = 0; i < parsed.sentences.length; i++) {
-      const s = parsed.sentences[i];
-      if (s.paragraphIndex !== currentParagraph) {
-        if (currentParagraph > 0) {
-          const pTransition = paragraphTransitionMap.get(currentParagraph);
-          if (pTransition) {
-            const id = `p-${pTransition.fromParagraph}`;
-            map.set(id, { id, quality: pTransition.quality, comment: pTransition.comment,
-              label: `¶${pTransition.fromParagraph} → ¶${pTransition.toParagraph}` });
-          }
-        }
-        currentParagraph = s.paragraphIndex;
-      }
-      if (i > 0 && parsed.sentences[i - 1].paragraphIndex === s.paragraphIndex) {
-        const key = `${s.paragraphIndex}-${s.sentenceIndex - 1}-${s.sentenceIndex}`;
-        const sTransition = sentenceTransitionMap.get(key);
-        if (sTransition) {
-          const id = `s-${key}`;
-          map.set(id, { id, quality: sTransition.quality, comment: sTransition.comment,
-            label: `S${sTransition.fromSentence} → S${sTransition.toSentence}` });
-        }
-      }
-    }
+    for (const slot of slots) map.set(slot.id, slot.item);
     return map;
-  }, [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap]);
+  }, [slots]);
 
   // Measure the position of the active marker to place the sidebar comment
   useLayoutEffect(() => {
@@ -129,53 +159,53 @@ export default function TransitionView({ content, analysis }: Props) {
 
   const essayElements = useMemo(() => {
     const elements: React.ReactNode[] = [];
-    let currentParagraph = 0;
+    // Index slots by the sentence they precede
+    const slotsBefore = new Map<number, TransitionSlot[]>();
+    for (const slot of slots) {
+      const arr = slotsBefore.get(slot.sentenceIndex) ?? [];
+      arr.push(slot);
+      slotsBefore.set(slot.sentenceIndex, arr);
+    }
 
+    let lastParagraph = 0;
     for (let i = 0; i < parsed.sentences.length; i++) {
       const s = parsed.sentences[i];
+      // Paragraph gap spacer (when no paragraph transition exists)
+      if (s.paragraphIndex !== lastParagraph) {
+        if (lastParagraph > 0 && !slotsBefore.get(i)?.some(sl => sl.type === 'paragraph')) {
+          elements.push(<div key={`pb-${lastParagraph}`} style={{ height: 16 }} />);
+        }
+        lastParagraph = s.paragraphIndex;
+      }
 
-      if (s.paragraphIndex !== currentParagraph) {
-        if (currentParagraph > 0) {
-          const pTransition = paragraphTransitionMap.get(currentParagraph);
-          if (pTransition) {
-            const pKey = `p-${pTransition.fromParagraph}`;
-            const isActive = activeKey === pKey;
+      const preceding = slotsBefore.get(i);
+      if (preceding) {
+        for (const slot of preceding) {
+          const isActive = activeKey === slot.id;
+          if (slot.type === 'paragraph') {
             elements.push(
               <div
-                key={`pb-${currentParagraph}`}
-                data-transition-id={pKey}
-                className={`transition-marker ${pTransition.quality} ${isActive ? 'active' : ''}`}
-                onClick={() => handleClick(pKey)}
+                key={`pb-${slot.id}`}
+                data-transition-id={slot.id}
+                className={`transition-marker ${slot.item.quality} ${isActive ? 'active' : ''}`}
+                onClick={() => handleClick(slot.id)}
               >
                 <span className="transition-marker-line" />
-                <span className="transition-marker-label">
-                  ¶{pTransition.fromParagraph} → ¶{pTransition.toParagraph}
-                </span>
-                <span className="transition-marker-quality">{pTransition.quality}</span>
+                <span className="transition-marker-label">{slot.item.label}</span>
+                <span className="transition-marker-quality">{slot.item.quality}</span>
               </div>
             );
           } else {
-            elements.push(<div key={`pb-${currentParagraph}`} style={{ height: 16 }} />);
+            elements.push(
+              <span
+                key={`st-${slot.id}`}
+                data-transition-id={slot.id}
+                className={`transition-dot ${slot.item.quality} ${isActive ? 'active' : ''}`}
+                onClick={() => handleClick(slot.id)}
+                title={`${slot.item.quality}: ${slot.item.comment}`}
+              />
+            );
           }
-        }
-        currentParagraph = s.paragraphIndex;
-      }
-
-      if (i > 0 && parsed.sentences[i - 1].paragraphIndex === s.paragraphIndex) {
-        const key = `${s.paragraphIndex}-${s.sentenceIndex - 1}-${s.sentenceIndex}`;
-        const sTransition = sentenceTransitionMap.get(key);
-        if (sTransition) {
-          const sKey = `s-${key}`;
-          const isActive = activeKey === sKey;
-          elements.push(
-            <span
-              key={`st-${key}`}
-              data-transition-id={sKey}
-              className={`transition-dot ${sTransition.quality} ${isActive ? 'active' : ''}`}
-              onClick={() => handleClick(sKey)}
-              title={`${sTransition.quality}: ${sTransition.comment}`}
-            />
-          );
         }
       }
 
@@ -187,33 +217,13 @@ export default function TransitionView({ content, analysis }: Props) {
     }
 
     return elements;
-  }, [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap, activeKey, handleClick]);
+  }, [parsed.sentences, slots, activeKey, handleClick]);
 
-  // Collect issue IDs (weak/missing) in document order for "Next Issue" navigation
-  const issueIds = useMemo(() => {
-    const ids: string[] = [];
-    let currentParagraph = 0;
-    for (let i = 0; i < parsed.sentences.length; i++) {
-      const s = parsed.sentences[i];
-      if (s.paragraphIndex !== currentParagraph) {
-        if (currentParagraph > 0) {
-          const pTransition = paragraphTransitionMap.get(currentParagraph);
-          if (pTransition && pTransition.quality !== 'smooth') {
-            ids.push(`p-${pTransition.fromParagraph}`);
-          }
-        }
-        currentParagraph = s.paragraphIndex;
-      }
-      if (i > 0 && parsed.sentences[i - 1].paragraphIndex === s.paragraphIndex) {
-        const key = `${s.paragraphIndex}-${s.sentenceIndex - 1}-${s.sentenceIndex}`;
-        const sTransition = sentenceTransitionMap.get(key);
-        if (sTransition && sTransition.quality !== 'smooth') {
-          ids.push(`s-${key}`);
-        }
-      }
-    }
-    return ids;
-  }, [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap]);
+  // Issue IDs (non-smooth) in document order for "Next Issue" navigation
+  const issueIds = useMemo(
+    () => slots.filter(s => s.item.quality !== 'smooth').map(s => s.id),
+    [slots],
+  );
 
   const handleNextIssue = useCallback(() => {
     if (issueIds.length === 0) return;

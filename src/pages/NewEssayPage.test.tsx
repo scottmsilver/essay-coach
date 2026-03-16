@@ -13,7 +13,7 @@ describe('NewEssayPage', () => {
   it('renders all form fields', () => {
     renderWithRouter(<NewEssayPage />);
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/writing type/i)).toBeInTheDocument();
+    expect(screen.getByText(/writing type/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/assignment prompt/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/your essay/i)).toBeInTheDocument();
   });

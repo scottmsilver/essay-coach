@@ -30,12 +30,13 @@ export default function ProgressPage() {
 
   useEffect(() => {
     if (!user || essaysLoading) return;
+    const uid = user.uid;
 
     async function fetchAllDrafts() {
       const points: DataPoint[] = [];
       for (const essay of essays) {
         const draftsQuery = query(
-          collection(db, `users/${user!.uid}/essays/${essay.id}/drafts`),
+          collection(db, `users/${uid}/essays/${essay.id}/drafts`),
           orderBy('draftNumber', 'asc')
         );
         const snapshot = await getDocs(draftsQuery);

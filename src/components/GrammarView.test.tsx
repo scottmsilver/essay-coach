@@ -60,18 +60,6 @@ describe('GrammarView', () => {
     expect(screen.getByText('1 warning')).toBeInTheDocument();
   });
 
-  it('renders category buttons for non-zero categories', () => {
-    const analysis = makeAnalysis({
-      commaSplices: {
-        locations: [{ sentence: 'I ran, I jumped.', quotedText: 'ran, I', comment: 'Comma splice.', severity: 'error' }],
-      },
-    });
-    const { container } = renderWithRouter(<GrammarView content="I ran, I jumped." analysis={analysis} />);
-    const btn = container.querySelector('.grammar-category-btn');
-    expect(btn).toBeInTheDocument();
-    expect(btn?.textContent).toContain('Comma Splices');
-  });
-
   it('renders essay content', () => {
     renderWithRouter(<GrammarView content="The quick brown fox jumps over the lazy dog." analysis={emptyAnalysis} />);
     expect(screen.getByText('The quick brown fox jumps over the lazy dog.')).toBeInTheDocument();
@@ -114,7 +102,7 @@ describe('GrammarView', () => {
     expect(screen.getByText(/5 active, 1 passive/)).toBeInTheDocument();
   });
 
-  it('filters issues by category when clicking category button', async () => {
+  it('renders all issues without category filtering', () => {
     const analysis = makeAnalysis({
       commaSplices: {
         locations: [{ sentence: 'I ran, I jumped.', quotedText: 'ran, I', comment: 'Comma splice.', severity: 'error' }],
@@ -126,19 +114,7 @@ describe('GrammarView', () => {
     const { container } = renderWithRouter(
       <GrammarView content="I ran, I jumped. Because reasons." analysis={analysis} />
     );
-
-    // Before filtering, both issues should be underlined
-    let underlines = container.querySelectorAll('.grammar-underline');
+    const underlines = container.querySelectorAll('.grammar-underline');
     expect(underlines.length).toBe(2);
-
-    // Click the "Comma Splices" category button to filter
-    const csButton = Array.from(container.querySelectorAll('.grammar-category-btn'))
-      .find(btn => btn.textContent?.includes('Comma Splices'))!;
-    await userEvent.click(csButton);
-
-    // After filtering, only the comma splice should be underlined
-    underlines = container.querySelectorAll('.grammar-underline');
-    expect(underlines.length).toBe(1);
-    expect(underlines[0].textContent).toBe('ran, I');
   });
 });

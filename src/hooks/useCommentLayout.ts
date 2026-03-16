@@ -8,7 +8,8 @@ export function useCommentLayout(
   const [positions, setPositions] = useState<Record<string, number>>({});
 
   useLayoutEffect(() => {
-    if (!containerRef.current || items.length === 0) return;
+    const el = containerRef.current;
+    if (!el || items.length === 0) return;
 
     const measure = () => {
       const container = containerRef.current;
@@ -36,7 +37,7 @@ export function useCommentLayout(
 
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(containerRef.current);
+    observer.observe(el);
     return () => observer.disconnect();
   }, [items, markerAttr]);
 

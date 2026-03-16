@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Button } from '@mantine/core';
 import { useEssays } from '../hooks/useEssays';
 import { useAuth } from '../hooks/useAuth';
 
@@ -13,7 +14,7 @@ export default function HomePage() {
       <div className="empty-state">
         <h2>Welcome to EssayCoach</h2>
         <p>Submit your first essay to get feedback and start improving your writing.</p>
-        <Link to="/new" className="btn-primary">Write Your First Essay</Link>
+        <Button component={Link} to="/new">Write Your First Essay</Button>
       </div>
     );
   }
@@ -22,7 +23,7 @@ export default function HomePage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2>My Essays</h2>
-        <Link to="/new" className="btn-primary">New Essay</Link>
+        <Button component={Link} to="/new" size="sm">New Essay</Button>
       </div>
       <ul className="essay-list">
         {essays.map((essay) => {

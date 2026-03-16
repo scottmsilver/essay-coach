@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Button } from '@mantine/core';
 import type { EvaluationStatus } from '../types';
 
 interface Props {
@@ -19,9 +20,9 @@ export default function AnalysisPanel({ data, error, loading, status, onRetry, d
     return (
       <div className="error-state">
         <p>{error}</p>
-        <button className="btn-primary" style={{ marginTop: 8 }} onClick={onRetry}>
+        <Button size="sm" mt={8} onClick={onRetry}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

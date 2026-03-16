@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { MantineProvider } from '@mantine/core';
 import { vi } from 'vitest';
 
 // Mock auth context values
@@ -36,7 +37,9 @@ export function renderWithRouter(
 ) {
   return render(ui, {
     wrapper: ({ children }) => (
-      <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+      <MantineProvider>
+        <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+      </MantineProvider>
     ),
     ...options,
   });
