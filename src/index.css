@@ -200,6 +200,10 @@ body {
 }
 .analysis-bar-right {
   flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 /* View dropdown */
@@ -282,31 +286,41 @@ body {
   color: var(--color-text-secondary);
 }
 
-/* Accent button (replaces purple btn-primary in toolbar) */
-.btn-accent {
-  background: #3b82b6;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 12px;
+/* Toolbar buttons — compact, consistent sizing */
+.btn-compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 14px;
   font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
   font-family: var(--font-family);
   letter-spacing: 0.02em;
+  border-radius: 6px;
+  cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
-.btn-accent:hover {
-  background: #2d6d9e;
+.btn-compact:hover {
+  background: var(--color-bg);
+  border-color: var(--color-text-secondary);
 }
-.btn-accent:disabled {
+.btn-compact:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.btn-compact {
-  padding: 3px 10px;
-  font-size: 11px;
+.btn-compact.primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+.btn-compact.primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 /* Main content */

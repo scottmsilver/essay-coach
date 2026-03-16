@@ -118,7 +118,7 @@ export default function RevisionPage() {
           })}
         </div>
         <div className="analysis-bar-right">
-          <button onClick={handleResubmit} className="btn-accent btn-compact" disabled={submitting || retryCount >= 3}>
+          <button onClick={handleResubmit} className="btn-compact" disabled={submitting || retryCount >= 3}>
             {submitting ? 'Evaluating...' : 'Resubmit'}
           </button>
         </div>

@@ -235,15 +235,26 @@ export default function EssayPage() {
           </div>
         )}
         <div className="analysis-bar-right">
-          {activeView === 'grammar' && activeDraft.grammarAnalysis && (
-            <button onClick={handleGrammarReanalyze} className="btn-accent btn-compact" style={{ opacity: 0.7 }}>
-              Re-analyze
-            </button>
-          )}
+          <button
+            onClick={
+              activeView === 'grammar' ? handleGrammarReanalyze
+              : activeView === 'transitions' ? handleTransitionsTab
+              : handleRetry
+            }
+            className="btn-compact"
+            disabled={
+              activeView === 'grammar' ? grammarLoading
+              : activeView === 'transitions' ? transitionLoading
+              : retrying || retryCount >= 3
+            }
+          >
+            {(activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying)
+              ? 'Rerunning...' : 'Rerun'}
+          </button>
           {isLatestDraft && (
             <Link
               to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
-              className="btn-accent btn-compact"
+              className="btn-compact primary"
             >
               Revise
             </Link>
