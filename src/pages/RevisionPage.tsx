@@ -9,6 +9,7 @@ import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import type { TraitAnnotation } from '../components/AnnotatedEssay';
 import { handleRichPaste } from '../utils/pasteHandler';
+import { scoreLevel, scoreColor } from '../utils';
 
 export default function RevisionPage() {
   const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
@@ -185,16 +186,4 @@ export default function RevisionPage() {
       </div>
     </div>
   );
-}
-
-function scoreLevel(score: number): string {
-  if (score <= 2) return 'low';
-  if (score === 3) return 'mid';
-  return 'high';
-}
-
-function scoreColor(score: number): string {
-  if (score <= 2) return 'var(--color-red)';
-  if (score === 3) return 'var(--color-yellow)';
-  return 'var(--color-green)';
 }

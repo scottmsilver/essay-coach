@@ -164,7 +164,7 @@ body {
 /* Form */
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
-.form-group input, .form-group select, .form-group textarea {
+.input, .form-group input, .form-group select, .form-group textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
@@ -174,13 +174,20 @@ body {
   background: var(--color-surface);
 }
 .form-group textarea { resize: vertical; min-height: 60px; }
-.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+.input:focus, .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 /* ═══ Essay Page ═══ */
+.essay-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.essay-page-title { font-size: 22px; margin-bottom: 4px; }
 
 /* Dense toolbar — everything on one line */
 .essay-toolbar {
@@ -564,6 +571,7 @@ body {
 
 /* Error */
 .error-state { background: #fef2f2; color: var(--color-red); padding: 12px 16px; border-radius: 8px; font-size: 14px; }
+.success-state { background: #f0fdf4; color: var(--color-green); padding: 12px 16px; border-radius: 8px; font-size: 14px; }
 
 /* Essay editor */
 .essay-editor {
@@ -945,15 +953,6 @@ mark {
 .grammar-category-btn.active .grammar-category-count {
   background: rgba(255,255,255,0.2);
 }
-.grammar-pattern-toggle {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 /* Sentence variety */
 .grammar-sentence-variety {
   background: var(--color-surface);

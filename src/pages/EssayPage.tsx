@@ -5,6 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
+import { scoreLevel, scoreColor } from '../utils';
 import { TRAIT_KEYS, TRAIT_LABELS, TRAIT_SHORT_LABELS } from '../types';
 import type { TraitKey, TransitionAnalysis } from '../types';
 import type { TraitAnnotation } from '../components/AnnotatedEssay';
@@ -406,16 +407,4 @@ export default function EssayPage() {
       </div>
     </div>
   );
-}
-
-function scoreLevel(score: number): string {
-  if (score <= 2) return 'low';
-  if (score === 3) return 'mid';
-  return 'high';
-}
-
-function scoreColor(score: number): string {
-  if (score <= 2) return 'var(--color-red)';
-  if (score === 3) return 'var(--color-yellow)';
-  return 'var(--color-green)';
 }

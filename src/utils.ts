@@ -4,10 +4,14 @@ export function countWords(text: string): number {
   return trimmed.split(/\s+/).length;
 }
 
-export function scoreClass(score: number): 'score-low' | 'score-mid' | 'score-high' {
-  if (score <= 2) return 'score-low';
-  if (score === 3) return 'score-mid';
-  return 'score-high';
+export function scoreLevel(score: number): string {
+  if (score <= 2) return 'low';
+  if (score === 3) return 'mid';
+  return 'high';
+}
+
+export function scoreClass(score: number): string {
+  return `score-${scoreLevel(score)}`;
 }
 
 export function scoreColor(score: number): string {
