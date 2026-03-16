@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithRouter } from '../test-utils';
@@ -84,8 +84,10 @@ describe('GrammarView', () => {
         locations: [{ sentence: 'I ran, I jumped.', quotedText: 'ran, I', comment: 'Comma splice.', severity: 'error' }],
       },
     });
-    renderWithRouter(<GrammarView content="I ran, I jumped." analysis={analysis} />);
-    expect(screen.getByText('Comma Splices')).toBeInTheDocument();
+    const { container } = renderWithRouter(<GrammarView content="I ran, I jumped." analysis={analysis} />);
+    const btn = container.querySelector('.grammar-category-btn');
+    expect(btn).toBeInTheDocument();
+    expect(btn?.textContent).toContain('Comma Splices');
   });
 
   it('renders essay content', () => {
@@ -119,7 +121,8 @@ describe('GrammarView', () => {
     const underline = container.querySelector('.grammar-underline')!;
     await userEvent.click(underline);
     expect(screen.getByText('Use a semicolon or period instead.')).toBeInTheDocument();
-    const label = container.querySelector('.grammar-comment-label');
+    // Comment appears in the sidebar with a trait label
+    const label = container.querySelector('.sidebar-comment-trait');
     expect(label).toBeInTheDocument();
     expect(label?.textContent).toBe('Comma Splices');
   });
@@ -158,8 +161,10 @@ describe('GrammarView', () => {
     let underlines = container.querySelectorAll('.grammar-underline');
     expect(underlines.length).toBe(2);
 
-    // Click "Comma Splices" to filter
-    await userEvent.click(screen.getByText('Comma Splices'));
+    // Click the "Comma Splices" category button to filter
+    const csButton = Array.from(container.querySelectorAll('.grammar-category-btn'))
+      .find(btn => btn.textContent?.includes('Comma Splices'))!;
+    await userEvent.click(csButton);
 
     // After filtering, only the comma splice should be underlined
     underlines = container.querySelectorAll('.grammar-underline');

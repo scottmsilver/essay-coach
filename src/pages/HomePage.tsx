@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useEssays } from '../hooks/useEssays';
+import { useAuth } from '../hooks/useAuth';
 
 export default function HomePage() {
   const { essays, loading } = useEssays();
+  const { user } = useAuth();
 
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essays...</p></div>;
 
@@ -23,19 +25,30 @@ export default function HomePage() {
         <Link to="/new" className="btn-primary">New Essay</Link>
       </div>
       <ul className="essay-list">
-        {essays.map((essay) => (
-          <Link key={essay.id} to={`/essay/${essay.id}`} className="essay-list-item">
-            <div>
-              <strong>{essay.title}</strong>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                {essay.writingType} · Draft {essay.currentDraftNumber}
+        {essays.map((essay) => {
+          const isShared = essay.ownerUid !== user?.uid;
+          const essayUrl = isShared
+            ? `/user/${essay.ownerUid}/essay/${essay.id}`
+            : `/essay/${essay.id}`;
+          return (
+            <Link key={`${essay.ownerUid}_${essay.id}`} to={essayUrl} className="essay-list-item">
+              <div>
+                <strong>{essay.title}</strong>
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                  {essay.writingType} · Draft {essay.currentDraftNumber}
+                  {isShared && (
+                    <span style={{ marginLeft: 8, color: 'var(--color-accent)', fontStyle: 'italic' }}>
+                      Shared by {essay.ownerEmail}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-              {essay.updatedAt.toLocaleDateString()}
-            </div>
-          </Link>
-        ))}
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                {essay.updatedAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+              </div>
+            </Link>
+          );
+        })}
       </ul>
     </div>
   );

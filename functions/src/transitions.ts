@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import type { DocumentReference } from 'firebase-admin/firestore';
+import { splitSentences } from './sentenceSplitter';
 
 const TRANSITION_SYSTEM_PROMPT = `You are an expert writing coach specializing in essay structure and flow. Your job is to analyze EVERY transition in a student's essay — between consecutive sentences and between paragraphs.
 
@@ -109,8 +110,7 @@ export function formatEssayForTransitionAnalysis(content: string): string {
 
   for (let pi = 0; pi < effectiveParagraphs.length; pi++) {
     const para = effectiveParagraphs[pi].trim();
-    // Split into sentences (handle abbreviations reasonably)
-    const sentences = para.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [para];
+    const sentences = splitSentences(para);
 
     for (let si = 0; si < sentences.length; si++) {
       const s = sentences[si].trim();

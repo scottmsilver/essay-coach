@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { doc, collection, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { functions, db } from '../firebase';
+import { useAuth } from '../hooks/useAuth';
 import { useEssay } from '../hooks/useEssay';
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import type { TraitAnnotation } from '../components/AnnotatedEssay';
+import { handleRichPaste } from '../utils/pasteHandler';
 
 export default function RevisionPage() {
-  const { essayId } = useParams<{ essayId: string }>();
+  const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
   const navigate = useNavigate();
-  const { essay, drafts, loading } = useEssay(essayId);
+  const { user } = useAuth();
+  const { essay, drafts, loading } = useEssay(essayId, ownerUid);
   const [selectedTrait, setSelectedTrait] = useState<TraitKey | null>(null);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -54,14 +58,38 @@ export default function RevisionPage() {
   }, [essayId]);
 
   const handleResubmit = async () => {
-    if (retryCount >= 3 || !essayId) return;
+    if (retryCount >= 3 || !essayId || !user || !latestDraft) return;
     setSubmitting(true);
     setError(null);
     try {
-      const resubmitDraft = httpsCallable(functions, 'resubmitDraft', { timeout: 180000 });
-      await resubmitDraft({ essayId, content });
+      const uid = ownerUid ?? user.uid;
+      const newDraftNumber = (essay?.currentDraftNumber ?? latestDraft.draftNumber) + 1;
+      const essayRef = doc(db, `users/${uid}/essays/${essayId}`);
+      const draftRef = doc(collection(db, `users/${uid}/essays/${essayId}/drafts`));
+
+      // Create draft + update essay immediately
+      await Promise.all([
+        setDoc(draftRef, {
+          draftNumber: newDraftNumber,
+          content,
+          submittedAt: serverTimestamp(),
+        }),
+        updateDoc(essayRef, {
+          currentDraftNumber: newDraftNumber,
+          updatedAt: serverTimestamp(),
+        }),
+      ]);
+
       localStorage.removeItem(`essaycoach_autosave_${essayId}`);
-      navigate(`/essay/${essayId}`);
+
+      // Navigate immediately — EssayPage will show progress UI
+      navigate(ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`);
+
+      // Fire evaluation in background
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      evaluateEssay({ essayId, draftId: draftRef.id }).catch((err) => {
+        console.error('Background evaluation failed:', err);
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to resubmit. Please try again.');
       setRetryCount((c) => c + 1);
@@ -139,6 +167,7 @@ export default function RevisionPage() {
             className="essay-editor"
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
+            onPaste={(e) => handleRichPaste(e, handleContentChange)}
           />
         </div>
         <div className="revision-annotations">

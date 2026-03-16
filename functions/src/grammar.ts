@@ -76,7 +76,7 @@ Identify specific errors by quoting the EXACT text from the essay. Categories:
 - **Run-on sentences**: Two or more independent clauses with no punctuation or conjunction between them, OR excessively long sentences that fuse multiple independent clauses
 - **Fragments**: Incomplete sentences lacking a subject, verb, or complete thought
 - **Subject-verb agreement**: Subject and verb don't match in number
-- **Pronoun reference**: Ambiguous, vague, or incorrect pronoun antecedents
+- **Pronoun reference**: Ambiguous, vague, or incorrect pronoun antecedents. Do NOT flag demonstrative pronouns ("this," "that," "these," "those") when they clearly refer to a concept, term, practice, or idea named in the immediately preceding sentence — this is standard academic writing. Only flag when the referent is genuinely unclear even in context.
 - **Verb tense consistency**: Unnecessary shifts in verb tense, including shifts BETWEEN adjacent sentences (not just within a single sentence). Check whether the essay maintains a consistent tense perspective throughout, and flag any unmotivated shifts.
 - **Parallel structure**: Items in a list or comparison not in the same grammatical form
 - **Punctuation errors**: Misused semicolons, apostrophes, colons, etc.
@@ -92,6 +92,12 @@ Identify specific errors by quoting the EXACT text from the essay. Categories:
 - **error**: Definitively grammatically wrong. A teacher would mark this.
 - **warning**: Likely wrong or very awkward. Most teachers would flag this.
 - **pattern**: Not technically wrong, but a stylistic observation worth noting (e.g., overuse of passive voice, repetitive sentence structure).
+
+## Handling quoted material
+- Essays often contain quoted terms, phrases, or passages within quotation marks (e.g., "senatorial courtesy," "permanent pacification"). These are part of the essay's content.
+- NEVER truncate or skip text inside quotation marks. Always include the complete sentence — including any quoted material — in the "sentence" field.
+- When a sentence ends with a period inside closing quotation marks (e.g., '..."senatorial courtesy."'), the sentence boundary is AFTER the closing quote mark, not before it. The quoted text is part of that sentence.
+- When analyzing pronoun references or other cross-sentence issues, treat quoted terms and phrases as valid referents. For example, if one sentence defines "senatorial courtesy" and the next says "Under this," the pronoun "this" clearly refers to the quoted concept.
 
 ## Grade-level calibration
 - Do NOT flag intentional fragments used for rhetorical effect as errors — label them as "pattern" if noteworthy.

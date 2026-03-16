@@ -8,6 +8,8 @@ import NewEssayPage from './pages/NewEssayPage';
 import EssayPage from './pages/EssayPage';
 import RevisionPage from './pages/RevisionPage';
 import ProgressPage from './pages/ProgressPage';
+import SharingPage from './pages/SharingPage';
+import ClipboardDebugPage from './pages/ClipboardDebugPage';
 
 export default function App() {
   return (
@@ -21,6 +23,10 @@ export default function App() {
             <Route path="/essay/:essayId" element={<EssayPage />} />
             <Route path="/essay/:essayId/revise" element={<RevisionPage />} />
             <Route path="/progress" element={<ProgressPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/revise" element={<RevisionPage />} />
+            <Route path="/sharing" element={<SharingPage />} />
+            <Route path="/debug/clipboard" element={<ClipboardDebugPage />} />
           </Route>
         </Routes>
       </AuthProvider>

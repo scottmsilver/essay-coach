@@ -181,15 +181,54 @@ body {
 }
 
 /* ═══ Essay Page ═══ */
-.essay-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-.essay-page-title { font-size: 22px; margin-bottom: 4px; }
 
-/* Score strip — compact horizontal trait badges */
+/* Dense toolbar — everything on one line */
+.essay-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.essay-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.essay-toolbar-title {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.essay-toolbar-draft {
+  padding: 2px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+.essay-toolbar-scores {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.essay-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.btn-compact { padding: 6px 14px; font-size: 13px; }
+
+/* Score badges */
 .score-strip {
   display: flex;
   gap: 6px;
@@ -207,6 +246,11 @@ body {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
+}
+.score-badge.compact {
+  padding: 3px 8px;
+  gap: 4px;
+  font-size: 12px;
 }
 .score-badge:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 .score-badge.active { border-color: var(--color-primary); background: rgba(79, 70, 229, 0.06); }
@@ -229,7 +273,46 @@ body {
   opacity: 0.7;
 }
 
-/* Trait feedback panel — shows when a trait badge is clicked */
+/* Trait feedback popover — floats below the score badge */
+.trait-popover {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  margin-top: 6px;
+  width: 320px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.trait-popover::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+}
+.trait-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+.trait-popover-text { color: var(--color-text-secondary); font-size: 13px; }
+
+/* Legacy trait feedback panel — still used on revision page */
 .trait-feedback-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -265,6 +348,7 @@ body {
   font-size: 15px;
   line-height: 2;
   color: var(--color-text);
+  white-space: pre-wrap;
 }
 
 /* Comment sidebar — right column, comments positioned to align with marks */
@@ -290,7 +374,9 @@ body {
 }
 .sidebar-comment.suggestion.active {
   border-color: var(--color-primary);
+  border-left: 3px solid var(--color-primary);
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+  background: rgba(79, 70, 229, 0.04);
 }
 .sidebar-comment.praise {
   border-left: 3px solid rgba(5, 150, 105, 0.3);
@@ -300,7 +386,9 @@ body {
 }
 .sidebar-comment.praise.active {
   border-color: var(--color-green);
+  border-left: 3px solid var(--color-green);
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+  background: rgba(5, 150, 105, 0.04);
 }
 .sidebar-comment-trait {
   display: block;
@@ -320,6 +408,12 @@ body {
 }
 .sidebar-comment.active .sidebar-comment-text {
   color: var(--color-text);
+}
+.sidebar-hint {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+  padding: 12px;
 }
 
 /* Annotation marks in the essay text */
@@ -559,15 +653,14 @@ mark {
 .view-toggle {
   display: flex;
   gap: 0;
-  margin-bottom: 20px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
   width: fit-content;
 }
 .view-toggle-btn {
-  padding: 8px 20px;
-  font-size: 13px;
+  padding: 5px 14px;
+  font-size: 12px;
   font-weight: 500;
   background: var(--color-surface);
   border: none;
@@ -643,14 +736,9 @@ mark {
   line-height: 1.6;
 }
 
-/* The essay with heatmap markers */
+/* The essay with heatmap markers — inherits .essay-text styling */
 .transition-essay {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 32px;
-  font-size: 15px;
-  line-height: 2;
+  white-space: normal;
 }
 
 .transition-sentence {
@@ -727,25 +815,6 @@ mark {
 .transition-marker.weak .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
 .transition-marker.missing .transition-marker-quality { color: var(--color-red); background: rgba(220, 38, 38, 0.08); }
 
-/* Transition comment — inline popup */
-.transition-comment {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--color-text-secondary);
-  margin: 6px 0;
-}
-.transition-comment.inline {
-  display: block;
-  margin: 4px 0 8px 0;
-}
-.transition-comment.smooth { border-left: 3px solid var(--color-green); }
-.transition-comment.adequate { border-left: 3px solid var(--color-text-secondary); }
-.transition-comment.weak { border-left: 3px solid var(--color-yellow); }
-.transition-comment.missing { border-left: 3px solid var(--color-red); }
 
 /* ═══ Grammar View — inline error markers ═══ */
 .grammar-view {
@@ -915,15 +984,9 @@ mark {
   line-height: 1.5;
 }
 
-/* Essay with inline markers */
+/* Grammar essay — inherits .essay-text styling */
 .grammar-essay {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 32px;
-  font-size: 15px;
-  line-height: 2;
-  white-space: pre-wrap;
+  /* Additional grammar-specific styles if needed */
 }
 
 /* Underline markers */
@@ -949,7 +1012,8 @@ mark {
   background: rgba(0,0,0,0.04);
 }
 .grammar-underline.active {
-  background: rgba(0,0,0,0.06);
+  background: rgba(79, 70, 229, 0.15);
+  border-radius: 2px;
 }
 
 /* Comment popup */

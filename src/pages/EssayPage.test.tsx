@@ -44,14 +44,14 @@ describe('EssayPage', () => {
 
   it('renders all 7 trait score badges', () => {
     renderWithRouter(<EssayPage />);
-    // Trait names may appear in both score badges and sidebar comments
-    expect(screen.getAllByText('Ideas').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Organization').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Voice').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Word Choice').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Sentence Fluency').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Conventions').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Presentation').length).toBeGreaterThanOrEqual(1);
+    // Compact toolbar uses short labels
+    expect(screen.getByText('Id')).toBeInTheDocument();
+    expect(screen.getByText('Org')).toBeInTheDocument();
+    expect(screen.getByText('Vo')).toBeInTheDocument();
+    expect(screen.getByText('WC')).toBeInTheDocument();
+    expect(screen.getByText('Fl')).toBeInTheDocument();
+    expect(screen.getByText('Cv')).toBeInTheDocument();
+    expect(screen.getByText('Pr')).toBeInTheDocument();
   });
 
   it('renders revision plan', () => {
@@ -66,7 +66,7 @@ describe('EssayPage', () => {
 
   it('renders Start Revising button for latest draft', () => {
     renderWithRouter(<EssayPage />);
-    expect(screen.getByText(/start revising/i)).toBeInTheDocument();
+    expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
   });
 
   it('shows loading state for recent draft with null evaluation', () => {

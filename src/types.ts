@@ -22,6 +22,16 @@ export const TRAIT_LABELS: Record<TraitKey, string> = {
   presentation: 'Presentation',
 };
 
+export const TRAIT_SHORT_LABELS: Record<TraitKey, string> = {
+  ideas: 'Id',
+  organization: 'Org',
+  voice: 'Vo',
+  wordChoice: 'WC',
+  sentenceFluency: 'Fl',
+  conventions: 'Cv',
+  presentation: 'Pr',
+};
+
 export interface Annotation {
   quotedText: string;
   comment: string;
@@ -163,6 +173,20 @@ export interface Essay {
   createdAt: Date;
   updatedAt: Date;
   currentDraftNumber: number;
+}
+
+export interface Share {
+  id: string;
+  ownerUid: string;
+  ownerEmail: string;
+  sharedWithUid: string;
+  sharedWithEmail: string;
+  createdAt: Date;
+}
+
+export interface EssayListItem extends Essay {
+  ownerUid: string;
+  ownerEmail: string;
 }
 
 export interface UserProfile {

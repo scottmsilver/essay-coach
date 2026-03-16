@@ -13,6 +13,7 @@ export default function Layout() {
             <NavLink to="/new">New Essay</NavLink>
             <NavLink to="/">My Essays</NavLink>
             <NavLink to="/progress">Progress</NavLink>
+            <NavLink to="/sharing">Sharing</NavLink>
           </div>
           <div className="nav-user">
             {user?.photoURL && <img src={user.photoURL} alt="" className="avatar" />}

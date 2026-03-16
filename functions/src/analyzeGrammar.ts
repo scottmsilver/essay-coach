@@ -4,6 +4,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import { isEmailAllowed } from './allowlist';
 import { analyzeGrammarWithGemini } from './grammar';
+import { resolveEssayOwner } from './resolveEssayOwner';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
@@ -25,7 +26,7 @@ export const analyzeGrammar = onCall(
     }
 
     const db = getFirestore();
-    const uid = request.auth.uid;
+    const uid = await resolveEssayOwner(request.auth.uid, request.data.ownerUid);
 
     const draftRef = db.doc(`users/${uid}/essays/${essayId}/drafts/${draftId}`);
     const draftDoc = await draftRef.get();

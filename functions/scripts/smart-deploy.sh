@@ -32,13 +32,20 @@ declare -A FILE_TO_FUNCTIONS=(
   ["src/analyzeTransitions.ts"]="analyzeTransitions"
   ["src/analyzeGrammar.ts"]="analyzeGrammar"
   ["src/deleteAccount.ts"]="deleteAccount"
+  ["src/devSignIn.ts"]="devSignIn"
+  ["src/shareEssays.ts"]="shareEssays"
+  ["src/unshareEssays.ts"]="unshareEssays"
+  ["src/removeSharedWithMe.ts"]="removeSharedWithMe"
+  ["src/evaluateEssay.ts"]="evaluateEssay"
   ["src/prompt.ts"]="submitEssay resubmitDraft"
   ["src/gemini.ts"]="submitEssay resubmitDraft"
   ["src/transitions.ts"]="analyzeTransitions"
+  ["src/sentenceSplitter.ts"]="analyzeTransitions"
   ["src/grammar.ts"]="analyzeGrammar"
-  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar"
+  ["src/resolveEssayOwner.ts"]="resubmitDraft analyzeTransitions analyzeGrammar"
+  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar shareEssays unshareEssays removeSharedWithMe"
   ["src/validation.ts"]="submitEssay resubmitDraft"
-  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount"
+  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
 )
 
 # Files that trigger a full deploy if changed
@@ -54,7 +61,7 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
   if [[ -z "$LAST_SHA" ]] && ! $FORCE_ALL; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
-  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount"
+  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
 else
   # Get changed files since last deploy
   CHANGED_FILES=$(git diff --name-only "$LAST_SHA" -- . 2>/dev/null || echo "")
@@ -79,7 +86,7 @@ else
   done
 
   if $NEED_FULL; then
-    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount"
+    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
   else
     # Map changed files to affected functions
     DEPLOY_SET=""

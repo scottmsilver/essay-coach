@@ -1,20 +1,22 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
-import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import { TRAIT_KEYS, TRAIT_LABELS, TRAIT_SHORT_LABELS } from '../types';
 import type { TraitKey, TransitionAnalysis } from '../types';
 import type { TraitAnnotation } from '../components/AnnotatedEssay';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
-import DraftSelector from '../components/DraftSelector';
 import GrammarView from '../components/GrammarView';
 import type { GrammarAnalysis } from '../types';
 
 export default function EssayPage() {
-  const { essayId } = useParams<{ essayId: string }>();
-  const { essay, drafts, loading } = useEssay(essayId);
+  const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
+  const { user } = useAuth();
+  const { essay, drafts, loading } = useEssay(essayId, ownerUid);
   const [activeTrait, setActiveTrait] = useState<TraitKey | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -24,6 +26,20 @@ export default function EssayPage() {
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarError, setGrammarError] = useState<string | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close popover on click outside
+  useEffect(() => {
+    if (!activeTrait) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        const badge = (e.target as Element)?.closest?.('.score-badge');
+        if (!badge) setActiveTrait(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [activeTrait]);
 
   // Collect all annotations with trait info
   const allAnnotations = useMemo(() => {
@@ -52,17 +68,17 @@ export default function EssayPage() {
     setTransitionError(null);
     try {
       const analyzeTransitions = httpsCallable<
-        { essayId: string; draftId: string },
+        { essayId: string; draftId: string; ownerUid?: string },
         TransitionAnalysis
       >(functions, 'analyzeTransitions', { timeout: 180000 });
-      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft_.id });
+      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft_.id, ownerUid });
       // Firestore listener will update the draft with transitionAnalysis
     } catch {
       setTransitionError('Failed to analyze transitions. Please try again.');
     } finally {
       setTransitionLoading(false);
     }
-  }, [drafts, selectedDraftId, essayId]);
+  }, [drafts, selectedDraftId, essayId, ownerUid]);
 
   const handleGrammarTab = useCallback(async () => {
     setActiveView('grammar');
@@ -75,16 +91,39 @@ export default function EssayPage() {
     setGrammarError(null);
     try {
       const analyzeGrammar = httpsCallable<
-        { essayId: string; draftId: string },
+        { essayId: string; draftId: string; ownerUid?: string },
         GrammarAnalysis
       >(functions, 'analyzeGrammar', { timeout: 180000 });
-      await analyzeGrammar({ essayId: essayId!, draftId: activeDraft_.id });
+      await analyzeGrammar({ essayId: essayId!, draftId: activeDraft_.id, ownerUid });
     } catch {
       setGrammarError('Failed to analyze grammar. Please try again.');
     } finally {
       setGrammarLoading(false);
     }
-  }, [drafts, selectedDraftId, essayId]);
+  }, [drafts, selectedDraftId, essayId, ownerUid]);
+
+  const handleGrammarReanalyze = useCallback(async () => {
+    const activeDraftId_ = selectedDraftId ?? drafts[0]?.id;
+    const activeDraft_ = drafts.find((d) => d.id === activeDraftId_) ?? drafts[0];
+    if (!activeDraft_ || !user) return;
+    const uid = ownerUid ?? user.uid;
+    const draftRef = doc(db, `users/${uid}/essays/${essayId}/drafts/${activeDraft_.id}`);
+    await updateDoc(draftRef, { grammarAnalysis: null, grammarStatus: null });
+    // Now trigger the analysis
+    setGrammarLoading(true);
+    setGrammarError(null);
+    try {
+      const analyzeGrammar = httpsCallable<
+        { essayId: string; draftId: string; ownerUid?: string },
+        GrammarAnalysis
+      >(functions, 'analyzeGrammar', { timeout: 180000 });
+      await analyzeGrammar({ essayId: essayId!, draftId: activeDraft_.id, ownerUid });
+    } catch {
+      setGrammarError('Failed to analyze grammar. Please try again.');
+    } finally {
+      setGrammarLoading(false);
+    }
+  }, [drafts, selectedDraftId, essayId, ownerUid, user]);
 
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
   if (!essay || drafts.length === 0) return <div>Essay not found.</div>;
@@ -140,10 +179,12 @@ export default function EssayPage() {
         <h2>{essay.title}</h2>
         <div className="error-state" style={{ marginTop: 24 }}>
           <p>Evaluation failed. Your essay has been saved.</p>
-          {retryCount < 3 ? (
+          {!ownerUid && retryCount < 3 ? (
             <button onClick={handleRetry} className="btn-primary" style={{ marginTop: 12 }} disabled={retrying}>
               {retrying ? 'Retrying...' : 'Retry'}
             </button>
+          ) : ownerUid ? (
+            <p style={{ marginTop: 8 }}>Only the essay owner can retry evaluation.</p>
           ) : (
             <p style={{ marginTop: 8 }}>Maximum retries reached. Please try again later.</p>
           )}
@@ -157,75 +198,86 @@ export default function EssayPage() {
 
   return (
     <div className="essay-page">
-      {/* Header */}
-      <div className="essay-page-header">
-        <div>
-          <h2 className="essay-page-title">{essay.title}</h2>
-          <DraftSelector drafts={drafts} selectedDraftId={activeDraftId} onChange={setSelectedDraftId} />
-        </div>
-        {isLatestDraft && (
-          <Link to={`/essay/${essayId}/revise`} className="btn-primary">Start Revising</Link>
-        )}
-      </div>
-
-      {/* Score strip */}
-      <div className="score-strip">
-        {TRAIT_KEYS.map((trait) => {
-          const score = evaluation.traits[trait].score;
-          const isActive = activeTrait === trait;
-          const change = comparison?.scoreChanges[trait];
-          return (
-            <button
-              key={trait}
-              className={`score-badge ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
-              onClick={() => setActiveTrait(isActive ? null : trait)}
-              title={evaluation.traits[trait].feedback}
+      {/* Dense toolbar */}
+      <div className="essay-toolbar">
+        <div className="essay-toolbar-left">
+          <h2 className="essay-toolbar-title">{essay.title}</h2>
+          {drafts.length > 1 && (
+            <select
+              className="essay-toolbar-draft"
+              value={activeDraftId}
+              onChange={(e) => setSelectedDraftId(e.target.value)}
             >
-              <span className="score-badge-label">{TRAIT_LABELS[trait]}</span>
-              <span className="score-badge-value">{score}</span>
-              {change && change.delta !== 0 && (
-                <span className={`score-badge-delta ${change.delta > 0 ? 'up' : 'down'}`}>
-                  {change.delta > 0 ? '+' : ''}{change.delta}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active trait feedback panel */}
-      {activeTrait && (
-        <div className="trait-feedback-panel">
-          <div className="trait-feedback-header">
-            <strong>{TRAIT_LABELS[activeTrait]}</strong>
-            <span className="trait-feedback-score" style={{ color: scoreColor(evaluation.traits[activeTrait].score) }}>
-              {evaluation.traits[activeTrait].score}/6
-            </span>
-          </div>
-          <p className="trait-feedback-text">{evaluation.traits[activeTrait].feedback}</p>
+              {drafts.map((d) => (
+                <option key={d.id} value={d.id}>D{d.draftNumber}</option>
+              ))}
+            </select>
+          )}
         </div>
-      )}
 
-      {/* View toggle: Feedback / Transitions */}
-      <div className="view-toggle">
-        <button
-          className={`view-toggle-btn ${activeView === 'feedback' ? 'active' : ''}`}
-          onClick={() => setActiveView('feedback')}
-        >
-          Feedback
-        </button>
-        <button
-          className={`view-toggle-btn ${activeView === 'transitions' ? 'active' : ''}`}
-          onClick={handleTransitionsTab}
-        >
-          Transitions
-        </button>
-        <button
-          className={`view-toggle-btn ${activeView === 'grammar' ? 'active' : ''}`}
-          onClick={handleGrammarTab}
-        >
-          Grammar
-        </button>
+        <div className="essay-toolbar-scores">
+          {TRAIT_KEYS.map((trait) => {
+            const score = evaluation.traits[trait].score;
+            const isActive = activeTrait === trait;
+            const change = comparison?.scoreChanges[trait];
+            return (
+              <div key={trait} style={{ position: 'relative' }}>
+                <button
+                  className={`score-badge compact ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveTrait(isActive ? null : trait)}
+                >
+                  <span className="score-badge-label">{TRAIT_SHORT_LABELS[trait]}</span>
+                  <span className="score-badge-value">{score}</span>
+                  {change && change.delta !== 0 && (
+                    <span className={`score-badge-delta ${change.delta > 0 ? 'up' : 'down'}`}>
+                      {change.delta > 0 ? '+' : ''}{change.delta}
+                    </span>
+                  )}
+                </button>
+                {isActive && (
+                  <div className="trait-popover" ref={popoverRef}>
+                    <div className="trait-popover-header">
+                      <strong>{TRAIT_LABELS[trait]}</strong>
+                      <span style={{ color: scoreColor(score), fontWeight: 700 }}>{score}/6</span>
+                    </div>
+                    <p className="trait-popover-text">{evaluation.traits[trait].feedback}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="essay-toolbar-right">
+          <div className="view-toggle">
+            <button
+              className={`view-toggle-btn ${activeView === 'feedback' ? 'active' : ''}`}
+              onClick={() => setActiveView('feedback')}
+            >
+              Feedback
+            </button>
+            <button
+              className={`view-toggle-btn ${activeView === 'transitions' ? 'active' : ''}`}
+              onClick={handleTransitionsTab}
+            >
+              Transitions
+            </button>
+            <button
+              className={`view-toggle-btn ${activeView === 'grammar' ? 'active' : ''}`}
+              onClick={handleGrammarTab}
+            >
+              Grammar
+            </button>
+          </div>
+          {isLatestDraft && (
+            <Link
+              to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
+              className="btn-primary btn-compact"
+            >
+              Revise
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Essay with inline annotations — the main event */}
@@ -278,10 +330,17 @@ export default function EssayPage() {
       {activeView === 'grammar' && (
         <>
           {activeDraft.grammarAnalysis ? (
-            <GrammarView
-              content={activeDraft.content}
-              analysis={activeDraft.grammarAnalysis}
-            />
+            <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button onClick={handleGrammarReanalyze} className="btn-secondary" style={{ fontSize: 13 }}>
+                  Re-analyze
+                </button>
+              </div>
+              <GrammarView
+                content={activeDraft.content}
+                analysis={activeDraft.grammarAnalysis}
+              />
+            </>
           ) : grammarError ? (
             <div className="error-state">
               <p>{grammarError}</p>

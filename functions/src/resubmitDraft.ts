@@ -5,6 +5,7 @@ import { isEmailAllowed } from './allowlist';
 import { validateResubmitDraft } from './validation';
 import { buildResubmissionPrompt } from './prompt';
 import { evaluateWithGemini } from './gemini';
+import { resolveEssayOwner } from './resolveEssayOwner';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
@@ -27,7 +28,7 @@ export const resubmitDraft = onCall(
     }
 
     const db = getFirestore();
-    const uid = request.auth.uid;
+    const uid = await resolveEssayOwner(request.auth.uid, request.data.ownerUid);
 
     const essayRef = db.doc(`users/${uid}/essays/${essayId}`);
     const essayDoc = await essayRef.get();

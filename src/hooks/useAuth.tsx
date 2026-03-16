@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, googleProvider, db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, googleProvider, db, functions } from '../firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               createdAt: serverTimestamp(),
             });
           }
+          // Resolve any pending shares addressed to this user's email.
+          // Fire-and-forget: don't block sign-in on this.
+          const resolve = httpsCallable(functions, 'resolvePendingShares');
+          resolve().catch((err) =>
+            console.warn('Failed to resolve pending shares:', err)
+          );
         }
       } else {
         setAllowed(null);

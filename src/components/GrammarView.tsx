@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useLayoutEffect, useCallback } from 'react';
 import type { GrammarAnalysis, GrammarIssue, GrammarIssueCategory } from '../types';
 
 interface Props {
@@ -29,10 +29,13 @@ const ALL_LABELS: Record<string, string> = { ...MECHANICS_LABELS, ...PATTERN_LAB
 
 const MECHANICS_KEYS = Object.keys(MECHANICS_LABELS) as (keyof typeof MECHANICS_LABELS)[];
 
+type IssueMatch = { start: number; end: number; issue: GrammarIssue; category: string; id: string };
+
 export default function GrammarView({ content, analysis }: Props) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeIssue, setActiveIssue] = useState<GrammarIssue | null>(null);
-  const [showPatterns, setShowPatterns] = useState(false);
+  const [activeIssueKey, setActiveIssueKey] = useState<string | null>(null);
+  const [commentPositions, setCommentPositions] = useState<Record<string, number>>({});
+  const essayRef = useRef<HTMLDivElement>(null);
 
   // Collect all issues with their category for rendering
   const allIssues = useMemo(() => {
@@ -44,7 +47,6 @@ export default function GrammarView({ content, analysis }: Props) {
         issues.push({ issue: loc, category: key });
       }
     }
-    // Tier 2: passive voice, modifier placement, wordiness
     for (const inst of analysis.activePassiveVoice?.passiveInstances || []) {
       issues.push({ issue: { sentence: '', quotedText: inst.quotedText, comment: inst.comment, severity: 'pattern' }, category: 'passiveVoice' });
     }
@@ -68,31 +70,21 @@ export default function GrammarView({ content, analysis }: Props) {
 
   const total = counts.error + counts.warning + counts.pattern;
 
-  // Filter issues for display
+  // Filter issues for display (always include patterns now)
   const visibleIssues = useMemo(() => {
-    return allIssues.filter(({ issue, category }) => {
-      if (activeCategory && category !== activeCategory) return false;
-      if (!showPatterns && issue.severity === 'pattern') return false;
-      return true;
-    });
-  }, [allIssues, activeCategory, showPatterns]);
+    if (!activeCategory) return allIssues;
+    return allIssues.filter(({ category }) => category === activeCategory);
+  }, [allIssues, activeCategory]);
 
-  // Build essay with inline underlines
-  const essayElements = useMemo(() => {
-    if (visibleIssues.length === 0) {
-      return [<span key="full">{content}</span>];
-    }
-
-    // Find all issue positions in the text, using sentence context for disambiguation
-    type IssueMatch = { start: number; end: number; issue: GrammarIssue; category: string };
-    const matches: IssueMatch[] = [];
+  // Find all issue positions in the text
+  const matches = useMemo((): IssueMatch[] => {
+    const result: IssueMatch[] = [];
     const usedPositions = new Set<number>();
 
     for (const { issue, category } of visibleIssues) {
       const needle = issue.quotedText;
       if (!needle) continue;
 
-      // Find all occurrences of the quotedText
       const candidates: number[] = [];
       let searchFrom = 0;
       while (searchFrom < content.length) {
@@ -105,13 +97,10 @@ export default function GrammarView({ content, analysis }: Props) {
       let bestIdx = -1;
 
       if (candidates.length === 1) {
-        // Unique match — use it directly
         bestIdx = candidates[0];
       } else if (candidates.length > 1 && issue.sentence) {
-        // Disambiguate using the sentence context
         const sentenceIdx = content.indexOf(issue.sentence);
         if (sentenceIdx >= 0) {
-          // Find the candidate that falls within the sentence span
           for (const idx of candidates) {
             if (idx >= sentenceIdx && idx + needle.length <= sentenceIdx + issue.sentence.length && !usedPositions.has(idx)) {
               bestIdx = idx;
@@ -121,7 +110,6 @@ export default function GrammarView({ content, analysis }: Props) {
         }
       }
 
-      // Fallback: first unused occurrence
       if (bestIdx === -1) {
         for (const idx of candidates) {
           if (!usedPositions.has(idx)) {
@@ -132,58 +120,102 @@ export default function GrammarView({ content, analysis }: Props) {
       }
 
       if (bestIdx >= 0) {
-        matches.push({ start: bestIdx, end: bestIdx + needle.length, issue, category });
+        const id = `${category}-${bestIdx}`;
+        result.push({ start: bestIdx, end: bestIdx + needle.length, issue, category, id });
         usedPositions.add(bestIdx);
       }
     }
 
-    // Sort by position
-    matches.sort((a, b) => a.start - b.start);
+    result.sort((a, b) => a.start - b.start);
+    return result;
+  }, [content, visibleIssues]);
 
-    // Build elements
+  // Measure mark positions and lay out comments in sidebar
+  useLayoutEffect(() => {
+    if (!essayRef.current || matches.length === 0) return;
+
+    const measure = () => {
+      const container = essayRef.current;
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      const positions: Record<string, number> = {};
+      let lastBottom = 0;
+
+      for (const m of matches) {
+        const markEl = container.querySelector(`[data-issue-id="${m.id}"]`);
+        if (!markEl) continue;
+
+        const markRect = markEl.getBoundingClientRect();
+        const idealTop = markRect.top - containerRect.top;
+        const top = Math.max(idealTop, lastBottom + 8);
+        positions[m.id] = top;
+
+        const commentEl = container.querySelector(`[data-comment-id="${m.id}"]`) as HTMLElement | null;
+        const commentHeight = commentEl ? commentEl.offsetHeight : 60;
+        lastBottom = top + commentHeight;
+      }
+
+      setCommentPositions(positions);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(essayRef.current);
+    return () => observer.disconnect();
+  }, [matches]);
+
+  const handleMarkClick = useCallback((id: string) => {
+    setActiveIssueKey(prev => {
+      const next = prev === id ? null : id;
+      if (next) {
+        requestAnimationFrame(() => {
+          const el = essayRef.current?.querySelector(`[data-comment-id="${next}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  // Build essay elements
+  const essayElements = useMemo(() => {
+    if (matches.length === 0) {
+      return [<span key="full">{content}</span>];
+    }
+
     const elements: React.ReactNode[] = [];
     let cursor = 0;
 
     for (let i = 0; i < matches.length; i++) {
       const m = matches[i];
-      // Skip overlapping matches
       if (m.start < cursor) continue;
 
-      // Text before this match
       if (m.start > cursor) {
         elements.push(<span key={`t-${cursor}`}>{content.slice(cursor, m.start)}</span>);
       }
 
-      const isActive = activeIssue === m.issue;
-
+      const isActive = activeIssueKey === m.id;
       elements.push(
-        <span key={`m-${i}`}>
-          <span
-            className={`grammar-underline ${m.issue.severity} ${isActive ? 'active' : ''}`}
-            onClick={() => setActiveIssue(isActive ? null : m.issue)}
-            title={ALL_LABELS[m.category] || m.category}
-          >
-            {content.slice(m.start, m.end)}
-          </span>
-          {isActive && (
-            <div className={`grammar-comment ${m.issue.severity}`}>
-              <span className="grammar-comment-label">{ALL_LABELS[m.category] || m.category}</span>
-              {m.issue.comment}
-            </div>
-          )}
+        <span
+          key={`m-${i}`}
+          data-issue-id={m.id}
+          className={`grammar-underline ${m.issue.severity} ${isActive ? 'active' : ''}`}
+          onClick={() => handleMarkClick(m.id)}
+          title={ALL_LABELS[m.category] || m.category}
+        >
+          {content.slice(m.start, m.end)}
         </span>
       );
 
       cursor = m.end;
     }
 
-    // Remaining text
     if (cursor < content.length) {
       elements.push(<span key={`t-${cursor}`}>{content.slice(cursor)}</span>);
     }
 
     return elements;
-  }, [content, visibleIssues, activeIssue]);
+  }, [content, matches, activeIssueKey, handleMarkClick]);
 
   // Check if we have any mechanics issues at all
   const hasMechanics = MECHANICS_KEYS.some(key => {
@@ -243,7 +275,7 @@ export default function GrammarView({ content, analysis }: Props) {
         )}
       </div>
 
-      {/* Category breakdown */}
+      {/* Category filter buttons */}
       {(hasMechanics || hasPatterns) && (
         <div className="grammar-categories">
           {hasMechanics && (
@@ -270,10 +302,24 @@ export default function GrammarView({ content, analysis }: Props) {
           {hasPatterns && (
             <div className="grammar-category-group">
               <h4 className="grammar-category-heading">Patterns</h4>
-              <label className="grammar-pattern-toggle">
-                <input type="checkbox" checked={showPatterns} onChange={e => setShowPatterns(e.target.checked)} />
-                Show patterns in essay
-              </label>
+              {Object.entries(PATTERN_LABELS).map(([key, label]) => {
+                let count = 0;
+                if (key === 'passiveVoice') count = analysis.activePassiveVoice?.passiveInstances?.length || 0;
+                else if (key === 'modifierPlacement') count = analysis.modifierPlacement?.issues?.length || 0;
+                else if (key === 'wordiness') count = analysis.wordiness?.instances?.length || 0;
+                if (count === 0) return null;
+                const isActive = activeCategory === key;
+                return (
+                  <button
+                    key={key}
+                    className={`grammar-category-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => setActiveCategory(isActive ? null : key)}
+                  >
+                    {label}
+                    <span className="grammar-category-count">{count}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -294,9 +340,31 @@ export default function GrammarView({ content, analysis }: Props) {
         </div>
       )}
 
-      {/* The essay with inline markers */}
-      <div className="grammar-essay">
-        {essayElements}
+      {/* The essay with sidebar comments */}
+      <div className="annotated-essay" ref={essayRef}>
+        <div className="essay-text grammar-essay">
+          {essayElements}
+        </div>
+        {matches.length > 0 && (
+          <div className="comment-sidebar">
+            {matches.map((m) => {
+              const isActive = activeIssueKey === m.id;
+              const severityClass = m.issue.severity === 'pattern' ? 'suggestion' : 'suggestion';
+              return (
+                <div
+                  key={m.id}
+                  data-comment-id={m.id}
+                  className={`sidebar-comment ${severityClass} ${isActive ? 'active' : ''}`}
+                  style={{ top: commentPositions[m.id] ?? 0 }}
+                  onClick={() => handleMarkClick(m.id)}
+                >
+                  <span className="sidebar-comment-trait">{ALL_LABELS[m.category] || m.category}</span>
+                  <span className="sidebar-comment-text">{m.issue.comment}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -103,7 +103,16 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
   }, [markers]);
 
   const handleMarkClick = useCallback((id: string) => {
-    setActiveId(prev => prev === id ? null : id);
+    setActiveId(prev => {
+      const next = prev === id ? null : id;
+      if (next) {
+        requestAnimationFrame(() => {
+          const el = essayRef.current?.querySelector(`[data-comment-id="${next}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+      return next;
+    });
   }, []);
 
   if (!readOnly) {

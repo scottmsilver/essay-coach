@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { functions, db } from '../firebase';
+import { useAuth } from '../hooks/useAuth';
 import { WRITING_TYPES, type WritingType } from '../types';
 import { countWords } from '../utils';
+import { handleRichPaste } from '../utils/pasteHandler';
 
 export default function NewEssayPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [writingType, setWritingType] = useState<WritingType>('argumentative');
   const [assignmentPrompt, setAssignmentPrompt] = useState('');
@@ -18,13 +22,38 @@ export default function NewEssayPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setSubmitting(true);
     setError(null);
     try {
-      const submitEssay = httpsCallable(functions, 'submitEssay', { timeout: 180000 });
-      const result = await submitEssay({ title, assignmentPrompt, writingType, content });
-      const { essayId } = result.data as { essayId: string };
-      navigate(`/essay/${essayId}`);
+      // Create essay + draft docs directly so we can navigate immediately
+      const essayRef = doc(collection(db, `users/${user.uid}/essays`));
+      const draftRef = doc(collection(db, `users/${user.uid}/essays/${essayRef.id}/drafts`));
+
+      await Promise.all([
+        setDoc(essayRef, {
+          title,
+          assignmentPrompt,
+          writingType,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          currentDraftNumber: 1,
+        }),
+        setDoc(draftRef, {
+          draftNumber: 1,
+          content,
+          submittedAt: serverTimestamp(),
+        }),
+      ]);
+
+      // Navigate immediately — EssayPage will show the progress UI
+      navigate(`/essay/${essayRef.id}`);
+
+      // Trigger evaluation in background (fire-and-forget)
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      evaluateEssay({ essayId: essayRef.id, draftId: draftRef.id }).catch((err) => {
+        console.error('Background evaluation failed:', err);
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to submit essay. Please try again.');
       setSubmitting(false);
@@ -55,19 +84,16 @@ export default function NewEssayPage() {
         <div className="form-group">
           <label htmlFor="essay">Your Essay</label>
           <textarea id="essay" value={content} onChange={(e) => setContent(e.target.value)}
+            onPaste={(e) => handleRichPaste(e, setContent)}
             required placeholder="Paste or type your essay here..." rows={16} />
           <div style={{ fontSize: 12, color: wordCount > 10000 ? 'var(--color-red)' : 'var(--color-text-secondary)', marginTop: 4 }}>
             {wordCount.toLocaleString()} / 10,000 words
           </div>
         </div>
         {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
-        {submitting ? (
-          <div className="loading-state"><div className="spinner" /><p>Evaluating your essay... This may take 10-30 seconds.</p></div>
-        ) : (
-          <button type="submit" className="btn-primary" disabled={!title || !assignmentPrompt || !content || wordCount > 10000}>
-            Submit for Feedback
-          </button>
-        )}
+        <button type="submit" className="btn-primary" disabled={submitting || !title || !assignmentPrompt || !content || wordCount > 10000}>
+          {submitting ? 'Submitting...' : 'Submit for Feedback'}
+        </button>
       </form>
     </div>
   );

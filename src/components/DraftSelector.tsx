@@ -11,7 +11,7 @@ export default function DraftSelector({ drafts, selectedDraftId, onChange }: Pro
         style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--color-border)' }}>
         {drafts.map((d) => (
           <option key={d.id} value={d.id}>
-            Draft {d.draftNumber} — {d.submittedAt.toLocaleDateString()}
+            Draft {d.draftNumber} — {d.submittedAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
           </option>
         ))}
       </select>

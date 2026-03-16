@@ -1,11 +1,34 @@
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { httpsCallable } from 'firebase/functions';
+import { signInWithCustomToken } from 'firebase/auth';
+import { functions, auth } from '../firebase';
+import { useState } from 'react';
+
+const DEV_USERS = [
+  { email: 'dev-alice@essaycoach.test', label: 'Alice (Dev)' },
+  { email: 'dev-bob@essaycoach.test', label: 'Bob (Dev)' },
+];
 
 export default function LoginPage() {
   const { user, loading, allowed, signIn, logOut } = useAuth();
+  const [devLoading, setDevLoading] = useState(false);
 
   if (loading) return <div className="center">Loading...</div>;
   if (user && allowed) return <Navigate to="/" />;
+
+  const handleDevSignIn = async (email: string) => {
+    setDevLoading(true);
+    try {
+      const devSignIn = httpsCallable<{ email: string }, { token: string }>(functions, 'devSignIn');
+      const result = await devSignIn({ email });
+      await signInWithCustomToken(auth, result.data.token);
+    } catch (err) {
+      console.error('Dev sign-in failed:', err);
+    } finally {
+      setDevLoading(false);
+    }
+  };
 
   return (
     <div className="login-page">
@@ -17,9 +40,26 @@ export default function LoginPage() {
           <button onClick={logOut}>Sign out</button>
         </div>
       ) : (
-        <button className="google-sign-in" onClick={signIn}>
-          Sign in with Google
-        </button>
+        <>
+          <button className="google-sign-in" onClick={signIn}>
+            Sign in with Google
+          </button>
+          {import.meta.env.DEV && (
+            <div style={{ marginTop: 24, padding: 16, border: '1px dashed var(--color-text-secondary)', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Dev Login</div>
+              {DEV_USERS.map((u) => (
+                <button
+                  key={u.email}
+                  onClick={() => handleDevSignIn(u.email)}
+                  disabled={devLoading}
+                  style={{ display: 'block', width: '100%', marginBottom: 8, padding: '8px 16px', cursor: 'pointer' }}
+                >
+                  {u.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
