@@ -189,12 +189,50 @@ export default function TransitionView({ content, analysis }: Props) {
     return elements;
   }, [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap, activeKey, handleClick]);
 
+  // Collect issue IDs (weak/missing) in document order for "Next Issue" navigation
+  const issueIds = useMemo(() => {
+    const ids: string[] = [];
+    let currentParagraph = 0;
+    for (let i = 0; i < parsed.sentences.length; i++) {
+      const s = parsed.sentences[i];
+      if (s.paragraphIndex !== currentParagraph) {
+        if (currentParagraph > 0) {
+          const pTransition = paragraphTransitionMap.get(currentParagraph);
+          if (pTransition && pTransition.quality !== 'smooth') {
+            ids.push(`p-${pTransition.fromParagraph}`);
+          }
+        }
+        currentParagraph = s.paragraphIndex;
+      }
+      if (i > 0 && parsed.sentences[i - 1].paragraphIndex === s.paragraphIndex) {
+        const key = `${s.paragraphIndex}-${s.sentenceIndex - 1}-${s.sentenceIndex}`;
+        const sTransition = sentenceTransitionMap.get(key);
+        if (sTransition && sTransition.quality !== 'smooth') {
+          ids.push(`s-${key}`);
+        }
+      }
+    }
+    return ids;
+  }, [parsed.sentences, paragraphTransitionMap, sentenceTransitionMap]);
+
+  const handleNextIssue = useCallback(() => {
+    if (issueIds.length === 0) return;
+    const currentIndex = activeKey ? issueIds.indexOf(activeKey) : -1;
+    const nextIndex = (currentIndex + 1) % issueIds.length;
+    const nextId = issueIds[nextIndex];
+    setActiveKey(nextId);
+    requestAnimationFrame(() => {
+      const el = essayRef.current?.querySelector(`[data-transition-id="${nextId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [issueIds, activeKey]);
+
   const activeItem = activeKey ? transitionItemMap.get(activeKey) : null;
 
   return (
     <div className="transition-view">
-      <div className="transition-summary">
-        <div className="transition-summary-bar">
+      <div className="analysis-summary">
+        <div className="analysis-summary-bar">
           {total > 0 && (
             <>
               <div className="transition-bar-segment smooth" style={{ width: `${(counts.smooth / total) * 100}%` }} />
@@ -204,13 +242,13 @@ export default function TransitionView({ content, analysis }: Props) {
             </>
           )}
         </div>
-        <div className="transition-summary-legend">
+        <div className="analysis-summary-legend">
           {counts.smooth > 0 && <span className="legend-item"><span className="legend-dot smooth" />{counts.smooth} smooth</span>}
           {counts.adequate > 0 && <span className="legend-item"><span className="legend-dot adequate" />{counts.adequate} adequate</span>}
           {counts.weak > 0 && <span className="legend-item"><span className="legend-dot weak" />{counts.weak} weak</span>}
           {counts.missing > 0 && <span className="legend-item"><span className="legend-dot missing" />{counts.missing} missing</span>}
         </div>
-        <p className="transition-summary-text">{analysis.summary}</p>
+        <p className="analysis-summary-text">{analysis.summary}</p>
       </div>
 
       <div className="annotated-essay" ref={essayRef}>
@@ -228,6 +266,14 @@ export default function TransitionView({ content, analysis }: Props) {
                 {QUALITY_LABELS[activeItem.quality]} — {activeItem.label}
               </span>
               <span className="sidebar-comment-text">{activeItem.comment}</span>
+              {issueIds.length > 0 && (
+                <button
+                  className="next-issue-btn"
+                  onClick={(e) => { e.stopPropagation(); handleNextIssue(); }}
+                >
+                  Next Issue {issueIds.includes(activeItem.id) ? `(${issueIds.indexOf(activeItem.id) + 1}/${issueIds.length})` : ''}
+                </button>
+              )}
             </div>
           )}
         </div>

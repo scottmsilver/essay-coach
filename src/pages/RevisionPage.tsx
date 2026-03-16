@@ -4,12 +4,12 @@ import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
+import DocBar from '../components/DocBar';
 import { useEssay } from '../hooks/useEssay';
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
-import type { TraitAnnotation } from '../components/AnnotatedEssay';
 import { handleRichPaste } from '../utils/pasteHandler';
-import { scoreLevel, scoreColor } from '../utils';
+import { scoreLevel, scoreColor, collectAnnotations, classifyAnnotation } from '../utils';
 
 export default function RevisionPage() {
   const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
@@ -39,18 +39,9 @@ export default function RevisionPage() {
     }
   }, [latestDraft, essayId]);
 
-  // Collect all annotations with trait info for the sidebar
   const allAnnotations = useMemo(() => {
     if (!latestDraft?.evaluation) return [];
-    const result: TraitAnnotation[] = [];
-    for (const traitKey of TRAIT_KEYS) {
-      const trait = latestDraft.evaluation.traits[traitKey];
-      if (!trait?.annotations) continue;
-      for (const ann of trait.annotations) {
-        result.push({ ...ann, traitKey, traitLabel: TRAIT_LABELS[traitKey] });
-      }
-    }
-    return result;
+    return collectAnnotations(latestDraft.evaluation);
   }, [latestDraft]);
 
   const handleContentChange = useCallback((newContent: string) => {
@@ -68,7 +59,6 @@ export default function RevisionPage() {
       const essayRef = doc(db, `users/${uid}/essays/${essayId}`);
       const draftRef = doc(collection(db, `users/${uid}/essays/${essayId}/drafts`));
 
-      // Create draft + update essay immediately
       await Promise.all([
         setDoc(draftRef, {
           draftNumber: newDraftNumber,
@@ -82,11 +72,8 @@ export default function RevisionPage() {
       ]);
 
       localStorage.removeItem(`essaycoach_autosave_${essayId}`);
-
-      // Navigate immediately — EssayPage will show progress UI
       navigate(ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`);
 
-      // Fire evaluation in background
       const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
       evaluateEssay({ essayId, draftId: draftRef.id }).catch((err) => {
         console.error('Background evaluation failed:', err);
@@ -105,37 +92,36 @@ export default function RevisionPage() {
 
   return (
     <div className="essay-page">
-      {/* Header */}
-      <div className="essay-page-header">
-        <div>
-          <h2 className="essay-page-title">{essay.title} — Revision</h2>
+      <DocBar title={`${essay.title} — Revision`} />
+
+      {error && <div className="error-state" style={{ marginBottom: 0, padding: '4px 12px', fontSize: 12 }}>{error}</div>}
+
+      {/* Row 2 — Score pills + Resubmit */}
+      <div className="analysis-bar">
+        <div className="analysis-bar-scores">
+          {TRAIT_KEYS.map((trait) => {
+            const score = evaluation.traits[trait].score;
+            const isActive = selectedTrait === trait;
+            const priority = evaluation.traits[trait].revisionPriority;
+            return (
+              <button
+                key={trait}
+                className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
+                onClick={() => setSelectedTrait(isActive ? null : trait)}
+                title={evaluation.traits[trait].feedback}
+              >
+                <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>
+                <span className="score-pill-value">{score}</span>
+                {priority !== null && <span className="score-pill-priority">#{priority}</span>}
+              </button>
+            );
+          })}
         </div>
-        <button onClick={handleResubmit} className="btn-primary" disabled={submitting || retryCount >= 3}>
-          {submitting ? 'Evaluating...' : 'Resubmit'}
-        </button>
-      </div>
-
-      {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
-
-      {/* Score strip — same as EssayPage, click to filter annotations */}
-      <div className="score-strip">
-        {TRAIT_KEYS.map((trait) => {
-          const score = evaluation.traits[trait].score;
-          const isActive = selectedTrait === trait;
-          const priority = evaluation.traits[trait].revisionPriority;
-          return (
-            <button
-              key={trait}
-              className={`score-badge ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
-              onClick={() => setSelectedTrait(isActive ? null : trait)}
-              title={evaluation.traits[trait].feedback}
-            >
-              <span className="score-badge-label">{TRAIT_LABELS[trait]}</span>
-              <span className="score-badge-value">{score}</span>
-              {priority && <span className="score-badge-priority">#{priority}</span>}
-            </button>
-          );
-        })}
+        <div className="analysis-bar-right">
+          <button onClick={handleResubmit} className="btn-accent btn-compact" disabled={submitting || retryCount >= 3}>
+            {submitting ? 'Evaluating...' : 'Resubmit'}
+          </button>
+        </div>
       </div>
 
       {/* Trait feedback panel */}
@@ -177,7 +163,7 @@ export default function RevisionPage() {
             ? allAnnotations.filter(a => a.traitKey === selectedTrait)
             : allAnnotations
           ).map((ann, i) => (
-            <div key={i} className={`sidebar-comment ${ann.comment.includes('?') ? 'suggestion' : 'praise'}`} style={{ position: 'static' }}>
+            <div key={i} className={`sidebar-comment ${classifyAnnotation(ann.comment)}`} style={{ position: 'static' }}>
               <span className="sidebar-comment-trait">{ann.traitLabel}</span>
               <span className="sidebar-comment-text">{ann.comment}</span>
             </div>

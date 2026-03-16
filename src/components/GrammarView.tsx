@@ -1,5 +1,7 @@
-import { useMemo, useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { useMemo, useRef } from 'react';
 import type { GrammarAnalysis, GrammarIssue, GrammarIssueCategory } from '../types';
+import { useCommentLayout } from '../hooks/useCommentLayout';
+import { useActiveMarker } from '../hooks/useActiveMarker';
 
 interface Props {
   content: string;
@@ -32,10 +34,8 @@ const MECHANICS_KEYS = Object.keys(MECHANICS_LABELS) as (keyof typeof MECHANICS_
 type IssueMatch = { start: number; end: number; issue: GrammarIssue; category: string; id: string };
 
 export default function GrammarView({ content, analysis }: Props) {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeIssueKey, setActiveIssueKey] = useState<string | null>(null);
-  const [commentPositions, setCommentPositions] = useState<Record<string, number>>({});
   const essayRef = useRef<HTMLDivElement>(null);
+  const [activeIssueKey, handleMarkClick] = useActiveMarker(essayRef);
 
   // Collect all issues with their category for rendering
   const allIssues = useMemo(() => {
@@ -70,18 +70,12 @@ export default function GrammarView({ content, analysis }: Props) {
 
   const total = counts.error + counts.warning + counts.pattern;
 
-  // Filter issues for display (always include patterns now)
-  const visibleIssues = useMemo(() => {
-    if (!activeCategory) return allIssues;
-    return allIssues.filter(({ category }) => category === activeCategory);
-  }, [allIssues, activeCategory]);
-
   // Find all issue positions in the text
   const matches = useMemo((): IssueMatch[] => {
     const result: IssueMatch[] = [];
     const usedPositions = new Set<number>();
 
-    for (const { issue, category } of visibleIssues) {
+    for (const { issue, category } of allIssues) {
       const needle = issue.quotedText;
       if (!needle) continue;
 
@@ -128,54 +122,9 @@ export default function GrammarView({ content, analysis }: Props) {
 
     result.sort((a, b) => a.start - b.start);
     return result;
-  }, [content, visibleIssues]);
+  }, [content, allIssues]);
 
-  // Measure mark positions and lay out comments in sidebar
-  useLayoutEffect(() => {
-    if (!essayRef.current || matches.length === 0) return;
-
-    const measure = () => {
-      const container = essayRef.current;
-      if (!container) return;
-      const containerRect = container.getBoundingClientRect();
-      const positions: Record<string, number> = {};
-      let lastBottom = 0;
-
-      for (const m of matches) {
-        const markEl = container.querySelector(`[data-issue-id="${m.id}"]`);
-        if (!markEl) continue;
-
-        const markRect = markEl.getBoundingClientRect();
-        const idealTop = markRect.top - containerRect.top;
-        const top = Math.max(idealTop, lastBottom + 8);
-        positions[m.id] = top;
-
-        const commentEl = container.querySelector(`[data-comment-id="${m.id}"]`) as HTMLElement | null;
-        const commentHeight = commentEl ? commentEl.offsetHeight : 60;
-        lastBottom = top + commentHeight;
-      }
-
-      setCommentPositions(positions);
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(essayRef.current);
-    return () => observer.disconnect();
-  }, [matches]);
-
-  const handleMarkClick = useCallback((id: string) => {
-    setActiveIssueKey(prev => {
-      const next = prev === id ? null : id;
-      if (next) {
-        requestAnimationFrame(() => {
-          const el = essayRef.current?.querySelector(`[data-comment-id="${next}"]`);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-      }
-      return next;
-    });
-  }, []);
+  const commentPositions = useCommentLayout(essayRef, matches, 'data-issue-id');
 
   // Build essay elements
   const essayElements = useMemo(() => {
@@ -217,21 +166,11 @@ export default function GrammarView({ content, analysis }: Props) {
     return elements;
   }, [content, matches, activeIssueKey, handleMarkClick]);
 
-  // Check if we have any mechanics issues at all
-  const hasMechanics = MECHANICS_KEYS.some(key => {
-    const cat = analysis[key as keyof GrammarAnalysis] as GrammarIssueCategory;
-    return cat?.locations?.length > 0;
-  });
-
-  const hasPatterns = (analysis.activePassiveVoice?.passiveInstances?.length || 0) > 0
-    || (analysis.modifierPlacement?.issues?.length || 0) > 0
-    || (analysis.wordiness?.instances?.length || 0) > 0;
-
   return (
     <div className="grammar-view">
       {/* Summary bar */}
-      <div className="grammar-summary">
-        <div className="grammar-summary-bar">
+      <div className="analysis-summary">
+        <div className="analysis-summary-bar">
           {total > 0 ? (
             <>
               {counts.error > 0 && <div className="grammar-bar-segment error" style={{ width: `${(counts.error / total) * 100}%` }} />}
@@ -242,7 +181,7 @@ export default function GrammarView({ content, analysis }: Props) {
             <div className="grammar-bar-segment clean" style={{ width: '100%' }} />
           )}
         </div>
-        <div className="grammar-summary-legend">
+        <div className="analysis-summary-legend">
           {counts.error > 0 && <span className="legend-item"><span className="legend-dot error" />{counts.error} error{counts.error !== 1 ? 's' : ''}</span>}
           {counts.warning > 0 && <span className="legend-item"><span className="legend-dot warning" />{counts.warning} warning{counts.warning !== 1 ? 's' : ''}</span>}
           {counts.pattern > 0 && <span className="legend-item"><span className="legend-dot pattern" />{counts.pattern} pattern{counts.pattern !== 1 ? 's' : ''}</span>}
@@ -256,89 +195,9 @@ export default function GrammarView({ content, analysis }: Props) {
             }
           </p>
         )}
-        <p className="grammar-summary-text">{analysis.summary.overallComment}</p>
+        <p className="analysis-summary-text">{analysis.summary.overallComment}</p>
       </div>
 
-      {/* Strength areas + priority fixes */}
-      <div className="grammar-callouts">
-        {analysis.summary.strengthAreas.length > 0 && (
-          <div className="grammar-callout strengths">
-            <strong>Strengths</strong>
-            <ul>{analysis.summary.strengthAreas.map((s, i) => <li key={i}>{s}</li>)}</ul>
-          </div>
-        )}
-        {analysis.summary.priorityFixes.length > 0 && (
-          <div className="grammar-callout priorities">
-            <strong>Fix First</strong>
-            <ol>{analysis.summary.priorityFixes.map((s, i) => <li key={i}>{s}</li>)}</ol>
-          </div>
-        )}
-      </div>
-
-      {/* Category filter buttons */}
-      {(hasMechanics || hasPatterns) && (
-        <div className="grammar-categories">
-          {hasMechanics && (
-            <div className="grammar-category-group">
-              <h4 className="grammar-category-heading">Mechanics</h4>
-              {MECHANICS_KEYS.map(key => {
-                const cat = analysis[key as keyof GrammarAnalysis] as GrammarIssueCategory;
-                const count = cat?.locations?.length || 0;
-                if (count === 0) return null;
-                const isActive = activeCategory === key;
-                return (
-                  <button
-                    key={key}
-                    className={`grammar-category-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(isActive ? null : key)}
-                  >
-                    {MECHANICS_LABELS[key]}
-                    <span className="grammar-category-count">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {hasPatterns && (
-            <div className="grammar-category-group">
-              <h4 className="grammar-category-heading">Patterns</h4>
-              {Object.entries(PATTERN_LABELS).map(([key, label]) => {
-                let count = 0;
-                if (key === 'passiveVoice') count = analysis.activePassiveVoice?.passiveInstances?.length || 0;
-                else if (key === 'modifierPlacement') count = analysis.modifierPlacement?.issues?.length || 0;
-                else if (key === 'wordiness') count = analysis.wordiness?.instances?.length || 0;
-                if (count === 0) return null;
-                const isActive = activeCategory === key;
-                return (
-                  <button
-                    key={key}
-                    className={`grammar-category-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(isActive ? null : key)}
-                  >
-                    {label}
-                    <span className="grammar-category-count">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Sentence variety */}
-      {analysis.sentenceVariety && (
-        <div className="grammar-sentence-variety">
-          <h4>Sentence Variety</h4>
-          <div className="grammar-variety-stats">
-            <span>Avg length: {analysis.sentenceVariety.avgLength} words</span>
-            <span>Simple: {analysis.sentenceVariety.distribution.simple}</span>
-            <span>Compound: {analysis.sentenceVariety.distribution.compound}</span>
-            <span>Complex: {analysis.sentenceVariety.distribution.complex}</span>
-            <span>Compound-Complex: {analysis.sentenceVariety.distribution.compoundComplex}</span>
-          </div>
-          <p className="grammar-variety-comment">{analysis.sentenceVariety.comment}</p>
-        </div>
-      )}
 
       {/* The essay with sidebar comments */}
       <div className="annotated-essay" ref={essayRef}>

@@ -48,7 +48,12 @@ describe('RevisionPage', () => {
     expect(screen.getByText(/revision/i)).toBeInTheDocument();
   });
 
-  it('renders trait selector buttons', () => {
+  it('renders hamburger menu button', () => {
+    const { container } = renderWithRouter(<RevisionPage />);
+    expect(container.querySelector('.hamburger-btn')).toBeInTheDocument();
+  });
+
+  it('renders trait score pills with full names', () => {
     renderWithRouter(<RevisionPage />);
     expect(screen.getAllByText(/conventions/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/organization/i).length).toBeGreaterThan(0);
@@ -64,7 +69,7 @@ describe('RevisionPage', () => {
     expect(screen.getByText(/fix this/i)).toBeInTheDocument();
   });
 
-  it('renders Resubmit button', () => {
+  it('renders Resubmit button in analysis bar', () => {
     renderWithRouter(<RevisionPage />);
     expect(screen.getByText(/resubmit/i)).toBeInTheDocument();
   });

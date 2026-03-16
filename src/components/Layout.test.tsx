@@ -20,4 +20,22 @@ describe('Layout', () => {
     renderWithRouter(<Layout />);
     expect(screen.getByText(/sign out/i)).toBeInTheDocument();
   });
+
+  it('hides navbar on essay routes', () => {
+    renderWithRouter(<Layout />, { route: '/essay/e1' });
+    const nav = document.querySelector('.navbar');
+    expect(nav).toHaveClass('navbar-hidden');
+  });
+
+  it('hides navbar on shared essay routes', () => {
+    renderWithRouter(<Layout />, { route: '/user/u1/essay/e1' });
+    const nav = document.querySelector('.navbar');
+    expect(nav).toHaveClass('navbar-hidden');
+  });
+
+  it('shows navbar on non-essay routes', () => {
+    renderWithRouter(<Layout />, { route: '/' });
+    const nav = document.querySelector('.navbar');
+    expect(nav).not.toHaveClass('navbar-hidden');
+  });
 });

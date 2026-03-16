@@ -1,10 +1,10 @@
-import { useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react';
-import type { Annotation, TraitKey } from '../types';
+import { useMemo, useRef } from 'react';
+import type { TraitKey, TraitAnnotation } from '../types';
+import { useCommentLayout } from '../hooks/useCommentLayout';
+import { useActiveMarker } from '../hooks/useActiveMarker';
+import { classifyAnnotation } from '../utils';
 
-export interface TraitAnnotation extends Annotation {
-  traitKey: TraitKey;
-  traitLabel: string;
-}
+export type { TraitAnnotation } from '../types';
 
 interface Props {
   content: string;
@@ -22,15 +22,9 @@ interface AnnotationMarker {
   kind: 'praise' | 'suggestion';
 }
 
-// Annotations that ask questions are suggestions; pure statements of what works are praise
-function classifyAnnotation(comment: string): 'praise' | 'suggestion' {
-  return comment.includes('?') ? 'suggestion' : 'praise';
-}
-
 export default function AnnotatedEssay({ content, annotations, onChange, readOnly = true, activeTrait }: Props) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [commentPositions, setCommentPositions] = useState<Record<string, number>>({});
   const essayRef = useRef<HTMLDivElement>(null);
+  const [activeId, handleMarkClick] = useActiveMarker(essayRef);
 
   // Filter annotations by active trait if set
   const filteredAnnotations = useMemo(() => {
@@ -64,56 +58,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
     return found.sort((a, b) => a.start - b.start);
   }, [content, filteredAnnotations]);
 
-  // Measure mark positions and lay out comments on the right
-  useLayoutEffect(() => {
-    if (!essayRef.current || markers.length === 0) return;
-
-    const measure = () => {
-      const container = essayRef.current;
-      if (!container) return;
-      const containerRect = container.getBoundingClientRect();
-      const positions: Record<string, number> = {};
-      let lastBottom = 0;
-
-      for (const m of markers) {
-        const markEl = container.querySelector(`[data-ann-id="${m.id}"]`);
-        if (!markEl) continue;
-
-        const markRect = markEl.getBoundingClientRect();
-        const idealTop = markRect.top - containerRect.top;
-        // Push down if would overlap the previous comment
-        const top = Math.max(idealTop, lastBottom + 8);
-        positions[m.id] = top;
-
-        // Estimate comment height (will be refined by the browser, but good enough for layout)
-        const commentEl = container.querySelector(`[data-comment-id="${m.id}"]`) as HTMLElement | null;
-        const commentHeight = commentEl ? commentEl.offsetHeight : 60;
-        lastBottom = top + commentHeight;
-      }
-
-      setCommentPositions(positions);
-    };
-
-    // Measure after render
-    measure();
-    // Re-measure on resize
-    const observer = new ResizeObserver(measure);
-    observer.observe(essayRef.current);
-    return () => observer.disconnect();
-  }, [markers]);
-
-  const handleMarkClick = useCallback((id: string) => {
-    setActiveId(prev => {
-      const next = prev === id ? null : id;
-      if (next) {
-        requestAnimationFrame(() => {
-          const el = essayRef.current?.querySelector(`[data-comment-id="${next}"]`);
-          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-      }
-      return next;
-    });
-  }, []);
+  const commentPositions = useCommentLayout(essayRef, markers, 'data-ann-id');
 
   if (!readOnly) {
     return (

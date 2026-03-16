@@ -35,24 +35,6 @@ describe('GrammarView', () => {
     expect(screen.getByText('Solid mechanics overall.')).toBeInTheDocument();
   });
 
-  it('renders strength areas', () => {
-    const analysis = makeAnalysis({
-      summary: { ...emptyAnalysis.summary, strengthAreas: ['Consistent verb tense', 'Clear pronoun reference'] },
-    });
-    renderWithRouter(<GrammarView content="Some essay text." analysis={analysis} />);
-    expect(screen.getByText('Consistent verb tense')).toBeInTheDocument();
-    expect(screen.getByText('Clear pronoun reference')).toBeInTheDocument();
-  });
-
-  it('renders priority fixes', () => {
-    const analysis = makeAnalysis({
-      summary: { ...emptyAnalysis.summary, priorityFixes: ['Fix comma splices', 'Address run-on sentences'] },
-    });
-    renderWithRouter(<GrammarView content="Some essay text." analysis={analysis} />);
-    expect(screen.getByText('Fix comma splices')).toBeInTheDocument();
-    expect(screen.getByText('Address run-on sentences')).toBeInTheDocument();
-  });
-
   it('renders "No issues found" when no issues', () => {
     renderWithRouter(<GrammarView content="Perfect essay." analysis={emptyAnalysis} />);
     expect(screen.getByText('No issues found')).toBeInTheDocument();
@@ -125,18 +107,6 @@ describe('GrammarView', () => {
     const label = container.querySelector('.sidebar-comment-trait');
     expect(label).toBeInTheDocument();
     expect(label?.textContent).toBe('Comma Splices');
-  });
-
-  it('shows sentence variety stats', () => {
-    const analysis = makeAnalysis({
-      sentenceVariety: { avgLength: 18, distribution: { simple: 5, compound: 3, complex: 2, compoundComplex: 1 }, comment: 'Nice variety.' },
-    });
-    renderWithRouter(<GrammarView content="Some text." analysis={analysis} />);
-    expect(screen.getByText('Avg length: 18 words')).toBeInTheDocument();
-    expect(screen.getByText('Simple: 5')).toBeInTheDocument();
-    expect(screen.getByText('Compound: 3')).toBeInTheDocument();
-    expect(screen.getByText('Complex: 2')).toBeInTheDocument();
-    expect(screen.getByText('Compound-Complex: 1')).toBeInTheDocument();
   });
 
   it('shows active/passive voice ratio', () => {

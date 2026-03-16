@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithRouter } from '../test-utils';
 import type { Evaluation, TraitEvaluation } from '../types';
@@ -37,21 +37,36 @@ vi.mock('react-router-dom', async () => {
 import EssayPage from './EssayPage';
 
 describe('EssayPage', () => {
+  beforeEach(() => {
+    mockEssayState = {
+      essay: { id: 'e1', title: 'Test Essay', writingType: 'argumentative', currentDraftNumber: 1, createdAt: new Date(), updatedAt: new Date(), assignmentPrompt: 'Prompt' },
+      drafts: [{ id: 'd1', draftNumber: 1, content: 'Essay text with sample quoted here', submittedAt: new Date(), evaluation: mockEval as Evaluation | null, revisionStage: null }],
+      loading: false,
+    };
+  });
+
   it('renders essay title', () => {
     renderWithRouter(<EssayPage />);
     expect(screen.getByText('Test Essay')).toBeInTheDocument();
   });
 
-  it('renders all 7 trait score badges', () => {
-    renderWithRouter(<EssayPage />);
-    // Compact toolbar uses short labels
-    expect(screen.getByText('Id')).toBeInTheDocument();
-    expect(screen.getByText('Org')).toBeInTheDocument();
-    expect(screen.getByText('Vo')).toBeInTheDocument();
-    expect(screen.getByText('WC')).toBeInTheDocument();
-    expect(screen.getByText('Fl')).toBeInTheDocument();
-    expect(screen.getByText('Cv')).toBeInTheDocument();
-    expect(screen.getByText('Pr')).toBeInTheDocument();
+  it('renders all 7 trait score pills with full names', () => {
+    const { container } = renderWithRouter(<EssayPage />);
+    const pills = container.querySelectorAll('.score-pill-label');
+    const labels = Array.from(pills).map((el) => el.textContent);
+    expect(labels).toEqual(['Ideas', 'Organization', 'Voice', 'Word Choice', 'Sentence Fluency', 'Conventions', 'Presentation']);
+  });
+
+  it('renders hamburger menu button', () => {
+    const { container } = renderWithRouter(<EssayPage />);
+    expect(container.querySelector('.hamburger-btn')).toBeInTheDocument();
+  });
+
+  it('renders view type dropdown', () => {
+    const { container } = renderWithRouter(<EssayPage />);
+    const dropdown = container.querySelector('.view-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown?.textContent).toContain('Overall');
   });
 
   it('renders revision plan', () => {
@@ -64,9 +79,14 @@ describe('EssayPage', () => {
     expect(screen.getByText('Overall feedback text')).toBeInTheDocument();
   });
 
-  it('renders Start Revising button for latest draft', () => {
+  it('renders Revise button for latest draft', () => {
     renderWithRouter(<EssayPage />);
     expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
+  });
+
+  it('renders user email', () => {
+    renderWithRouter(<EssayPage />);
+    expect(screen.getByText(/test@gmail\.com/)).toBeInTheDocument();
   });
 
   it('shows loading state for recent draft with null evaluation', () => {

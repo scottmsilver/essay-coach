@@ -33,6 +33,10 @@ body {
   align-items: center;
 }
 
+.navbar.navbar-hidden {
+  display: none;
+}
+
 .nav-content {
   max-width: 1120px;
   margin: 0 auto;
@@ -74,8 +78,250 @@ body {
 }
 .sign-out-btn:hover { background: var(--color-bg); }
 
+/* ═══ Document Bar (Row 1) ═══ */
+.doc-bar {
+  display: flex;
+  align-items: center;
+  padding: 4px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  gap: 8px;
+}
+.doc-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.doc-bar-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+.doc-bar-draft {
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 400;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  white-space: nowrap;
+}
+.doc-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.doc-bar-user {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Hamburger */
+.hamburger-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.hamburger-btn:hover {
+  background: var(--color-bg);
+}
+.hamburger-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+}
+.hamburger-item {
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+.hamburger-item:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.hamburger-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 2px 0;
+}
+
+/* ═══ Analysis Bar (Row 2) ═══ */
+.analysis-bar {
+  display: flex;
+  align-items: center;
+  padding: 3px 24px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  gap: 8px;
+}
+.analysis-bar-left {
+  flex-shrink: 0;
+}
+.analysis-bar-scores {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.analysis-bar-right {
+  flex-shrink: 0;
+}
+
+/* View dropdown */
+.view-dropdown {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  letter-spacing: 0.02em;
+}
+
+/* Score pills — muted, lightweight */
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-family);
+}
+.score-pill:hover {
+  opacity: 0.85;
+}
+.score-pill.active {
+  outline: 1px solid;
+}
+
+/* Muted score colors on light background */
+.score-pill.high {
+  background: rgba(34, 120, 60, 0.08);
+  color: #2d6a3e;
+}
+.score-pill.high.active {
+  background: rgba(34, 120, 60, 0.14);
+  outline-color: rgba(34, 120, 60, 0.4);
+}
+.score-pill.mid {
+  background: rgba(160, 120, 20, 0.08);
+  color: #8a6d1b;
+}
+.score-pill.mid.active {
+  background: rgba(160, 120, 20, 0.14);
+  outline-color: rgba(160, 120, 20, 0.4);
+}
+.score-pill.low {
+  background: rgba(160, 50, 50, 0.08);
+  color: #944040;
+}
+.score-pill.low.active {
+  background: rgba(160, 50, 50, 0.14);
+  outline-color: rgba(160, 50, 50, 0.4);
+}
+
+.score-pill-label {
+  font-weight: 400;
+}
+.score-pill-value {
+  font-weight: 600;
+}
+.score-pill-delta {
+  font-size: 9px;
+  font-weight: 500;
+}
+.score-pill-delta.up { color: #2d6a3e; }
+.score-pill-delta.down { color: #944040; }
+
+.score-pill-priority {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* Accent button (replaces purple btn-primary in toolbar) */
+.btn-accent {
+  background: #3b82b6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-family);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-accent:hover {
+  background: #2d6d9e;
+}
+.btn-accent:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-compact {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
 /* Main content */
 .main-content { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+
+/* Full-bleed on essay pages — Google Docs style */
+.main-content:has(.essay-page) { max-width: none; padding: 0; }
+.essay-footer, .essay-page > .annotated-essay,
+.essay-page > .transition-view, .essay-page > .grammar-view,
+.essay-page > .loading-state, .essay-page > .error-state,
+.essay-page > .trait-feedback-panel,
+.essay-page > .revision-plan-inline,
+.essay-page > .revision-layout {
+  padding: 16px 24px;
+}
 
 /* Buttons */
 .btn-primary {
@@ -181,104 +427,6 @@ body {
 }
 
 /* ═══ Essay Page ═══ */
-.essay-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-.essay-page-title { font-size: 22px; margin-bottom: 4px; }
-
-/* Dense toolbar — everything on one line */
-.essay-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.essay-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.essay-toolbar-title {
-  font-size: 17px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.essay-toolbar-draft {
-  padding: 2px 6px;
-  font-size: 12px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-family: var(--font-family);
-}
-.essay-toolbar-scores {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-}
-.essay-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.btn-compact { padding: 6px 14px; font-size: 13px; }
-
-/* Score badges */
-.score-strip {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.score-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.score-badge.compact {
-  padding: 3px 8px;
-  gap: 4px;
-  font-size: 12px;
-}
-.score-badge:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-.score-badge.active { border-color: var(--color-primary); background: rgba(79, 70, 229, 0.06); }
-.score-badge-label { color: var(--color-text-secondary); font-weight: 500; }
-.score-badge-value {
-  font-weight: 700;
-  min-width: 14px;
-  text-align: center;
-}
-.score-badge.low .score-badge-value { color: var(--color-red); }
-.score-badge.mid .score-badge-value { color: var(--color-yellow); }
-.score-badge.high .score-badge-value { color: var(--color-green); }
-.score-badge-delta { font-size: 11px; font-weight: 600; }
-.score-badge-delta.up { color: var(--color-green); }
-.score-badge-delta.down { color: var(--color-red); }
-.score-badge-priority {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-primary);
-  opacity: 0.7;
-}
 
 /* Trait feedback popover — floats below the score badge */
 .trait-popover {
@@ -416,13 +564,22 @@ body {
 .sidebar-comment.active .sidebar-comment-text {
   color: var(--color-text);
 }
-.sidebar-hint {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-style: italic;
-  padding: 12px;
+.next-issue-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3b82b6;
+  background: none;
+  border: 1px solid #3b82b6;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-family);
 }
-
+.next-issue-btn:hover {
+  background: rgba(59, 130, 182, 0.08);
+}
 /* Annotation marks in the essay text */
 .annotation-mark {
   padding: 2px 0;
@@ -504,8 +661,7 @@ body {
 .comparison-section.remaining ul { color: var(--color-yellow); }
 .comparison-section.remaining ul li::before { content: '- '; }
 
-/* ═══ Legacy trait cards (still used on RevisionPage) ═══ */
-.trait-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+/* ═══ Trait cards (used in TraitCard component) ═══ */
 .trait-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -634,22 +790,6 @@ body {
   .revision-layout { grid-template-columns: 1fr; }
 }
 
-/* Legacy side by side (unused but kept for compat) */
-.side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-@media (max-width: 768px) { .side-by-side { grid-template-columns: 1fr; } }
-
-/* Trait selector */
-.trait-selector { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-.trait-selector button {
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 13px;
-  cursor: pointer;
-}
-.trait-selector button.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
-
 /* Highlight */
 mark {
   background: rgba(79, 70, 229, 0.15);
@@ -657,54 +797,38 @@ mark {
   border-radius: 2px;
 }
 
-/* ═══ View toggle — Feedback / Transitions tabs ═══ */
-.view-toggle {
-  display: flex;
-  gap: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-  width: fit-content;
-}
-.view-toggle-btn {
-  padding: 5px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-surface);
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  transition: all 0.15s;
-}
-.view-toggle-btn:not(:last-child) {
-  border-right: 1px solid var(--color-border);
-}
-.view-toggle-btn:hover { background: var(--color-bg); }
-.view-toggle-btn.active {
-  background: var(--color-primary);
-  color: white;
-}
 
-/* ═══ Transition View — heatmap overlay ═══ */
-.transition-view {
-  margin-bottom: 24px;
-}
-
-/* Summary bar */
-.transition-summary {
+/* ═══ Shared analysis summary (used by Transition & Grammar views) ═══ */
+.analysis-summary {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 16px;
 }
-.transition-summary-bar {
+.analysis-summary-bar {
   display: flex;
   height: 8px;
   border-radius: 4px;
   overflow: hidden;
   background: var(--color-border);
   margin-bottom: 10px;
+}
+.analysis-summary-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.analysis-summary-text {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ═══ Transition View — heatmap overlay ═══ */
+.transition-view {
+  margin-bottom: 24px;
 }
 .transition-bar-segment {
   transition: width 0.3s;
@@ -713,13 +837,6 @@ mark {
 .transition-bar-segment.adequate { background: var(--color-text-secondary); }
 .transition-bar-segment.weak { background: var(--color-yellow); }
 .transition-bar-segment.missing { background: var(--color-red); }
-
-.transition-summary-legend {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
 .legend-item {
   display: flex;
   align-items: center;
@@ -738,19 +855,9 @@ mark {
 .legend-dot.weak { background: var(--color-yellow); }
 .legend-dot.missing { background: var(--color-red); }
 
-.transition-summary-text {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
 /* The essay with heatmap markers — inherits .essay-text styling */
 .transition-essay {
   white-space: normal;
-}
-
-.transition-sentence {
-  /* Sentences render inline */
 }
 
 /* Sentence transition dot — inline between sentences */
@@ -829,34 +936,13 @@ mark {
   margin-bottom: 24px;
 }
 
-/* Summary bar */
-.grammar-summary {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
-}
-.grammar-summary-bar {
-  display: flex;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--color-border);
-  margin-bottom: 10px;
-}
+/* Grammar-specific bar segments */
 .grammar-bar-segment { transition: width 0.3s; }
 .grammar-bar-segment.error { background: var(--color-red); }
 .grammar-bar-segment.warning { background: var(--color-yellow); }
 .grammar-bar-segment.pattern { background: var(--color-primary); }
 .grammar-bar-segment.clean { background: var(--color-green); }
 
-.grammar-summary-legend {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
 .legend-dot.error { background: var(--color-red); }
 .legend-dot.warning { background: var(--color-yellow); }
 .legend-dot.pattern { background: var(--color-primary); }
@@ -866,126 +952,6 @@ mark {
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-bottom: 4px;
-}
-.grammar-summary-text {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
-/* Callout cards */
-.grammar-callouts {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.grammar-callout {
-  flex: 1;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-size: 13px;
-}
-.grammar-callout strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-secondary);
-}
-.grammar-callout.strengths { border-left: 3px solid var(--color-green); }
-.grammar-callout.priorities { border-left: 3px solid var(--color-red); }
-.grammar-callout ul, .grammar-callout ol {
-  margin: 0;
-  padding-left: 18px;
-}
-.grammar-callout li {
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
-/* Category breakdown */
-.grammar-categories {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-}
-.grammar-category-heading {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-secondary);
-  margin: 0 0 8px 0;
-}
-.grammar-category-group {
-  margin-bottom: 12px;
-}
-.grammar-category-group:last-child { margin-bottom: 0; }
-.grammar-category-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  margin: 0 6px 6px 0;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  cursor: pointer;
-  color: var(--color-text);
-  transition: all 0.15s;
-}
-.grammar-category-btn:hover { background: var(--color-surface); border-color: var(--color-text-secondary); }
-.grammar-category-btn.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
-.grammar-category-count {
-  background: rgba(0,0,0,0.08);
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.grammar-category-btn.active .grammar-category-count {
-  background: rgba(255,255,255,0.2);
-}
-/* Sentence variety */
-.grammar-sentence-variety {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-}
-.grammar-sentence-variety h4 {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-secondary);
-  margin: 0 0 8px 0;
-}
-.grammar-variety-stats {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  margin-bottom: 6px;
-}
-.grammar-variety-comment {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-/* Grammar essay — inherits .essay-text styling */
-.grammar-essay {
-  /* Additional grammar-specific styles if needed */
 }
 
 /* Underline markers */
@@ -1015,27 +981,3 @@ mark {
   border-radius: 2px;
 }
 
-/* Comment popup */
-.grammar-comment {
-  display: block;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--color-text-secondary);
-  margin: 4px 0 8px 0;
-}
-.grammar-comment.error { border-left: 3px solid var(--color-red); }
-.grammar-comment.warning { border-left: 3px solid var(--color-yellow); }
-.grammar-comment.pattern { border-left: 3px solid var(--color-primary); }
-.grammar-comment-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--color-text-secondary);
-  margin-bottom: 4px;
-}
