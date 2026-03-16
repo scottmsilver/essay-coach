@@ -6,6 +6,7 @@
   --color-border: #e5e7eb;
   --color-text: #111827;
   --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
   --color-red: #dc2626;
   --color-yellow: #d97706;
   --color-green: #059669;
@@ -104,19 +105,87 @@ body {
   margin: 0;
   letter-spacing: 0.01em;
 }
+.doc-bar-draft {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.doc-bar-draft-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.doc-bar-draft-pick {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.doc-bar-draft-pick:hover { color: var(--color-text); background: var(--color-bg); }
+.doc-bar-draft-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.doc-bar-draft-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+.doc-bar-draft-item:hover { background: var(--color-bg); color: var(--color-text); }
+.doc-bar-draft-item.active { color: var(--color-primary); font-weight: 600; }
 .doc-bar-right {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
-.doc-bar-user {
-  font-size: 12px;
+.doc-bar-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: default;
+}
+.doc-bar-avatar-fallback {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-border);
   color: var(--color-text-secondary);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
 }
 
 /* Hamburger */
+.hamburger-wrapper {
+  position: relative;
+}
 .hamburger-btn {
   background: none;
   border: none;
@@ -267,7 +336,7 @@ body {
 
 /* Full-bleed on essay pages — Google Docs style */
 .main-content:has(.essay-page) { max-width: none; padding: 0; }
-.essay-footer, .essay-page > .annotated-essay,
+.essay-page > .annotated-essay,
 .essay-page > .transition-view, .essay-page > .grammar-view,
 .essay-page > .loading-state, .essay-page > .error-state,
 .essay-page > .trait-feedback-panel,
@@ -529,40 +598,46 @@ body {
   }
 }
 
-/* ═══ Essay footer — overall feedback, revision plan ═══ */
-.essay-footer {
-  display: grid;
-  gap: 16px;
-}
-.overall-feedback, .revision-plan, .comparison-section {
+/* ═══ Feedback summary — framed card above essay ═══ */
+.feedback-summary {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  padding: 20px;
-}
-.overall-feedback h3, .revision-plan h3, .comparison-section h3 {
   font-size: 14px;
-  font-weight: 600;
+  line-height: 1.6;
+  margin: 16px 24px 0;
+  padding: 16px 20px;
+}
+.feedback-summary:empty { display: none; }
+.feedback-summary-text {
+  color: var(--color-text-secondary);
   margin-bottom: 8px;
-  color: var(--color-text);
 }
-.overall-feedback p { font-size: 14px; line-height: 1.6; color: var(--color-text-secondary); }
-.revision-plan ol {
+.feedback-summary-section {
+  margin-top: 8px;
+}
+.feedback-summary-section strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.feedback-summary-section ol {
   padding-left: 20px;
-  font-size: 14px;
-  line-height: 1.7;
   color: var(--color-text-secondary);
 }
-.revision-plan ol li { margin-bottom: 4px; }
-.comparison-section ul {
+.feedback-summary-section ol li { margin-bottom: 2px; }
+.feedback-summary-section ul {
   list-style: none;
   padding: 0;
-  font-size: 14px;
   color: var(--color-green);
 }
-.comparison-section ul li::before { content: '+ '; font-weight: 600; }
-.comparison-section.remaining ul { color: var(--color-yellow); }
-.comparison-section.remaining ul li::before { content: '- '; }
+.feedback-summary-section ul li::before { content: '+ '; font-weight: 600; }
+.feedback-summary-section.remaining ul { color: var(--color-yellow); }
+.feedback-summary-section.remaining ul li::before { content: '- '; }
 
 /* ═══ Trait cards (used in TraitCard component) ═══ */
 .trait-card {

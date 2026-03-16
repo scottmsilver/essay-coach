@@ -16,5 +16,5 @@ export function useActiveMarker(containerRef: RefObject<HTMLElement | null>) {
     });
   }, []);
 
-  return [activeId, handleClick] as const;
+  return [activeId, handleClick, setActiveId] as const;
 }

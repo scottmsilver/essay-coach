@@ -82,9 +82,11 @@ describe('EssayPage', () => {
     expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
   });
 
-  it('renders user email', () => {
-    renderWithRouter(<EssayPage />);
-    expect(screen.getByText(/test@gmail\.com/)).toBeInTheDocument();
+  it('renders user avatar with email tooltip', () => {
+    const { container } = renderWithRouter(<EssayPage />);
+    const avatar = container.querySelector('.doc-bar-avatar-fallback');
+    expect(avatar).toBeInTheDocument();
+    expect(avatar?.getAttribute('title')).toBe('test@gmail.com');
   });
 
   it('shows loading state for recent draft with null evaluation', () => {

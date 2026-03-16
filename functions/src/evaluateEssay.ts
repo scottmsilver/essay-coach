@@ -45,7 +45,7 @@ export const evaluateEssay = onCall(
     }
 
     const draftData = draftDoc.data()!;
-    if (draftData.evaluation) {
+    if (draftData.evaluation && !request.data.force) {
       return { evaluation: draftData.evaluation };
     }
 

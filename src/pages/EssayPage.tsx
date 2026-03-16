@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Button, Select, Group } from '@mantine/core';
@@ -17,15 +17,30 @@ import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
 
+type ViewMode = 'feedback' | 'transitions' | 'grammar';
+
+function viewFromPath(pathname: string): ViewMode {
+  if (pathname.endsWith('/transitions')) return 'transitions';
+  if (pathname.endsWith('/grammar')) return 'grammar';
+  return 'feedback';
+}
+
 export default function EssayPage() {
   const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { essay, drafts, loading } = useEssay(essayId, ownerUid);
   const [activeTrait, setActiveTrait] = useState<TraitKey | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [retrying, setRetrying] = useState(false);
-  const [activeView, setActiveView] = useState<'feedback' | 'transitions' | 'grammar'>('feedback');
+  const activeView = viewFromPath(location.pathname);
+  const basePath = ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`;
+  const setActiveView = useCallback((view: ViewMode) => {
+    const suffix = view === 'feedback' ? '' : `/${view}`;
+    navigate(`${basePath}${suffix}`, { replace: true });
+  }, [navigate, basePath]);
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [grammarLoading, setGrammarLoading] = useState(false);
@@ -81,14 +96,14 @@ export default function EssayPage() {
     } finally {
       setTransitionLoading(false);
     }
-  }, [activeDraft, essayId, ownerUid]);
+  }, [activeDraft, essayId, ownerUid, setActiveView]);
 
   const handleGrammarTab = useCallback(async () => {
     setActiveView('grammar');
     if (!activeDraft || activeDraft.grammarAnalysis) return;
     if (activeDraft.grammarStatus && activeDraft.grammarStatus.stage !== 'error') return;
     await runGrammarAnalysis(activeDraft.id);
-  }, [activeDraft, runGrammarAnalysis]);
+  }, [activeDraft, runGrammarAnalysis, setActiveView]);
 
   const handleGrammarReanalyze = useCallback(async () => {
     if (!activeDraft || !user) return;
@@ -97,6 +112,36 @@ export default function EssayPage() {
     await updateDoc(draftRef, { grammarAnalysis: null, grammarStatus: null });
     await runGrammarAnalysis(activeDraft.id);
   }, [activeDraft, essayId, ownerUid, user, runGrammarAnalysis]);
+
+  const handleTransitionReanalyze = useCallback(async () => {
+    if (!activeDraft) return;
+    setTransitionLoading(true);
+    setTransitionError(null);
+    try {
+      const analyzeTransitions = httpsCallable<
+        { essayId: string; draftId: string; ownerUid?: string },
+        TransitionAnalysis
+      >(functions, 'analyzeTransitions', { timeout: 180000 });
+      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft.id, ownerUid });
+    } catch {
+      setTransitionError('Failed to analyze transitions. Please try again.');
+    } finally {
+      setTransitionLoading(false);
+    }
+  }, [activeDraft, essayId, ownerUid]);
+
+  const handleFeedbackReanalyze = useCallback(async () => {
+    if (!activeDraft || !user) return;
+    setRetrying(true);
+    try {
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      await evaluateEssay({ essayId: essayId!, draftId: activeDraft.id, ownerUid, force: true });
+    } catch {
+      setRetryCount((c) => c + 1);
+    } finally {
+      setRetrying(false);
+    }
+  }, [activeDraft, essayId, ownerUid, user]);
 
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
   if (!essay || !activeDraft) return <div>Essay not found.</div>;
@@ -163,17 +208,13 @@ export default function EssayPage() {
 
   return (
     <div className="essay-page">
-      <DocBar title={essay.title}>
-        {drafts.length > 1 && (
-          <Select
-            size="xs"
-            value={activeDraft.id}
-            onChange={(val) => val && setSelectedDraftId(val)}
-            data={drafts.map((d) => ({ value: d.id, label: `Rev ${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
-            styles={{ input: { minWidth: 180 } }}
-          />
-        )}
-      </DocBar>
+      <DocBar
+        title={essay.title}
+        activeDraftId={activeDraft.id}
+        draftLabel={`v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`}
+        draftOptions={drafts.map((d) => ({ id: d.id, label: `v${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
+        onPickDraft={setSelectedDraftId}
+      />
 
       {/* Row 2 — Analysis bar */}
       <div className="analysis-bar">
@@ -196,7 +237,7 @@ export default function EssayPage() {
           />
         </div>
         {activeView === 'feedback' && (
-          <div style={{ position: 'relative', display: 'contents' }}>
+          <div style={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center' }}>
             <ScorePillBar
               evaluation={evaluation}
               activeKey={activeTrait}
@@ -222,8 +263,8 @@ export default function EssayPage() {
             variant="default"
             onClick={
               activeView === 'grammar' ? handleGrammarReanalyze
-              : activeView === 'transitions' ? handleTransitionsTab
-              : handleRetry
+              : activeView === 'transitions' ? handleTransitionReanalyze
+              : handleFeedbackReanalyze
             }
             disabled={
               activeView === 'grammar' ? grammarLoading
@@ -232,7 +273,7 @@ export default function EssayPage() {
             }
             loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
           >
-            Rerun
+            Analyze Again
           </Button>
           {isLatestDraft && (
             <Button
@@ -245,6 +286,39 @@ export default function EssayPage() {
           )}
         </Group>
       </div>
+
+      {/* Feedback summary — only on overall/feedback tab */}
+      {activeView === 'feedback' && (
+        <div className="feedback-summary">
+          {evaluation.overallFeedback && (
+            <p className="feedback-summary-text">{evaluation.overallFeedback}</p>
+          )}
+          {evaluation.revisionPlan.length > 0 && (
+            <div className="feedback-summary-section">
+              <strong>Revision Plan</strong>
+              <ol>
+                {evaluation.revisionPlan.map((step, i) => <li key={i}>{step}</li>)}
+              </ol>
+            </div>
+          )}
+          {comparison && comparison.improvements.length > 0 && (
+            <div className="feedback-summary-section improvements">
+              <strong>Improvements</strong>
+              <ul>
+                {comparison.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+              </ul>
+            </div>
+          )}
+          {comparison && comparison.remainingIssues.length > 0 && (
+            <div className="feedback-summary-section remaining">
+              <strong>Still to Work On</strong>
+              <ul>
+                {comparison.remainingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Essay with inline annotations — the main event */}
       {activeView === 'feedback' && (
@@ -284,41 +358,6 @@ export default function EssayPage() {
         </AnalysisPanel>
       )}
 
-      {/* Overall feedback + revision plan */}
-      <div className="essay-footer">
-        {evaluation.overallFeedback && (
-          <div className="overall-feedback">
-            <h3>Overall</h3>
-            <p>{evaluation.overallFeedback}</p>
-          </div>
-        )}
-
-        {evaluation.revisionPlan.length > 0 && (
-          <div className="revision-plan">
-            <h3>Revision Plan</h3>
-            <ol>
-              {evaluation.revisionPlan.map((step, i) => <li key={i}>{step}</li>)}
-            </ol>
-          </div>
-        )}
-
-        {comparison && comparison.improvements.length > 0 && (
-          <div className="comparison-section">
-            <h3>Improvements</h3>
-            <ul>
-              {comparison.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
-            </ul>
-          </div>
-        )}
-        {comparison && comparison.remainingIssues.length > 0 && (
-          <div className="comparison-section remaining">
-            <h3>Still to Work On</h3>
-            <ul>
-              {comparison.remainingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
-            </ul>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

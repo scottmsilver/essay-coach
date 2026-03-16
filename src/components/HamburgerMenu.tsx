@@ -12,7 +12,7 @@ export default function HamburgerMenu({ onSignOut }: Props) {
   const ref = useClickOutside<HTMLDivElement>(() => setOpen(false), open);
 
   return (
-    <div style={{ position: 'relative' }} ref={ref}>
+    <div className="hamburger-wrapper" ref={ref}>
       <button className="hamburger-btn" onClick={() => setOpen(!open)}>
         &#9776;
       </button>

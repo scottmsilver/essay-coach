@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import type { GrammarAnalysis, GrammarIssue, GrammarIssueCategory } from '../types';
 import { useCommentLayout } from '../hooks/useCommentLayout';
 import { useActiveMarker } from '../hooks/useActiveMarker';
@@ -35,7 +35,7 @@ type IssueMatch = { start: number; end: number; issue: GrammarIssue; category: s
 
 export default function GrammarView({ content, analysis }: Props) {
   const essayRef = useRef<HTMLDivElement>(null);
-  const [activeIssueKey, handleMarkClick] = useActiveMarker(essayRef);
+  const [activeIssueKey, handleMarkClick, setActiveIssueKey] = useActiveMarker(essayRef);
 
   // Collect all issues with their category for rendering
   const allIssues = useMemo(() => {
@@ -123,6 +123,20 @@ export default function GrammarView({ content, analysis }: Props) {
     result.sort((a, b) => a.start - b.start);
     return result;
   }, [content, allIssues]);
+
+  const handleNextIssue = useCallback(() => {
+    if (matches.length === 0) return;
+    const currentIndex = activeIssueKey ? matches.findIndex(m => m.id === activeIssueKey) : -1;
+    const nextIndex = (currentIndex + 1) % matches.length;
+    const nextId = matches[nextIndex].id;
+    setActiveIssueKey(nextId);
+    requestAnimationFrame(() => {
+      const marker = essayRef.current?.querySelector(`[data-issue-id="${nextId}"]`);
+      marker?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const comment = essayRef.current?.querySelector(`[data-comment-id="${nextId}"]`);
+      comment?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [matches, activeIssueKey, setActiveIssueKey]);
 
   const commentPositions = useCommentLayout(essayRef, matches, 'data-issue-id');
 
@@ -219,6 +233,14 @@ export default function GrammarView({ content, analysis }: Props) {
                 >
                   <span className="sidebar-comment-trait">{ALL_LABELS[m.category] || m.category}</span>
                   <span className="sidebar-comment-text">{m.issue.comment}</span>
+                  {isActive && matches.length > 1 && (
+                    <button
+                      className="next-issue-btn"
+                      onClick={(e) => { e.stopPropagation(); handleNextIssue(); }}
+                    >
+                      Next Issue ({matches.findIndex(x => x.id === m.id) + 1}/{matches.length})
+                    </button>
+                  )}
                 </div>
               );
             })}
