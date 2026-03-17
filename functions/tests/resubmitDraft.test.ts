@@ -25,10 +25,10 @@ vi.mock('firebase-admin/firestore', () => ({
 
 vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn() }));
 
-const mockGenerateContent = vi.fn();
+const mockGenerateContentStream = vi.fn();
 vi.mock('@google/genai', () => ({
   GoogleGenAI: vi.fn().mockImplementation(() => ({
-    models: { generateContent: mockGenerateContent },
+    models: { generateContentStream: mockGenerateContentStream },
   })),
 }));
 
@@ -83,8 +83,10 @@ describe('resubmitDraft', () => {
       empty: false,
       docs: [{ data: () => ({ evaluation: { traits: {} } }) }],
     });
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify(mockEvaluation),
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ text: JSON.stringify(mockEvaluation) }] } }] };
+      },
     });
   });
 
@@ -112,7 +114,7 @@ describe('resubmitDraft', () => {
 
     expect(mockSet).toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalled();
-    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(mockGenerateContentStream).toHaveBeenCalled();
     expect(result.draftNumber).toBe(2);
     expect(result.evaluation.comparisonToPrevious).toBeTruthy();
   });

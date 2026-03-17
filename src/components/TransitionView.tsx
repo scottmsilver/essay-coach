@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useLayoutEffect, useCallback } from 'react';
 import type { TransitionAnalysis, SentenceTransition, ParagraphTransition } from '../types';
-import { splitSentences } from '../utils/sentenceSplitter';
+import { splitSentences, splitParagraphs } from '../utils/sentenceSplitter';
 
 interface Props {
   content: string;
@@ -81,23 +81,25 @@ export default function TransitionView({ content, analysis }: Props) {
   const essayRef = useRef<HTMLDivElement>(null);
 
   const parsed = useMemo(() => {
-    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    const effectiveParagraphs = paragraphs.length > 1
-      ? paragraphs
-      : content.split(/\n/).filter(p => p.trim().length > 0);
+    // Use sentences from the backend when available (Gemma 3 4B split),
+    // fall back to local regex splitting for old analyses without stored sentences
+    let sentenceArrays: string[][];
+    if (analysis.sentences) {
+      sentenceArrays = analysis.sentences;
+    } else {
+      sentenceArrays = splitParagraphs(content).map(splitSentences);
+    }
 
     const allSentences: ParsedSentence[] = [];
-    for (let pi = 0; pi < effectiveParagraphs.length; pi++) {
-      const para = effectiveParagraphs[pi].trim();
-      const sentences = splitSentences(para);
-      for (let si = 0; si < sentences.length; si++) {
-        const s = sentences[si].trim();
+    for (let pi = 0; pi < sentenceArrays.length; pi++) {
+      for (let si = 0; si < sentenceArrays[pi].length; si++) {
+        const s = sentenceArrays[pi][si].trim();
         if (s.length === 0) continue;
         allSentences.push({ text: s, paragraphIndex: pi + 1, sentenceIndex: si + 1 });
       }
     }
-    return { paragraphs: effectiveParagraphs, sentences: allSentences };
-  }, [content]);
+    return { sentences: allSentences };
+  }, [content, analysis.sentences]);
 
   const sentenceTransitionMap = useMemo(() => {
     const map = new Map<string, SentenceTransition>();

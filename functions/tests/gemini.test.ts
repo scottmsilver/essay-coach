@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockGenerateContent = vi.fn();
+const mockGenerateContentStream = vi.fn();
 
 vi.mock('@google/genai', () => ({
   GoogleGenAI: vi.fn().mockImplementation(() => ({
     models: {
-      generateContent: mockGenerateContent,
+      generateContentStream: mockGenerateContentStream,
     },
   })),
 }));
@@ -33,8 +33,11 @@ describe('evaluateWithGemini', () => {
       comparisonToPrevious: null,
     };
 
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify(mockEvaluation),
+    const jsonText = JSON.stringify(mockEvaluation);
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ text: jsonText }] } }] };
+      },
     });
 
     const result = await evaluateWithGemini('fake-key', 'evaluate this');
@@ -42,12 +45,20 @@ describe('evaluateWithGemini', () => {
   });
 
   it('throws on empty Gemini response', async () => {
-    mockGenerateContent.mockResolvedValue({ text: null });
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ thought: true, text: 'thinking...' }] } }] };
+      },
+    });
     await expect(evaluateWithGemini('fake-key', 'evaluate this')).rejects.toThrow('empty response');
   });
 
   it('throws on invalid JSON response', async () => {
-    mockGenerateContent.mockResolvedValue({ text: 'not json' });
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ text: 'not json' }] } }] };
+      },
+    });
     await expect(evaluateWithGemini('fake-key', 'evaluate this')).rejects.toThrow();
   });
 });

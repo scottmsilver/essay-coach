@@ -13,8 +13,9 @@ describe('SYSTEM_PROMPT', () => {
   });
 
   it('includes score descriptors 1-6', () => {
-    expect(SYSTEM_PROMPT).toContain('1 -');
-    expect(SYSTEM_PROMPT).toContain('6 -');
+    expect(SYSTEM_PROMPT).toContain('Score 1');
+    expect(SYSTEM_PROMPT).toContain('Score 5');
+    expect(SYSTEM_PROMPT).toContain('A 6 means');
   });
 
   it('mentions revision-oriented feedback', () => {

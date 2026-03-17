@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -293,53 +293,17 @@ export async function analyzeGrammarWithGemini(
   content: string,
   progressRef?: DocumentReference,
 ): Promise<GrammarAnalysis> {
-  const ai = new GoogleGenAI({ apiKey });
   const prompt = buildGrammarPrompt(content);
 
-  const stream = await ai.models.generateContentStream({
-    model: 'gemini-3.1-pro-preview',
+  const outputText = await streamGeminiJson({
+    apiKey,
     contents: prompt,
-    config: {
-      systemInstruction: GRAMMAR_SYSTEM_PROMPT,
-      responseMimeType: 'application/json',
-      responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
-      thinkingConfig: { includeThoughts: true },
-    },
+    systemInstruction: GRAMMAR_SYSTEM_PROMPT,
+    responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
+    progressRef,
+    statusField: 'grammarStatus',
+    generatingMessage: 'Analyzing grammar...',
   });
-
-  let outputText = '';
-  let stage: 'thinking' | 'generating' = 'thinking';
-  let lastProgressWrite = 0;
-  const PROGRESS_THROTTLE_MS = 2000;
-
-  for await (const chunk of stream) {
-    const parts = chunk.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.thought) {
-        if (progressRef) {
-          const now = Date.now();
-          if (now - lastProgressWrite >= PROGRESS_THROTTLE_MS) {
-            const lines = (part.text || '').trim().split('\n');
-            const headline = lines[0]?.replace(/^\*+|\*+$/g, '').trim() || 'Thinking...';
-            await progressRef.update({ grammarStatus: { stage: 'thinking', message: headline } });
-            lastProgressWrite = now;
-          }
-        }
-      } else {
-        if (stage === 'thinking') {
-          stage = 'generating';
-          if (progressRef) {
-            await progressRef.update({ grammarStatus: { stage: 'generating', message: 'Analyzing grammar...' } });
-          }
-        }
-        outputText += part.text || '';
-      }
-    }
-  }
-
-  if (!outputText) {
-    throw new Error('Gemini returned an empty response');
-  }
 
   return JSON.parse(outputText) as GrammarAnalysis;
 }

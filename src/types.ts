@@ -58,26 +58,8 @@ export interface Evaluation {
   comparisonToPrevious: Comparison | null;
 }
 
-export interface SentenceTransition {
-  paragraph: number;
-  fromSentence: number;
-  toSentence: number;
-  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
-  comment: string;
-}
-
-export interface ParagraphTransition {
-  fromParagraph: number;
-  toParagraph: number;
-  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
-  comment: string;
-}
-
-export interface TransitionAnalysis {
-  sentenceTransitions: SentenceTransition[];
-  paragraphTransitions: ParagraphTransition[];
-  summary: string;
-}
+import type { SentenceTransition, ParagraphTransition, TransitionAnalysis } from '../shared/transitionTypes';
+export type { SentenceTransition, ParagraphTransition, TransitionAnalysis };
 
 // Grammar analysis types
 export interface GrammarIssue {

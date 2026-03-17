@@ -1,6 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
+import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
-import { splitSentences } from './sentenceSplitter';
+import { splitSentences, splitParagraphs, splitSentencesAI } from './sentenceSplitter';
 
 const TRANSITION_SYSTEM_PROMPT = `You are an expert writing coach specializing in essay structure and flow. Your job is to analyze EVERY transition in a student's essay — between consecutive sentences and between paragraphs.
 
@@ -74,51 +74,33 @@ const TRANSITION_SCHEMA = {
   required: ['sentenceTransitions', 'paragraphTransitions', 'summary'],
 };
 
-export interface SentenceTransition {
-  paragraph: number;
-  fromSentence: number;
-  toSentence: number;
-  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
-  comment: string;
-}
-
-export interface ParagraphTransition {
-  fromParagraph: number;
-  toParagraph: number;
-  quality: 'smooth' | 'adequate' | 'weak' | 'missing';
-  comment: string;
-}
-
-export interface TransitionAnalysis {
-  sentenceTransitions: SentenceTransition[];
-  paragraphTransitions: ParagraphTransition[];
-  summary: string;
-}
+import type { TransitionAnalysis } from './shared/transitionTypes';
+export type { SentenceTransition, ParagraphTransition, TransitionAnalysis } from './shared/transitionTypes';
 
 /**
- * Split essay into numbered paragraphs and sentences for the prompt.
- * Returns the formatted text to send to Gemini.
+ * Split essay into paragraphs and sentences.
+ * Uses Gemma 3 4B (free via Gemini API) when apiKey is provided, with regex fallback.
+ * Returns both the formatted prompt text and the sentence arrays for storage.
  */
-export function formatEssayForTransitionAnalysis(content: string): string {
-  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-  // Fallback: if no double-newlines, split on single newlines
-  const effectiveParagraphs = paragraphs.length > 1
-    ? paragraphs
-    : content.split(/\n/).filter(p => p.trim().length > 0);
+export async function splitEssayIntoSentences(content: string, apiKey?: string): Promise<string[][]> {
+  const paragraphs = splitParagraphs(content);
+  const raw = apiKey
+    ? await splitSentencesAI(apiKey, paragraphs)
+    : paragraphs.map(splitSentences);
 
+  // Filter empties so sentence indices are always dense (no gaps)
+  return raw.map(arr => arr.map(s => s.trim()).filter(s => s.length > 0));
+}
+
+export function formatSentencesForPrompt(sentences: string[][]): string {
   const lines: string[] = [];
 
-  for (let pi = 0; pi < effectiveParagraphs.length; pi++) {
-    const para = effectiveParagraphs[pi].trim();
-    const sentences = splitSentences(para);
-
-    for (let si = 0; si < sentences.length; si++) {
-      const s = sentences[si].trim();
-      if (s.length === 0) continue;
-      lines.push(`¶${pi + 1} S${si + 1}: "${s}"`);
+  for (let pi = 0; pi < sentences.length; pi++) {
+    for (let si = 0; si < sentences[pi].length; si++) {
+      lines.push(`¶${pi + 1} S${si + 1}: "${sentences[pi][si]}"`);
     }
 
-    if (pi < effectiveParagraphs.length - 1) {
+    if (pi < sentences.length - 1) {
       lines.push(`--- PARAGRAPH BREAK (¶${pi + 1} → ¶${pi + 2}) ---`);
     }
   }
@@ -126,8 +108,7 @@ export function formatEssayForTransitionAnalysis(content: string): string {
   return lines.join('\n');
 }
 
-export function buildTransitionPrompt(content: string): string {
-  const formatted = formatEssayForTransitionAnalysis(content);
+export function buildTransitionPrompt(formatted: string): string {
   return `Analyze every transition in this student essay. The essay has been split into numbered paragraphs (¶) and sentences (S) for your reference.
 
 Rate each sentence-to-sentence transition within each paragraph, and each paragraph-to-paragraph transition. Use the rating scale: smooth, adequate, weak, missing.
@@ -144,53 +125,22 @@ export async function analyzeTransitionsWithGemini(
   content: string,
   progressRef?: DocumentReference,
 ): Promise<TransitionAnalysis> {
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = buildTransitionPrompt(content);
+  // Split sentences with Gemma 3 4B (falls back to regex)
+  const sentences = await splitEssayIntoSentences(content, apiKey);
+  const formatted = formatSentencesForPrompt(sentences);
+  const prompt = buildTransitionPrompt(formatted);
 
-  const stream = await ai.models.generateContentStream({
-    model: 'gemini-3.1-pro-preview',
+  const outputText = await streamGeminiJson({
+    apiKey,
     contents: prompt,
-    config: {
-      systemInstruction: TRANSITION_SYSTEM_PROMPT,
-      responseMimeType: 'application/json',
-      responseSchema: TRANSITION_SCHEMA,
-      thinkingConfig: { includeThoughts: true },
-    },
+    systemInstruction: TRANSITION_SYSTEM_PROMPT,
+    responseSchema: TRANSITION_SCHEMA,
+    progressRef,
+    statusField: 'transitionStatus',
+    generatingMessage: 'Analyzing transitions...',
   });
 
-  let outputText = '';
-  let stage: 'thinking' | 'generating' = 'thinking';
-  let lastProgressWrite = 0;
-  const PROGRESS_THROTTLE_MS = 2000;
-
-  for await (const chunk of stream) {
-    const parts = chunk.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.thought) {
-        if (progressRef) {
-          const now = Date.now();
-          if (now - lastProgressWrite >= PROGRESS_THROTTLE_MS) {
-            const lines = (part.text || '').trim().split('\n');
-            const headline = lines[0]?.replace(/^\*+|\*+$/g, '').trim() || 'Thinking...';
-            await progressRef.update({ transitionStatus: { stage: 'thinking', message: headline } });
-            lastProgressWrite = now;
-          }
-        }
-      } else {
-        if (stage === 'thinking') {
-          stage = 'generating';
-          if (progressRef) {
-            await progressRef.update({ transitionStatus: { stage: 'generating', message: 'Analyzing transitions...' } });
-          }
-        }
-        outputText += part.text || '';
-      }
-    }
-  }
-
-  if (!outputText) {
-    throw new Error('Gemini returned an empty response');
-  }
-
-  return JSON.parse(outputText) as TransitionAnalysis;
+  const analysis = JSON.parse(outputText) as TransitionAnalysis;
+  analysis.sentences = sentences;
+  return analysis;
 }

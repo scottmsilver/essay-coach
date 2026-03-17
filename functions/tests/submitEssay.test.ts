@@ -36,10 +36,10 @@ vi.mock('firebase-admin/app', () => ({
 }));
 
 // Mock Gemini
-const mockGenerateContent = vi.fn();
+const mockGenerateContentStream = vi.fn();
 vi.mock('@google/genai', () => ({
   GoogleGenAI: vi.fn().mockImplementation(() => ({
-    models: { generateContent: mockGenerateContent },
+    models: { generateContentStream: mockGenerateContentStream },
   })),
 }));
 
@@ -79,8 +79,10 @@ describe('submitEssay', () => {
       exists: true,
       data: () => ({ emails: ['test@gmail.com'] }),
     });
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify(mockEvaluation),
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ text: JSON.stringify(mockEvaluation) }] } }] };
+      },
     });
   });
 
@@ -124,7 +126,7 @@ describe('submitEssay', () => {
     });
 
     expect(mockSet).toHaveBeenCalled();
-    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(mockGenerateContentStream).toHaveBeenCalled();
     expect(result.evaluation).toEqual(mockEvaluation);
   });
 });
