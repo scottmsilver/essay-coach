@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Button } from '@mantine/core';
+import { Button, Text } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import DocBar from '../components/DocBar';
@@ -10,6 +10,8 @@ import { useEssay } from '../hooks/useEssay';
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { handleRichPaste } from '../utils/pasteHandler';
+import { fetchGDocInfo } from '../utils/gdocImport';
+import { parseSections } from '../../shared/gdocTypes';
 import { scoreColor, collectAnnotations, classifyAnnotation } from '../utils';
 import ScorePillBar from '../components/ScorePillBar';
 
@@ -23,6 +25,7 @@ export default function RevisionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [refetching, setRefetching] = useState(false);
   const initialized = useRef(false);
 
   const latestDraft = drafts[0];
@@ -56,6 +59,23 @@ export default function RevisionPage() {
     setSubmitting(true);
     setError(null);
     try {
+      let essayContent = content;
+
+      // Re-fetch from Google Docs if content is doc-sourced
+      if (essay?.contentSource) {
+        setRefetching(true);
+        try {
+          const data = await fetchGDocInfo(essay.contentSource.docId, essay.contentSource.tab);
+          const sections = parseSections(data.text, data.bookmarks);
+          if (essay.contentSource.sectionIndex < sections.length) {
+            essayContent = sections[essay.contentSource.sectionIndex];
+          }
+        } catch (err) {
+          console.warn('Failed to re-fetch from Google Docs, using current content:', err);
+        }
+        setRefetching(false);
+      }
+
       const uid = user.uid;
       const newDraftNumber = (essay?.currentDraftNumber ?? latestDraft.draftNumber) + 1;
       const essayRef = doc(db, `users/${uid}/essays/${essayId}`);
@@ -64,7 +84,7 @@ export default function RevisionPage() {
       await Promise.all([
         setDoc(draftRef, {
           draftNumber: newDraftNumber,
-          content,
+          content: essayContent,
           submittedAt: serverTimestamp(),
         }),
         updateDoc(essayRef, {
@@ -108,8 +128,8 @@ export default function RevisionPage() {
         />
         <div className="analysis-bar-right">
           {!ownerUid && (
-            <Button size="compact-sm" onClick={handleResubmit} disabled={submitting || retryCount >= 3} loading={submitting}>
-              Resubmit
+            <Button size="compact-sm" onClick={handleResubmit} disabled={submitting || retryCount >= 3} loading={submitting || refetching}>
+              {refetching ? 'Re-importing...' : 'Resubmit'}
             </Button>
           )}
         </div>
@@ -141,12 +161,21 @@ export default function RevisionPage() {
       {/* Essay editor with annotation sidebar for reference */}
       <div className="revision-layout">
         <div className="revision-editor">
-          <textarea
-            className="essay-editor"
-            value={content}
-            onChange={(e) => handleContentChange(e.target.value)}
-            onPaste={(e) => handleRichPaste(e, handleContentChange)}
-          />
+          {essay?.contentSource ? (
+            <div style={{ padding: 16, background: 'var(--mantine-color-gray-0)', borderRadius: 8, height: '100%' }}>
+              <Text size="sm" c="dimmed" mb="sm">
+                This essay is linked to a Google Doc. Edit your essay in Google Docs, then click Resubmit to re-import and evaluate the latest version.
+              </Text>
+              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{content}</Text>
+            </div>
+          ) : (
+            <textarea
+              className="essay-editor"
+              value={content}
+              onChange={(e) => handleContentChange(e.target.value)}
+              onPaste={(e) => handleRichPaste(e, handleContentChange)}
+            />
+          )}
         </div>
         <div className="revision-annotations">
           <div className="revision-annotations-header">Feedback</div>

@@ -29,6 +29,9 @@ dist-ssr
 
 # Secrets
 .env
+gdocs-oauth.json
+gdocs-token.json
+gdocs-script-id.json
 
 # Firebase
 .firebase/

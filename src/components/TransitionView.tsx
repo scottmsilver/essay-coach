@@ -82,20 +82,24 @@ export default function TransitionView({ content, analysis }: Props) {
 
   const parsed = useMemo(() => {
     // Use sentences from the backend when available (Gemma 3 4B split),
-    // fall back to local regex splitting for old analyses without stored sentences
-    let sentenceArrays: string[][];
+    // fall back to local regex splitting for old analyses without stored sentences.
+    // Backend stores as Record<string, string[]> (Firestore can't store nested arrays).
+    let sentenceMap: Record<string, string[]>;
     if (analysis.sentences) {
-      sentenceArrays = analysis.sentences;
+      sentenceMap = analysis.sentences;
     } else {
-      sentenceArrays = splitParagraphs(content).map(splitSentences);
+      const arrays = splitParagraphs(content).map(splitSentences);
+      sentenceMap = Object.fromEntries(arrays.map((a, i) => [String(i), a]));
     }
 
+    const keys = Object.keys(sentenceMap).sort((a, b) => Number(a) - Number(b));
     const allSentences: ParsedSentence[] = [];
-    for (let pi = 0; pi < sentenceArrays.length; pi++) {
-      for (let si = 0; si < sentenceArrays[pi].length; si++) {
-        const s = sentenceArrays[pi][si].trim();
+    for (let ki = 0; ki < keys.length; ki++) {
+      const sents = sentenceMap[keys[ki]];
+      for (let si = 0; si < sents.length; si++) {
+        const s = sents[si].trim();
         if (s.length === 0) continue;
-        allSentences.push({ text: s, paragraphIndex: pi + 1, sentenceIndex: si + 1 });
+        allSentences.push({ text: s, paragraphIndex: ki + 1, sentenceIndex: si + 1 });
       }
     }
     return { sentences: allSentences };

@@ -43,6 +43,12 @@ describe('validateSubmitEssay', () => {
   it('rejects empty content', () => {
     expect(validateSubmitEssay({ ...valid, content: '' })).toMatch(/content/i);
   });
+  it('accepts empty content when contentSource is provided', () => {
+    expect(validateSubmitEssay({ ...valid, content: '' }, { hasContentSource: true })).toBeNull();
+  });
+  it('accepts empty prompt when promptSource is provided', () => {
+    expect(validateSubmitEssay({ ...valid, assignmentPrompt: '' }, { hasPromptSource: true })).toBeNull();
+  });
 });
 
 describe('validateResubmitDraft', () => {
@@ -54,5 +60,8 @@ describe('validateResubmitDraft', () => {
   });
   it('rejects empty content', () => {
     expect(validateResubmitDraft({ essayId: 'abc', content: '' })).toMatch(/content/i);
+  });
+  it('accepts empty content when contentSource is provided', () => {
+    expect(validateResubmitDraft({ essayId: 'abc', content: '' }, { hasContentSource: true })).toBeNull();
   });
 });

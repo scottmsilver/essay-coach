@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
 import HamburgerMenu from './HamburgerMenu';

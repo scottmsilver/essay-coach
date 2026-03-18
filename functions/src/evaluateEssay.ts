@@ -1,12 +1,14 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
-import { defineSecret } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import { isEmailAllowed } from './allowlist';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { evaluateWithGemini } from './gemini';
 import { resolveEssayOwner } from './resolveEssayOwner';
+import { resolveDocSource } from './gdocResolver';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
+const gdocWebAppId = defineString('GDOC_WEBAPP_DEPLOYMENT_ID', { default: '' });
 
 /**
  * Evaluate an existing draft that doesn't have an evaluation yet.
@@ -50,8 +52,30 @@ export const evaluateEssay = onCall(
     }
 
     const essayData = essayDoc.data()!;
-    const { assignmentPrompt, writingType } = essayData;
-    const { content, draftNumber } = draftData;
+    let { assignmentPrompt, writingType } = essayData;
+    let { content } = draftData;
+    const { draftNumber } = draftData;
+
+    // Re-fetch from Google Docs if doc sources are set
+    const webAppId = gdocWebAppId.value();
+    if (webAppId) {
+      if (essayData.contentSource) {
+        try {
+          content = await resolveDocSource(essayData.contentSource, webAppId);
+          await draftRef.update({ content });
+        } catch (err) {
+          console.warn('Failed to re-fetch essay from Google Docs, using stored content:', (err as Error).message);
+        }
+      }
+      if (essayData.promptSource) {
+        try {
+          assignmentPrompt = await resolveDocSource(essayData.promptSource, webAppId);
+          await essayRef.update({ assignmentPrompt });
+        } catch (err) {
+          console.warn('Failed to re-fetch prompt from Google Docs, using stored prompt:', (err as Error).message);
+        }
+      }
+    }
 
     try {
       let prompt: string;

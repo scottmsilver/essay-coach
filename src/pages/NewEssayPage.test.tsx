@@ -14,13 +14,13 @@ describe('NewEssayPage', () => {
     renderWithRouter(<NewEssayPage />);
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
     expect(screen.getByText(/writing type/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/assignment prompt/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/your essay/i)).toBeInTheDocument();
+    expect(screen.getByText(/assignment prompt/i)).toBeInTheDocument();
+    expect(screen.getByText(/your essay/i)).toBeInTheDocument();
   });
 
   it('shows word count', async () => {
     renderWithRouter(<NewEssayPage />);
-    const textarea = screen.getByLabelText(/your essay/i);
+    const textarea = screen.getByPlaceholderText(/paste or type your essay/i);
     await userEvent.type(textarea, 'one two three four five');
     expect(screen.getByText(/5/)).toBeInTheDocument();
   });

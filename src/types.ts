@@ -61,6 +61,9 @@ export interface Evaluation {
 import type { SentenceTransition, ParagraphTransition, TransitionAnalysis } from '../shared/transitionTypes';
 export type { SentenceTransition, ParagraphTransition, TransitionAnalysis };
 
+import type { DocSource } from '../shared/gdocTypes';
+export type { DocSource };
+
 // Grammar analysis types
 export interface GrammarIssue {
   sentence: string;
@@ -150,6 +153,8 @@ export interface Essay {
   createdAt: Date;
   updatedAt: Date;
   currentDraftNumber: number;
+  promptSource?: DocSource | null;
+  contentSource?: DocSource | null;
 }
 
 export interface Share {

@@ -5,13 +5,14 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "main": "lib/index.js",
+  "main": "lib/functions/src/index.js",
   "dependencies": {
     "@google/genai": "^1.0.0",
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.0.0"
   },
   "devDependencies": {
+    "googleapis": "^171.4.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0"
   },

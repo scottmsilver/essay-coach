@@ -82,25 +82,37 @@ export type { SentenceTransition, ParagraphTransition, TransitionAnalysis } from
  * Uses Gemma 3 4B (free via Gemini API) when apiKey is provided, with regex fallback.
  * Returns both the formatted prompt text and the sentence arrays for storage.
  */
-export async function splitEssayIntoSentences(content: string, apiKey?: string): Promise<string[][]> {
+export async function splitEssayIntoSentences(content: string, apiKey?: string): Promise<Record<string, string[]>> {
   const paragraphs = splitParagraphs(content);
   const raw = apiKey
     ? await splitSentencesAI(apiKey, paragraphs)
     : paragraphs.map(splitSentences);
 
-  // Filter empties so sentence indices are always dense (no gaps)
-  return raw.map(arr => arr.map(s => s.trim()).filter(s => s.length > 0));
+  // Skip empty paragraphs so keys are dense and ¶N labels stay in sync.
+  // Return as Record<string, string[]> for Firestore compatibility (no nested arrays).
+  const result: Record<string, string[]> = {};
+  let ki = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const filtered = raw[i].map(s => s.trim()).filter(s => s.length > 0);
+    if (filtered.length > 0) {
+      result[String(ki++)] = filtered;
+    }
+  }
+  return result;
 }
 
-export function formatSentencesForPrompt(sentences: string[][]): string {
+export function formatSentencesForPrompt(sentences: Record<string, string[]>): string {
+  const keys = Object.keys(sentences).sort((a, b) => Number(a) - Number(b));
   const lines: string[] = [];
 
-  for (let pi = 0; pi < sentences.length; pi++) {
-    for (let si = 0; si < sentences[pi].length; si++) {
-      lines.push(`¶${pi + 1} S${si + 1}: "${sentences[pi][si]}"`);
+  for (let ki = 0; ki < keys.length; ki++) {
+    const pi = ki; // paragraph index (0-based)
+    const sents = sentences[keys[ki]];
+    for (let si = 0; si < sents.length; si++) {
+      lines.push(`¶${pi + 1} S${si + 1}: "${sents[si]}"`);
     }
 
-    if (pi < sentences.length - 1) {
+    if (ki < keys.length - 1) {
       lines.push(`--- PARAGRAPH BREAK (¶${pi + 1} → ¶${pi + 2}) ---`);
     }
   }

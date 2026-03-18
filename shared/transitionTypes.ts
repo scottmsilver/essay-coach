@@ -17,5 +17,6 @@ export interface TransitionAnalysis {
   sentenceTransitions: SentenceTransition[];
   paragraphTransitions: ParagraphTransition[];
   summary: string;
-  sentences?: string[][];
+  /** Paragraph index (as string key) → array of sentences. Map format for Firestore compatibility (no nested arrays). */
+  sentences?: Record<string, string[]>;
 }

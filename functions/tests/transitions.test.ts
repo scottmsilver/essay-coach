@@ -3,17 +3,17 @@ import { formatSentencesForPrompt, buildTransitionPrompt } from '../src/transiti
 
 describe('formatSentencesForPrompt', () => {
   it('formats single paragraph with numbered sentences', () => {
-    const result = formatSentencesForPrompt([
-      ['First sentence.', 'Second sentence.'],
-    ]);
+    const result = formatSentencesForPrompt({
+      '0': ['First sentence.', 'Second sentence.'],
+    });
     expect(result).toBe('¶1 S1: "First sentence."\n¶1 S2: "Second sentence."');
   });
 
   it('formats multiple paragraphs with breaks', () => {
-    const result = formatSentencesForPrompt([
-      ['Para one sent one.', 'Para one sent two.'],
-      ['Para two sent one.'],
-    ]);
+    const result = formatSentencesForPrompt({
+      '0': ['Para one sent one.', 'Para one sent two.'],
+      '1': ['Para two sent one.'],
+    });
     expect(result).toContain('¶1 S1: "Para one sent one."');
     expect(result).toContain('¶1 S2: "Para one sent two."');
     expect(result).toContain('--- PARAGRAPH BREAK (¶1 → ¶2) ---');
@@ -21,14 +21,14 @@ describe('formatSentencesForPrompt', () => {
   });
 
   it('formats all sentences without filtering (filtering is done upstream)', () => {
-    const result = formatSentencesForPrompt([
-      ['Real sentence.', 'Another one.'],
-    ]);
+    const result = formatSentencesForPrompt({
+      '0': ['Real sentence.', 'Another one.'],
+    });
     expect(result).toBe('¶1 S1: "Real sentence."\n¶1 S2: "Another one."');
   });
 
   it('handles empty input', () => {
-    expect(formatSentencesForPrompt([])).toBe('');
+    expect(formatSentencesForPrompt({})).toBe('');
   });
 });
 
@@ -87,8 +87,8 @@ describe('analyzeTransitionsWithGemini', () => {
 
     expect(result.summary).toBe('Well connected.');
     expect(result.sentences).toBeDefined();
-    expect(result.sentences).toHaveLength(1);
-    expect(result.sentences![0]).toEqual(['First sentence.', 'Second sentence.']);
+    expect(Object.keys(result.sentences!)).toHaveLength(1);
+    expect(result.sentences!['0']).toEqual(['First sentence.', 'Second sentence.']);
   });
 
   it('falls back to regex sentences when Gemma fails', async () => {
@@ -114,8 +114,8 @@ describe('analyzeTransitionsWithGemini', () => {
 
     // Should still have sentences (from regex fallback)
     expect(result.sentences).toBeDefined();
-    expect(result.sentences![0]).toContain('Hello world.');
-    expect(result.sentences![0]).toContain('Goodbye.');
+    expect(result.sentences!['0']).toContain('Hello world.');
+    expect(result.sentences!['0']).toContain('Goodbye.');
   });
 });
 
@@ -128,9 +128,9 @@ describe('splitEssayIntoSentences', () => {
     const { splitEssayIntoSentences } = await import('../src/transitions');
 
     const result = await splitEssayIntoSentences('First sentence. Second sentence.\n\nNew paragraph. More text.');
-    expect(result).toHaveLength(2);
-    expect(result[0]).toEqual(['First sentence.', 'Second sentence.']);
-    expect(result[1]).toEqual(['New paragraph.', 'More text.']);
+    expect(Object.keys(result)).toHaveLength(2);
+    expect(result['0']).toEqual(['First sentence.', 'Second sentence.']);
+    expect(result['1']).toEqual(['New paragraph.', 'More text.']);
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
 
@@ -138,8 +138,27 @@ describe('splitEssayIntoSentences', () => {
     const { splitEssayIntoSentences } = await import('../src/transitions');
 
     const result = await splitEssayIntoSentences('Line one. Two.\nLine three. Four.');
-    expect(result).toHaveLength(2);
-    expect(result[0]).toEqual(['Line one.', 'Two.']);
-    expect(result[1]).toEqual(['Line three.', 'Four.']);
+    expect(Object.keys(result)).toHaveLength(2);
+    expect(result['0']).toEqual(['Line one.', 'Two.']);
+    expect(result['1']).toEqual(['Line three.', 'Four.']);
+  });
+
+  it('returns Record<string, string[]> format compatible with Firestore (no nested arrays)', async () => {
+    const { splitEssayIntoSentences } = await import('../src/transitions');
+
+    const result = await splitEssayIntoSentences('Hello. World.\n\nSecond paragraph.');
+
+    // Must be a plain object with string keys, not an array
+    expect(Array.isArray(result)).toBe(false);
+    expect(typeof result).toBe('object');
+
+    // Each value must be a flat string array (not nested)
+    for (const key of Object.keys(result)) {
+      expect(typeof key).toBe('string');
+      expect(Array.isArray(result[key])).toBe(true);
+      for (const s of result[key]) {
+        expect(typeof s).toBe('string');
+      }
+    }
   });
 });

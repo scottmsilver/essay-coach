@@ -2,6 +2,12 @@
  * Handles paste events from rich text sources (Google Docs, Word, etc.)
  * by extracting HTML and converting structural elements to plain text
  * with proper paragraph breaks preserved.
+ *
+ * FORMAT CONTRACT (must stay in sync with functions/scripts/apps-script-source.ts):
+ *   - Indented paragraphs → \t prefix
+ *   - Bullet list items → \u2022 (•) prefix
+ *   - Numbered list items → N. prefix
+ *   - Paragraph separation → \n\n
  */
 export function handleRichPaste(
   e: React.ClipboardEvent<HTMLTextAreaElement>,
@@ -31,7 +37,14 @@ export function handleRichPaste(
   });
 }
 
-function htmlToPlainText(root: Node): string {
+function hasTextIndent(el: Element): boolean {
+  if (el instanceof HTMLElement && parseFloat(el.style.textIndent) > 0) return true;
+  const style = el.getAttribute('style') ?? '';
+  const match = style.match(/text-indent:\s*([\d.]+)/);
+  return match !== null && parseFloat(match[1]) > 0;
+}
+
+export function htmlToPlainText(root: Node): string {
   const doc = root.ownerDocument ?? (root as Document);
 
   // Remove sup/sub elements (footnote markers) and replace with a space
@@ -74,7 +87,15 @@ function htmlToPlainText(root: Node): string {
       if (!text) continue;
 
       if (tag === 'li') {
-        parts.push('\n' + text);
+        const parent = block.parentElement;
+        if (parent && parent.tagName.toLowerCase() === 'ol') {
+          const idx = Array.from(parent.children).indexOf(block as Element) + 1;
+          parts.push(idx + '. ' + text);
+        } else {
+          parts.push('\u2022 ' + text);
+        }
+      } else if (hasTextIndent(block)) {
+        parts.push('\t' + text);
       } else {
         parts.push(text);
       }
@@ -82,7 +103,8 @@ function htmlToPlainText(root: Node): string {
 
     return parts.join('\n\n')
       .replace(/\n{3,}/g, '\n\n')
-      .trim();
+      .replace(/^\n+/, '')
+      .replace(/\s+$/, '');
   }
 
   // Fallback: just use textContent (handles simple HTML without block elements)
