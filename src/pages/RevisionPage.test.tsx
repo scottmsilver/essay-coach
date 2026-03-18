@@ -48,9 +48,9 @@ describe('RevisionPage', () => {
     expect(screen.getByText(/revision/i)).toBeInTheDocument();
   });
 
-  it('renders hamburger menu button', () => {
+  it('renders burger menu button', () => {
     const { container } = renderWithRouter(<RevisionPage />);
-    expect(container.querySelector('.hamburger-btn')).toBeInTheDocument();
+    expect(container.querySelector('.mantine-Burger-root')).toBeInTheDocument();
   });
 
   it('renders trait score pills with full names', () => {

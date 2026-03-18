@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { Burger, Drawer, Menu, Avatar, Stack } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import HamburgerMenu from './HamburgerMenu';
+import { NAV_LINKS } from '../constants';
 
 interface DraftOption {
   id: string;
@@ -21,52 +24,80 @@ export default function DocBar({ title, activeDraftId, draftLabel, draftOptions,
   const { user, logOut } = useAuth();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useClickOutside<HTMLDivElement>(() => setPickerOpen(false), pickerOpen);
+  const [drawerOpened, { open: openDrawer, close: closeDrawer }] = useDisclosure(false);
+
+  const initial = (user?.displayName?.[0] ?? user?.email?.[0] ?? '?').toUpperCase();
 
   return (
-    <div className="doc-bar">
-      <div className="doc-bar-left">
-        <HamburgerMenu onSignOut={logOut} />
-        <h2 className="doc-bar-title">{title}</h2>
-        {draftLabel && (
-          <div className="doc-bar-draft" ref={pickerRef}>
-            <span className="doc-bar-draft-label">{draftLabel}</span>
-            {draftOptions && draftOptions.length > 1 && (
-              <>
-                <button
-                  className="doc-bar-draft-pick"
-                  onClick={() => setPickerOpen(!pickerOpen)}
-                  aria-label="Pick version"
-                >
-                  &#9662;
-                </button>
-                {pickerOpen && (
-                  <div className="doc-bar-draft-menu">
-                    {draftOptions.map((opt) => (
-                      <button
-                        key={opt.id}
-                        className={`doc-bar-draft-item ${opt.id === activeDraftId ? 'active' : ''}`}
-                        onClick={() => { onPickDraft?.(opt.id); setPickerOpen(false); }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-        {children}
+    <>
+      <Drawer opened={drawerOpened} onClose={closeDrawer} size="xs" title="EssayCoach">
+        <Stack gap={4}>
+          {NAV_LINKS.map(({ to, label }) => (
+            <Link key={to} to={to} className="nav-tab-mobile" onClick={closeDrawer}>
+              {label}
+            </Link>
+          ))}
+          <div style={{ height: 1, background: 'var(--color-border)', margin: '8px 0' }} />
+          <button className="nav-tab-mobile" onClick={() => { closeDrawer(); logOut(); }}>
+            Sign out
+          </button>
+        </Stack>
+      </Drawer>
+
+      <div className="doc-bar">
+        <div className="doc-bar-left">
+          <Burger opened={drawerOpened} onClick={openDrawer} size="sm" />
+          <h2 className="doc-bar-title">{title}</h2>
+          {draftLabel && (
+            <div className="doc-bar-draft" ref={pickerRef}>
+              <span className="doc-bar-draft-label">{draftLabel}</span>
+              {draftOptions && draftOptions.length > 1 && (
+                <>
+                  <button
+                    className="doc-bar-draft-pick"
+                    onClick={() => setPickerOpen(!pickerOpen)}
+                    aria-label="Pick version"
+                  >
+                    &#9662;
+                  </button>
+                  {pickerOpen && (
+                    <div className="doc-bar-draft-menu">
+                      {draftOptions.map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`doc-bar-draft-item ${opt.id === activeDraftId ? 'active' : ''}`}
+                          onClick={() => { onPickDraft?.(opt.id); setPickerOpen(false); }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {children}
+        </div>
+        <div className="doc-bar-right">
+          <Menu shadow="md" width={160} position="bottom-end">
+            <Menu.Target>
+              <Avatar
+                src={user?.photoURL}
+                alt={user?.displayName ?? ''}
+                radius="xl"
+                size="sm"
+                style={{ cursor: 'pointer' }}
+              >
+                {initial}
+              </Avatar>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={logOut}>Sign out</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </div>
       </div>
-      <div className="doc-bar-right">
-        {user?.photoURL ? (
-          <img src={user.photoURL} alt="" className="doc-bar-avatar" title={user.email ?? ''} />
-        ) : (
-          <span className="doc-bar-avatar-fallback" title={user?.email ?? ''}>
-            {user?.email?.[0]?.toUpperCase() ?? '?'}
-          </span>
-        )}
-      </div>
-    </div>
+    </>
   );
 }

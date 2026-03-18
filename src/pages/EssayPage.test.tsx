@@ -57,9 +57,9 @@ describe('EssayPage', () => {
     expect(labels).toEqual(['Ideas', 'Organization', 'Voice', 'Word Choice', 'Sentence Fluency', 'Conventions', 'Presentation']);
   });
 
-  it('renders hamburger menu button', () => {
+  it('renders burger menu button', () => {
     const { container } = renderWithRouter(<EssayPage />);
-    expect(container.querySelector('.hamburger-btn')).toBeInTheDocument();
+    expect(container.querySelector('.mantine-Burger-root')).toBeInTheDocument();
   });
 
   it('renders view type dropdown', () => {
@@ -82,11 +82,9 @@ describe('EssayPage', () => {
     expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
   });
 
-  it('renders user avatar with email tooltip', () => {
+  it('renders user avatar', () => {
     const { container } = renderWithRouter(<EssayPage />);
-    const avatar = container.querySelector('.doc-bar-avatar-fallback');
-    expect(avatar).toBeInTheDocument();
-    expect(avatar?.getAttribute('title')).toBe('test@gmail.com');
+    expect(container.querySelector('.mantine-Avatar-root')).toBeInTheDocument();
   });
 
   it('shows loading state for recent draft with null evaluation', () => {
