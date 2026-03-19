@@ -1,25 +1,72 @@
+/*
+ * EssayCoach Design System — Warm Editorial
+ * Change these variables to retheme the entire app.
+ * See also: src/theme.ts for Mantine component theme overrides.
+ */
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-border: #e5e7eb;
-  --color-text: #111827;
-  --color-text-secondary: #6b7280;
-  --color-text-muted: #9ca3af;
-  --color-red: #dc2626;
-  --color-yellow: #d97706;
+  /* Primary palette */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: rgba(37, 99, 235, 0.08);
+  --color-accent: #F59E0B;
+  --color-accent-light: rgba(245, 158, 11, 0.12);
+
+  /* Semantic */
   --color-green: #059669;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-green-light: rgba(5, 150, 105, 0.08);
+  --color-yellow: #D97706;
+  --color-red: #DC2626;
+  --color-red-light: rgba(220, 38, 38, 0.06);
+
+  /* Surfaces — warm grays (stone palette) */
+  --color-bg: #F8F7F4;
+  --color-surface: #FFFFFF;
+  --color-surface-warm: #F5F3EF;
+  --color-border: #E7E5E4;
+
+  /* Text — warm darks */
+  --color-text: #1C1917;
+  --color-text-secondary: #78716C;
+  --color-text-muted: #A8A29E;
+
+  /* Typography */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+
+  /* Legacy alias — components using --font-family still work */
+  --font-family: var(--font-ui);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
+}
+
+/* Brand */
+.brand-link {
+  text-decoration: none;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+}
+
+/* Page headings use display font */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+/* Essay body text uses body font */
+.essay-text, .annotated-essay, .revision-editor textarea, .essay-mockup {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.8;
 }
 
 /* Nav tabs — header links */
@@ -33,7 +80,7 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 .nav-tab:hover { background: rgba(0,0,0,0.04); color: var(--color-text); }
-.nav-tab-active { color: var(--color-primary); background: rgba(79, 70, 229, 0.08); }
+.nav-tab-active { color: var(--color-primary); background: var(--color-primary-light); }
 
 /* Nav tabs — mobile drawer links */
 .nav-tab-mobile {
@@ -52,7 +99,7 @@ body {
   width: 100%;
 }
 .nav-tab-mobile:hover { background: rgba(0,0,0,0.04); }
-.nav-tab-mobile-active { color: var(--color-primary); background: rgba(79, 70, 229, 0.06); }
+.nav-tab-mobile-active { color: var(--color-primary); background: var(--color-primary-light); }
 
 /* ═══ Document Bar (Row 1) ═══ */
 .doc-bar {
@@ -192,8 +239,8 @@ body {
 }
 
 @keyframes pill-glow {
-  0% { box-shadow: 0 0 0 0 rgba(34, 120, 60, 0.4); }
-  50% { box-shadow: 0 0 8px 2px rgba(34, 120, 60, 0.25); }
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  50% { box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.25); }
   100% { box-shadow: none; }
 }
 
@@ -234,7 +281,7 @@ body {
   font-weight: 500;
 }
 .score-pill-delta.up {
-  color: #2d6a3e;
+  color: #92400E;
   animation: score-up 0.6s ease-out;
 }
 .score-pill-delta.down { color: #944040; }
@@ -251,8 +298,8 @@ body {
   color: var(--color-text-secondary);
 }
 
-/* Main content */
-.main-content { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+/* Main content — preserve Mantine's padding-top (clears fixed header) */
+.main-content { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-bottom: 32px; }
 
 /* Full-bleed on essay pages — Google Docs style */
 .main-content:has(.essay-page) { max-width: none; padding: 0; }

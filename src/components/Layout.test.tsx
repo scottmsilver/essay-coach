@@ -9,14 +9,16 @@ describe('Layout', () => {
     expect(screen.getByText('EssayCoach')).toBeInTheDocument();
   });
 
-  it('renders navigation links in header on non-essay routes', () => {
+  it('renders navigation tabs and new essay button in header', () => {
     renderWithRouter(<Layout />, { route: '/' });
     const header = document.querySelector('.mantine-AppShell-header')!;
     const headerScope = within(header as HTMLElement);
-    expect(headerScope.getByText('New Essay')).toBeInTheDocument();
+    // Tabs are views (no "New Essay" tab — it's a button now)
     expect(headerScope.getByText('My Essays')).toBeInTheDocument();
     expect(headerScope.getByText('Progress')).toBeInTheDocument();
     expect(headerScope.getByText('Sharing')).toBeInTheDocument();
+    // "New Essay" is a button, not a tab
+    expect(headerScope.getByText('+ New Essay')).toBeInTheDocument();
   });
 
   it('renders user avatar with initials', () => {

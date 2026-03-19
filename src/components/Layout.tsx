@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
-import { AppShell, Burger, Group, Stack } from '@mantine/core';
+import { AppShell, Burger, Group, Stack, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { NAV_LINKS } from '../constants';
 import UserAvatarMenu from './UserAvatarMenu';
@@ -17,14 +17,14 @@ export default function Layout() {
         breakpoint: 'sm',
         collapsed: { desktop: true, mobile: !opened },
       }}
-      padding={0}
+      padding="md"
     >
       {!isEssayRoute && (
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between">
             <Group gap="xs">
               <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-              <Link to="/" style={{ textDecoration: 'none', color: 'var(--color-primary)', fontWeight: 700, fontSize: 18 }}>
+              <Link to="/" className="brand-link">
                 EssayCoach
               </Link>
             </Group>
@@ -44,7 +44,12 @@ export default function Layout() {
               ))}
             </Group>
 
-            <UserAvatarMenu />
+            <Group gap="sm">
+              <Button component={Link} to="/new" size="compact-sm" visibleFrom="sm">
+                + New Essay
+              </Button>
+              <UserAvatarMenu />
+            </Group>
           </Group>
         </AppShell.Header>
       )}
@@ -64,6 +69,9 @@ export default function Layout() {
               {label}
             </NavLink>
           ))}
+          <Link to="/new" className="nav-tab-mobile" onClick={close}>
+            + New Essay
+          </Link>
         </Stack>
       </AppShell.Navbar>
 

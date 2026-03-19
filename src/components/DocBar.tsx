@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Burger, Drawer, Stack } from '@mantine/core';
+import { Link, useNavigate } from 'react-router-dom';
+import { Burger, Drawer, Stack, ActionIcon } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -23,6 +23,7 @@ interface Props {
 
 export default function DocBar({ title, activeDraftId, draftLabel, draftOptions, onPickDraft, children }: Props) {
   const { logOut } = useAuth();
+  const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useClickOutside<HTMLDivElement>(() => setPickerOpen(false), pickerOpen);
   const [drawerOpened, { open: openDrawer, close: closeDrawer }] = useDisclosure(false);
@@ -45,6 +46,9 @@ export default function DocBar({ title, activeDraftId, draftLabel, draftOptions,
 
       <div className="doc-bar">
         <div className="doc-bar-left">
+          <ActionIcon variant="subtle" color="gray" onClick={() => navigate('/')} aria-label="Back to essays" size="sm">
+            <span style={{ fontSize: 18, lineHeight: 1 }}>&larr;</span>
+          </ActionIcon>
           <Burger opened={drawerOpened} onClick={openDrawer} size="sm" />
           <h2 className="doc-bar-title">{title}</h2>
           {draftLabel && (
