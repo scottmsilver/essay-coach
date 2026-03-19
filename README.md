@@ -113,7 +113,7 @@ cd functions
 
 ```
 src/
-  pages/          # EssayPage, RevisionPage, HomePage, ProgressPage, etc.
+  pages/          # EssayPage, HomePage, ProgressPage, etc.
   components/     # AnnotatedEssay, GrammarView, TransitionView, ScorePillBar, DocBar
   hooks/          # useEssay, useAuth, useActiveMarker, useCommentLayout
   utils/          # sentenceSplitter, pasteHandler

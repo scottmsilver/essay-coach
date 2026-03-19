@@ -1,15 +1,15 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button, Select, Group } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations } from '../utils';
-import { TRAIT_LABELS } from '../types';
+import { scoreColor, relativeTime, collectAnnotations, classifyAnnotation } from '../utils';
+import { TRAIT_LABELS, TRAIT_KEYS } from '../types';
 import type { TraitKey, TransitionAnalysis, GrammarAnalysis } from '../types';
 import DocBar from '../components/DocBar';
 import ScorePillBar from '../components/ScorePillBar';
@@ -18,6 +18,10 @@ import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
+import { handleRichPaste } from '../utils/pasteHandler';
+import { fetchGDocInfo } from '../utils/gdocImport';
+import { parseSections } from '../../shared/gdocTypes';
+import { fireAllAnalyses } from '../utils/submitEssay';
 
 type ViewMode = 'feedback' | 'transitions' | 'grammar';
 
@@ -25,6 +29,10 @@ function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
   if (pathname.endsWith('/grammar')) return 'grammar';
   return 'feedback';
+}
+
+function isRevisePath(pathname: string): boolean {
+  return pathname.endsWith('/revise');
 }
 
 export default function EssayPage() {
@@ -50,6 +58,11 @@ export default function EssayPage() {
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(
     () => sessionStorage.getItem('essaycoach_notif_dismissed') === '1'
   );
+  const [revising, setRevising] = useState(() => isRevisePath(location.pathname));
+  const [revisionContent, setRevisionContent] = useState('');
+  const [resubmitting, setResubmitting] = useState(false);
+  const [resubmitError, setResubmitError] = useState<string | null>(null);
+  const [refetching, setRefetching] = useState(false);
   const popoverRef = useClickOutside<HTMLDivElement>((e) => {
     const badge = (e.target as Element)?.closest?.('.score-pill');
     if (!badge) setActiveTrait(null);
@@ -61,6 +74,21 @@ export default function EssayPage() {
     const id = selectedDraftId ?? drafts[0].id;
     return drafts.find((d) => d.id === id) ?? drafts[0];
   }, [drafts, selectedDraftId]);
+
+  // Auto-enter revision mode if URL ends with /revise and data is ready
+  const reviseInitRef = useRef(false);
+  useEffect(() => {
+    if (reviseInitRef.current || !revising || !activeDraft) return;
+    reviseInitRef.current = true;
+    const saved = localStorage.getItem(`essaycoach_autosave_${essayId}`);
+    setRevisionContent(saved ?? activeDraft.content);
+    if (activeDraft.evaluation) {
+      const prioritized = TRAIT_KEYS
+        .filter((t) => activeDraft.evaluation!.traits[t].revisionPriority !== null)
+        .sort((a, b) => (activeDraft.evaluation!.traits[a].revisionPriority! - activeDraft.evaluation!.traits[b].revisionPriority!));
+      if (prioritized.length > 0) setActiveTrait(prioritized[0]);
+    }
+  }, [revising, activeDraft, essayId]);
 
   // Toast + browser notification when evaluation completes
   const wasWaiting = useRef(false);
@@ -174,6 +202,89 @@ export default function EssayPage() {
     }
   }, [activeDraft, essayId, ownerUid, user]);
 
+  const enterRevisionMode = useCallback(() => {
+    if (!activeDraft) return;
+    setRevising(true);
+    setResubmitError(null);
+    navigate(`${basePath}/revise`, { replace: true });
+    const saved = localStorage.getItem(`essaycoach_autosave_${essayId}`);
+    setRevisionContent(saved ?? activeDraft.content);
+    if (activeDraft.evaluation) {
+      const prioritized = TRAIT_KEYS
+        .filter((t) => activeDraft.evaluation!.traits[t].revisionPriority !== null)
+        .sort((a, b) => (activeDraft.evaluation!.traits[a].revisionPriority! - activeDraft.evaluation!.traits[b].revisionPriority!));
+      if (prioritized.length > 0) setActiveTrait(prioritized[0]);
+    }
+  }, [activeDraft, essayId, navigate, basePath]);
+
+  const exitRevisionMode = useCallback(() => {
+    setRevising(false);
+    setResubmitError(null);
+    reviseInitRef.current = false;
+    navigate(basePath, { replace: true });
+  }, [navigate, basePath]);
+
+  const handleRevisionContentChange = useCallback((newContent: string) => {
+    setRevisionContent(newContent);
+    localStorage.setItem(`essaycoach_autosave_${essayId}`, newContent);
+  }, [essayId]);
+
+  const [resubmitRetryCount, setResubmitRetryCount] = useState(0);
+
+  const handleResubmit = useCallback(async () => {
+    if (resubmitRetryCount >= 3 || !essayId || !user || !activeDraft || ownerUid) return;
+    setResubmitting(true);
+    setResubmitError(null);
+    try {
+      let essayContent = revisionContent;
+
+      if (essay?.contentSource) {
+        setRefetching(true);
+        try {
+          const data = await fetchGDocInfo(essay.contentSource.docId, essay.contentSource.tab);
+          const sections = parseSections(data.text, data.bookmarks);
+          if (essay.contentSource.sectionIndex < sections.length) {
+            essayContent = sections[essay.contentSource.sectionIndex];
+          }
+        } catch (err) {
+          console.warn('Failed to re-fetch from Google Docs, using current content:', err);
+        }
+        setRefetching(false);
+      }
+
+      const uid = user.uid;
+      const newDraftNumber = (essay?.currentDraftNumber ?? activeDraft.draftNumber) + 1;
+      const essayRef = doc(db, `users/${uid}/essays/${essayId}`);
+      const draftRef = doc(collection(db, `users/${uid}/essays/${essayId}/drafts`));
+
+      await Promise.all([
+        setDoc(draftRef, {
+          draftNumber: newDraftNumber,
+          content: essayContent,
+          submittedAt: serverTimestamp(),
+          grammarStatus: { stage: 'pending', message: 'Queued...' },
+          transitionStatus: { stage: 'pending', message: 'Queued...' },
+        }),
+        updateDoc(essayRef, {
+          currentDraftNumber: newDraftNumber,
+          updatedAt: serverTimestamp(),
+        }),
+      ]);
+
+      localStorage.removeItem(`essaycoach_autosave_${essayId}`);
+      setRevising(false);
+      setResubmitting(false);
+      reviseInitRef.current = false;
+      navigate(basePath, { replace: true });
+
+      fireAllAnalyses(essayId, draftRef.id);
+    } catch (err: unknown) {
+      setResubmitError(err instanceof Error ? err.message : 'Failed to resubmit. Please try again.');
+      setResubmitRetryCount((c) => c + 1);
+      setResubmitting(false);
+    }
+  }, [essayId, user, activeDraft, ownerUid, essay, revisionContent, navigate, basePath, resubmitRetryCount]);
+
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
   if (!essay || !activeDraft) return <div>Essay not found.</div>;
 
@@ -212,54 +323,73 @@ export default function EssayPage() {
       <DocBar
         title={essay.title}
         activeDraftId={activeDraft.id}
-        draftLabel={`v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`}
+        draftLabel={revising
+          ? '· Revising'
+          : `v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`
+        }
         draftOptions={drafts.map((d) => ({ id: d.id, label: `v${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
         onPickDraft={setSelectedDraftId}
       >
         <Group gap="xs">
-          <Select
-            size="xs"
-            value={activeView}
-            onChange={(val) => {
-              const view = val as 'feedback' | 'transitions' | 'grammar';
-              if (view === 'transitions') handleTransitionsTab();
-              else if (view === 'grammar') handleGrammarTab();
-              else setActiveView('feedback');
-            }}
-            data={[
-              { value: 'feedback', label: 'Overall' },
-              { value: 'transitions', label: 'Transitions' },
-              { value: 'grammar', label: 'Grammar' },
-            ]}
-            styles={{ input: { minWidth: 110 } }}
-          />
-          {evaluation && (
-            <Button
-              size="compact-xs"
-              variant="default"
-              onClick={
-                activeView === 'grammar' ? handleGrammarReanalyze
-                : activeView === 'transitions' ? handleTransitionReanalyze
-                : handleFeedbackReanalyze
-              }
-              disabled={
-                activeView === 'grammar' ? grammarLoading
-                : activeView === 'transitions' ? transitionLoading
-                : retrying || retryCount >= 3
-              }
-              loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
-            >
-              Analyze
-            </Button>
-          )}
-          {isLatestDraft && evaluation && (
-            <Button
-              size="compact-xs"
-              component={Link}
-              to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
-            >
-              Revise
-            </Button>
+          {revising ? (
+            <>
+              <Button size="compact-xs" variant="default" onClick={exitRevisionMode} disabled={resubmitting}>
+                Cancel
+              </Button>
+              <Button
+                size="compact-xs"
+                onClick={handleResubmit}
+                disabled={resubmitting || resubmitRetryCount >= 3}
+                loading={resubmitting || refetching}
+              >
+                {essay?.contentSource
+                  ? (refetching ? 'Re-importing...' : 'Re-import & Evaluate')
+                  : 'Resubmit for Feedback'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Select
+                size="xs"
+                value={activeView}
+                onChange={(val) => {
+                  const view = val as 'feedback' | 'transitions' | 'grammar';
+                  if (view === 'transitions') handleTransitionsTab();
+                  else if (view === 'grammar') handleGrammarTab();
+                  else setActiveView('feedback');
+                }}
+                data={[
+                  { value: 'feedback', label: 'Overall' },
+                  { value: 'transitions', label: 'Transitions' },
+                  { value: 'grammar', label: 'Grammar' },
+                ]}
+                styles={{ input: { minWidth: 110 } }}
+              />
+              {evaluation && (
+                <Button
+                  size="compact-xs"
+                  variant="default"
+                  onClick={
+                    activeView === 'grammar' ? handleGrammarReanalyze
+                    : activeView === 'transitions' ? handleTransitionReanalyze
+                    : handleFeedbackReanalyze
+                  }
+                  disabled={
+                    activeView === 'grammar' ? grammarLoading
+                    : activeView === 'transitions' ? transitionLoading
+                    : retrying || retryCount >= 3
+                  }
+                  loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
+                >
+                  Analyze
+                </Button>
+              )}
+              {isLatestDraft && evaluation && !ownerUid && (
+                <Button size="compact-xs" onClick={enterRevisionMode}>
+                  Revise
+                </Button>
+              )}
+            </>
           )}
         </Group>
       </DocBar>
@@ -282,8 +412,53 @@ export default function EssayPage() {
         </div>
       )}
 
+      {/* Revision mode instruction banner */}
+      {revising && (
+        <>
+          {essay?.contentSource ? (
+            <div className="revision-banner revision-banner-gdoc">
+              <span className="revision-banner-icon">📄</span>
+              <div className="revision-banner-text">
+                <strong>Edit your essay in Google Docs</strong>
+                <span>Make your revisions there, then click Re-import & Evaluate to get new feedback.</span>
+              </div>
+              <Button
+                component="a"
+                href={`https://docs.google.com/document/d/${essay.contentSource.docId}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="compact-xs"
+                variant="light"
+                color="yellow"
+              >
+                Open in Google Docs ↗
+              </Button>
+            </div>
+          ) : (
+            <div className="revision-banner revision-banner-copypaste">
+              <span className="revision-banner-icon">✏️</span>
+              <div className="revision-banner-text">
+                <strong>Edit your essay below or paste your revised version</strong>
+                <span>Feedback is shown on the right for reference.</span>
+              </div>
+            </div>
+          )}
+          {resubmitError && (
+            <div className="error-state" style={{ margin: '0 24px' }}>{resubmitError}</div>
+          )}
+          {evaluation && evaluation.revisionPlan.length > 0 && (
+            <div className="revision-plan-inline" style={{ margin: '8px 24px' }}>
+              <strong>Focus on:</strong>
+              <ol>
+                {evaluation.revisionPlan.map((step, i) => <li key={i}>{step}</li>)}
+              </ol>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Score bar — sticky below breadcrumb */}
-      {activeView === 'feedback' && (
+      {activeView === 'feedback' && !revising && (
         <div className="score-bar">
           <div style={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center' }}>
             {evaluation ? (
@@ -323,7 +498,7 @@ export default function EssayPage() {
       )}
 
       {/* Error state for evaluation */}
-      {isPending && (isEvalError || isStale) && activeView === 'feedback' && (
+      {isPending && (isEvalError || isStale) && activeView === 'feedback' && !revising && (
         <div className="error-state" style={{ margin: '16px 24px' }}>
           <p>Evaluation failed. Your essay has been saved.</p>
           {!ownerUid && retryCount < 3 ? (
@@ -339,7 +514,7 @@ export default function EssayPage() {
       )}
 
       {/* Feedback summary — only on overall/feedback tab, only when evaluation exists */}
-      {activeView === 'feedback' && evaluation && (
+      {activeView === 'feedback' && evaluation && !revising && (
         <div className="feedback-summary">
           {evaluation.overallFeedback && (
             <p className="feedback-summary-text">{evaluation.overallFeedback}</p>
@@ -352,28 +527,46 @@ export default function EssayPage() {
               </ol>
             </div>
           )}
-          {comparison && comparison.improvements.length > 0 && (
-            <div className="feedback-summary-section improvements">
-              <strong>Improvements</strong>
-              <ul>
-                {comparison.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
-              </ul>
-            </div>
-          )}
-          {comparison && comparison.remainingIssues.length > 0 && (
-            <div className="feedback-summary-section remaining">
-              <strong>Still to Work On</strong>
-              <ul>
-                {comparison.remainingIssues.map((issue, i) => <li key={i}>{issue}</li>)}
-              </ul>
-            </div>
-          )}
         </div>
       )}
 
       {/* Essay with inline annotations or plain text when pending */}
       {activeView === 'feedback' && (
-        evaluation ? (
+        revising ? (
+          essay?.contentSource ? (
+            // Google Docs: show annotated essay read-only (it has its own feedback sidebar)
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+              activeTrait={activeTrait}
+            />
+          ) : (
+            // Copy/paste: textarea + feedback sidebar
+            <div className="revision-layout">
+              <div className="revision-editor">
+                <textarea
+                  className="essay-editor revision-editor-active"
+                  value={revisionContent}
+                  onChange={(e) => handleRevisionContentChange(e.target.value)}
+                  onPaste={(e) => handleRichPaste(e, handleRevisionContentChange)}
+                />
+              </div>
+              <div className="revision-annotations">
+                <div className="revision-annotations-header">Feedback</div>
+                {(activeTrait
+                  ? allAnnotations.filter(a => a.traitKey === activeTrait)
+                  : allAnnotations
+                ).map((ann, i) => (
+                  <div key={i} className={`sidebar-comment ${classifyAnnotation(ann.comment)}`} style={{ position: 'static' }}>
+                    <span className="sidebar-comment-trait">{ann.traitLabel}</span>
+                    <span className="sidebar-comment-text">{ann.comment}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        ) : evaluation ? (
           <AnnotatedEssay
             content={activeDraft.content}
             annotations={allAnnotations}
@@ -387,7 +580,7 @@ export default function EssayPage() {
         )
       )}
 
-      {activeView === 'transitions' && (
+      {activeView === 'transitions' && !revising && (
         <AnalysisPanel
           data={activeDraft.transitionAnalysis}
           error={transitionError}
@@ -401,7 +594,7 @@ export default function EssayPage() {
         </AnalysisPanel>
       )}
 
-      {activeView === 'grammar' && (
+      {activeView === 'grammar' && !revising && (
         <AnalysisPanel
           data={activeDraft.grammarAnalysis}
           error={grammarError}

@@ -138,7 +138,7 @@ export default function GrammarView({ content, analysis }: Props) {
     });
   }, [matches, activeIssueKey, setActiveIssueKey]);
 
-  const commentPositions = useCommentLayout(essayRef, matches, 'data-issue-id');
+  const commentPositions = useCommentLayout(essayRef, matches, 'data-issue-id', activeIssueKey);
 
   // Build essay elements
   const essayElements = useMemo(() => {

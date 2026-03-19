@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithRouter } from '../test-utils';
 import type { Evaluation, TraitEvaluation } from '../types';
 
@@ -103,5 +104,25 @@ describe('EssayPage', () => {
     };
     renderWithRouter(<EssayPage />);
     expect(screen.getAllByText(/failed|retry/i).length).toBeGreaterThan(0);
+  });
+
+  it('enters revision mode when Revise is clicked', async () => {
+    const usr = userEvent.setup();
+    renderWithRouter(<EssayPage />);
+    const reviseButton = screen.getByText(/^revise$/i);
+    await usr.click(reviseButton);
+    expect(screen.getByText('Resubmit for Feedback')).toBeInTheDocument();
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
+    expect(screen.getByText(/edit your essay below/i)).toBeInTheDocument();
+  });
+
+  it('exits revision mode when Cancel is clicked', async () => {
+    const usr = userEvent.setup();
+    renderWithRouter(<EssayPage />);
+    await usr.click(screen.getByText(/^revise$/i));
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
+    await usr.click(screen.getByText('Cancel'));
+    expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
+    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
   });
 });

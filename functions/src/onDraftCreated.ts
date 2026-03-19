@@ -3,13 +3,22 @@ import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
+import { evaluateWithGemini } from './gemini';
+import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
+/** Check if a status field indicates the client actually started processing (not just claimed) */
+function isActivelyProcessing(status: { stage: string } | null | undefined): boolean {
+  if (!status) return false;
+  return status.stage === 'thinking' || status.stage === 'generating';
+}
+
 /**
  * Firestore trigger fallback: when a new draft is created, wait 5 seconds
- * then check if grammar/transitions were already claimed by the client.
- * If not, fire them so analyses complete even if the tab closes.
+ * then check if analyses were already started by the client.
+ * If not (or if still stuck in 'pending'), fire them so analyses complete
+ * even if the tab closes.
  */
 export const onDraftCreated = onDocumentCreated(
   {
@@ -24,10 +33,10 @@ export const onDraftCreated = onDocumentCreated(
     const { uid, essayId, draftId } = event.params;
     const draftRef = snap.ref;
 
-    // Wait 5 seconds to give the client time to claim analyses
+    // Wait 5 seconds to give the client time to start analyses
     await new Promise((r) => setTimeout(r, 5000));
 
-    // Re-read the draft to see if client already claimed
+    // Re-read the draft to see if client already started processing
     const freshSnap = await draftRef.get();
     if (!freshSnap.exists) {
       logger.warn('Draft deleted before trigger could run', { uid, essayId, draftId });
@@ -44,9 +53,9 @@ export const onDraftCreated = onDocumentCreated(
     const apiKey = geminiApiKey.value();
     const tasks: Promise<void>[] = [];
 
-    // Grammar: fire if client didn't claim
-    if (!data.grammarStatus) {
-      logger.info('Grammar unclaimed — trigger firing', { essayId, draftId });
+    // Grammar: fire if client didn't start (absent or still 'pending')
+    if (!isActivelyProcessing(data.grammarStatus) && !data.grammarAnalysis) {
+      logger.info('Grammar not actively processing — trigger firing', { essayId, draftId, status: data.grammarStatus?.stage });
       tasks.push(
         (async () => {
           try {
@@ -61,12 +70,12 @@ export const onDraftCreated = onDocumentCreated(
         })()
       );
     } else {
-      logger.info('Grammar already claimed by client, skipping', { essayId, draftId });
+      logger.info('Grammar already processing or complete, skipping', { essayId, draftId });
     }
 
-    // Transitions: fire if client didn't claim
-    if (!data.transitionStatus) {
-      logger.info('Transitions unclaimed — trigger firing', { essayId, draftId });
+    // Transitions: fire if client didn't start (absent or still 'pending')
+    if (!isActivelyProcessing(data.transitionStatus) && !data.transitionAnalysis) {
+      logger.info('Transitions not actively processing — trigger firing', { essayId, draftId, status: data.transitionStatus?.stage });
       tasks.push(
         (async () => {
           try {
@@ -81,7 +90,49 @@ export const onDraftCreated = onDocumentCreated(
         })()
       );
     } else {
-      logger.info('Transitions already claimed by client, skipping', { essayId, draftId });
+      logger.info('Transitions already processing or complete, skipping', { essayId, draftId });
+    }
+
+    // Evaluation: fire if client didn't start (absent or still 'pending')
+    if (!isActivelyProcessing(data.evaluationStatus) && !data.evaluation) {
+      logger.info('Evaluation not actively processing — trigger firing', { essayId, draftId, status: data.evaluationStatus?.stage });
+      tasks.push(
+        (async () => {
+          try {
+            // Get essay data for prompt building
+            const essayRef = draftRef.parent.parent!;
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data();
+            const assignmentPrompt = essayData?.assignmentPrompt || '';
+            const writingType = essayData?.writingType || 'argumentative';
+
+            // Check if this is a resubmission (draftNumber > 1)
+            let prompt: string;
+            if (data.draftNumber > 1) {
+              // Try to get previous draft's evaluation for resubmission prompt
+              const draftsSnap = await draftRef.parent.where('draftNumber', '==', data.draftNumber - 1).limit(1).get();
+              const prevEval = draftsSnap.docs[0]?.data()?.evaluation;
+              if (prevEval) {
+                prompt = buildResubmissionPrompt({ assignmentPrompt, writingType, content, previousEvaluation: prevEval });
+              } else {
+                prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
+              }
+            } else {
+              prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
+            }
+
+            const evaluation = await evaluateWithGemini(apiKey, prompt, draftRef);
+            await draftRef.update({ evaluation, evaluationStatus: null });
+            logger.info('Trigger evaluation complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger evaluation failed', { error: msg, essayId, draftId });
+            await draftRef.update({ evaluationStatus: { stage: 'error', message: 'Evaluation failed' } });
+          }
+        })()
+      );
+    } else {
+      logger.info('Evaluation already processing or complete, skipping', { essayId, draftId });
     }
 
     if (tasks.length > 0) {

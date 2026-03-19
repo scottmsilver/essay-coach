@@ -11,11 +11,10 @@ interface Props {
   activeKey?: TraitKey | null;
   onSelect?: (key: TraitKey | null) => void;
   scoreChanges?: Partial<Record<TraitKey, ScoreChange>>;
-  showPriority?: boolean;
   skeleton?: boolean;
 }
 
-export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreChanges, showPriority, skeleton }: Props) {
+export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreChanges, skeleton }: Props) {
   if (skeleton) {
     return (
       <div className="analysis-bar-scores">
@@ -52,9 +51,6 @@ export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreCha
               <span className={`score-pill-delta ${change.delta > 0 ? 'up' : 'down'}`}>
                 {change.delta > 0 ? '+' : ''}{change.delta}
               </span>
-            )}
-            {showPriority && traitData.revisionPriority !== null && (
-              <span className="score-pill-priority">#{traitData.revisionPriority}</span>
             )}
           </button>
         );
