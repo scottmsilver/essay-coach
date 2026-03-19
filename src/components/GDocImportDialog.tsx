@@ -1,39 +1,58 @@
-import { useState } from 'react';
-import { Modal, TextInput, Button, Radio, Stack, Text, Loader, Alert } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import {
+  Modal, TextInput, Button, Radio, Stack, Text, Loader, Alert,
+  Group, Divider, Accordion, ScrollArea, Box,
+} from '@mantine/core';
 import { extractDocId, fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
-import type { DocSource } from '../../shared/gdocTypes';
+import { countWords } from '../utils';
+import type { DocSource, GDocBookmark } from '../../shared/gdocTypes';
+import { openGooglePicker } from '../utils/googlePicker';
 
 interface Props {
   opened: boolean;
   onClose: () => void;
-  onImport: (text: string, source: DocSource) => void;
+  onImport: (text: string, source: DocSource, url: string) => void;
   label: string; // "essay" or "prompt"
+  initialUrl?: string;
 }
 
-type Step = 'url' | 'tab' | 'section';
+type Step = 'url' | 'tab' | 'content';
 
-export default function GDocImportDialog({ opened, onClose, onImport, label }: Props) {
+export default function GDocImportDialog({ opened, onClose, onImport, label, initialUrl }: Props) {
   const [step, setStep] = useState<Step>('url');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
 
   // Data from web app
   const [docId, setDocId] = useState('');
   const [tabs, setTabs] = useState<Array<{ title: string; id: string }>>([]);
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
+  const [fullText, setFullText] = useState('');
+  const [bookmarks, setBookmarks] = useState<GDocBookmark[]>([]);
   const [sections, setSections] = useState<string[]>([]);
   const [selectedSection, setSelectedSection] = useState<number>(0);
 
+  // Pre-fill URL from prop when dialog opens
+  useEffect(() => {
+    if (opened && initialUrl) {
+      setUrl(initialUrl);
+    }
+  }, [opened, initialUrl]);
+
   const reset = () => {
     setStep('url');
-    setUrl('');
+    setUrl(initialUrl ?? '');
     setLoading(false);
     setError(null);
+    setPickerError(null);
     setDocId('');
     setTabs([]);
     setSelectedTab(null);
+    setFullText('');
+    setBookmarks([]);
     setSections([]);
     setSelectedSection(0);
   };
@@ -43,18 +62,18 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
     onClose();
   };
 
-  const handleFetchTabs = async () => {
+  const handleFetchTabs = async (inputUrl?: string) => {
+    const target = inputUrl ?? url;
     setError(null);
     setLoading(true);
     try {
-      const id = extractDocId(url);
+      const id = extractDocId(target);
       setDocId(id);
       const data = await fetchGDocInfo(id);
       setTabs(data.tabs);
       if (data.tabs.length === 1) {
-        // Auto-select single tab and move to section step
         setSelectedTab(data.tabs[0].title);
-        await handleFetchSections(id, data.tabs[0].title);
+        await handleFetchContent(id, data.tabs[0].title);
       } else {
         setStep('tab');
       }
@@ -65,15 +84,17 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
     }
   };
 
-  const handleFetchSections = async (id: string, tab: string) => {
+  const handleFetchContent = async (id: string, tab: string) => {
     setError(null);
     setLoading(true);
     try {
       const data = await fetchGDocInfo(id, tab);
+      setFullText(data.text);
+      setBookmarks(data.bookmarks);
       const parsed = parseSections(data.text, data.bookmarks);
       setSections(parsed);
       setSelectedSection(0);
-      setStep('section');
+      setStep('content');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tab');
     } finally {
@@ -83,29 +104,60 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
 
   const handleSelectTab = async (tab: string) => {
     setSelectedTab(tab);
-    await handleFetchSections(docId, tab);
+    await handleFetchContent(docId, tab);
   };
 
-  const handleConfirm = () => {
+  const handleRefresh = async () => {
+    if (!docId || !selectedTab) return;
+    await handleFetchContent(docId, selectedTab);
+  };
+
+  const handleImportSection = (sectionIndex: number) => {
     if (!selectedTab || sections.length === 0) return;
     const source: DocSource = {
       docId,
       tab: selectedTab,
-      sectionIndex: selectedSection,
+      sectionIndex,
     };
-    onImport(sections[selectedSection], source);
+    onImport(sections[sectionIndex], source, url);
     handleClose();
   };
 
-  const preview = (text: string, maxLen = 150) => {
-    const clean = text.replace(/\n+/g, ' ').trim();
-    return clean.length > maxLen ? clean.substring(0, maxLen) + '...' : clean;
+  const handleImportEntireTab = () => {
+    if (!selectedTab) return;
+    const trimmed = fullText.replace(/^[\n ]+/, '').replace(/\s+$/, '');
+    const source: DocSource = {
+      docId,
+      tab: selectedTab,
+      sectionIndex: 0,
+    };
+    onImport(trimmed, source, url);
+    handleClose();
   };
+
+  const handlePicker = async () => {
+    setPickerError(null);
+    try {
+      const result = await openGooglePicker();
+      if (!result) return; // user cancelled
+      setUrl(result.url);
+      await handleFetchTabs(result.url);
+    } catch (err) {
+      setPickerError(
+        err instanceof Error ? err.message : 'Google Picker unavailable'
+      );
+    }
+  };
+
+  const hasBookmarks = bookmarks.length > 0;
+  const multiTab = tabs.length > 1;
+  const contentLabel = multiTab ? `tab "${selectedTab}"` : 'document';
 
   return (
     <Modal opened={opened} onClose={handleClose} title={`Import ${label} from Google Docs`} size="lg">
       {error && <Alert color="red" mb="md">{error}</Alert>}
 
+      {/* Step 1: URL entry + Picker */}
       {step === 'url' && (
         <Stack>
           <TextInput
@@ -115,12 +167,26 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
             onChange={(e) => setUrl(e.currentTarget.value)}
             disabled={loading}
           />
-          <Button onClick={handleFetchTabs} disabled={!url.trim() || loading} loading={loading}>
+          <Button onClick={() => handleFetchTabs()} disabled={!url.trim() || loading} loading={loading}>
             Fetch Document
           </Button>
+          <Divider label="or" labelPosition="center" />
+          <Button
+            variant="light"
+            onClick={handlePicker}
+            disabled={loading}
+          >
+            Browse My Docs
+          </Button>
+          {pickerError && (
+            <Alert color="yellow" variant="light">
+              {pickerError} — you can still paste a URL above.
+            </Alert>
+          )}
         </Stack>
       )}
 
+      {/* Step 2: Tab selection (auto-skipped if single tab) */}
       {step === 'tab' && (
         <Stack>
           <Text fw={500}>Select a tab:</Text>
@@ -138,15 +204,17 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
         </Stack>
       )}
 
-      {step === 'section' && (
+      {/* Step 3: Content — two sub-modes based on bookmarks */}
+      {step === 'content' && (
         <Stack>
-          <Text fw={500}>
-            Tab: &quot;{selectedTab}&quot; — {sections.length === 1 ? '1 section (no bookmarks)' : `${sections.length} sections`}
-          </Text>
           {sections.length === 0 ? (
             <Alert color="yellow">This document has no text content. Try a different tab or URL.</Alert>
-          ) : (
+          ) : hasBookmarks ? (
+            /* --- Has bookmarks: section picker with word counts --- */
             <>
+              <Text fw={500}>
+                {sections.length} sections found
+              </Text>
               <Radio.Group
                 value={String(selectedSection)}
                 onChange={(val) => setSelectedSection(Number(val))}
@@ -158,7 +226,9 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
                       value={String(i)}
                       label={
                         <Text size="sm">
-                          <Text span fw={500}>Section {i + 1}: </Text>
+                          <Text span fw={500}>Section {i + 1}</Text>
+                          <Text span c="dimmed"> ({countWords(s).toLocaleString()} words)</Text>
+                          <Text span c="dimmed"> — </Text>
                           {preview(s)}
                         </Text>
                       }
@@ -166,9 +236,85 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
                   ))}
                 </Stack>
               </Radio.Group>
-              <Button onClick={handleConfirm}>
+              <Button onClick={() => handleImportSection(selectedSection)}>
                 Import Section {selectedSection + 1} as {label}
               </Button>
+            </>
+          ) : (
+            /* --- No bookmarks: preview + import entire tab + bookmark tutorial --- */
+            <>
+              <Text fw={500}>
+                {multiTab ? `Tab "${selectedTab}" preview` : 'Document preview'}
+                <Text span c="dimmed" fw={400}> ({countWords(fullText).toLocaleString()} words)</Text>
+              </Text>
+              <ScrollArea h={200} type="auto">
+                <Box
+                  p="sm"
+                  style={{
+                    backgroundColor: 'var(--mantine-color-gray-0)',
+                    borderRadius: 'var(--mantine-radius-sm)',
+                    fontFamily: '"Source Sans 3", sans-serif',
+                    fontSize: '14px',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {fullText}
+                </Box>
+              </ScrollArea>
+              <Button onClick={handleImportEntireTab}>
+                Import entire {contentLabel} as {label}
+              </Button>
+              <Accordion variant="subtle">
+                <Accordion.Item value="bookmark-tutorial">
+                  <Accordion.Control>
+                    <Text size="sm" c="dimmed">I only want part of this {multiTab ? 'tab' : 'document'}</Text>
+                  </Accordion.Control>
+                  <Accordion.Panel>
+                    <Stack gap="sm">
+                      <Text size="sm">
+                        You can split this {multiTab ? 'tab' : 'document'} into sections using <strong>Google Docs bookmarks</strong>.
+                        Place a bookmark where you want each section to start:
+                      </Text>
+                      <Box
+                        p="sm"
+                        style={{
+                          backgroundColor: 'var(--mantine-color-gray-0)',
+                          borderRadius: 'var(--mantine-radius-sm)',
+                        }}
+                      >
+                        <Text size="sm" component="ol" style={{ margin: 0, paddingLeft: 20 }}>
+                          <li>Open your document in Google Docs</li>
+                          <li>Click where you want a section break</li>
+                          <li>Go to <strong>Insert &rarr; Bookmark</strong></li>
+                          <li>Repeat for each section boundary</li>
+                          <li>Come back here and click <strong>Refresh</strong></li>
+                        </Text>
+                      </Box>
+                      <Group>
+                        <Button
+                          variant="light"
+                          size="sm"
+                          component="a"
+                          href={`https://docs.google.com/document/d/${docId}/edit`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open in Google Docs
+                        </Button>
+                        <Button
+                          variant="light"
+                          size="sm"
+                          onClick={handleRefresh}
+                          loading={loading}
+                        >
+                          Refresh
+                        </Button>
+                      </Group>
+                    </Stack>
+                  </Accordion.Panel>
+                </Accordion.Item>
+              </Accordion>
             </>
           )}
           <Button variant="subtle" onClick={() => {
@@ -185,4 +331,9 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
       )}
     </Modal>
   );
+}
+
+function preview(text: string, maxLen = 120): string {
+  const clean = text.replace(/\n+/g, ' ').trim();
+  return clean.length > maxLen ? clean.substring(0, maxLen) + '...' : clean;
 }

@@ -22,10 +22,12 @@ export default function NewEssayPage() {
   const [promptSource, setPromptSource] = useState<DocSource | null>(null);
   const [contentSource, setContentSource] = useState<DocSource | null>(null);
   const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | null>(null);
+  const [lastImportedUrl, setLastImportedUrl] = useState('');
 
   const wordCount = countWords(content);
 
-  const handleImport = (text: string, source: DocSource) => {
+  const handleImport = (text: string, source: DocSource, url: string) => {
+    setLastImportedUrl(url);
     if (importTarget === 'prompt') {
       setAssignmentPrompt(text);
       setPromptSource(source);
@@ -177,6 +179,7 @@ export default function NewEssayPage() {
         onClose={() => setImportTarget(null)}
         onImport={handleImport}
         label={importTarget === 'prompt' ? 'prompt' : 'essay'}
+        initialUrl={lastImportedUrl}
       />
     </div>
   );

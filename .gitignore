@@ -40,3 +40,4 @@ gdocs-script-id.json
 firebase-debug.log
 functions/lib/
 functions/.last-deploy-sha
+.gstack/
