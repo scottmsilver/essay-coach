@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Button } from '@mantine/core';
+import { Button, Stack, Text, Center } from '@mantine/core';
 import { useEssays } from '../hooks/useEssays';
 import { useAuth } from '../hooks/useAuth';
 
@@ -11,11 +11,15 @@ export default function HomePage() {
 
   if (essays.length === 0) {
     return (
-      <div className="empty-state">
-        <h2>Welcome to EssayCoach</h2>
-        <p>Submit your first essay to get feedback and start improving your writing.</p>
-        <Button component={Link} to="/new">Write Your First Essay</Button>
-      </div>
+      <Center style={{ minHeight: '60vh' }}>
+        <Stack align="center" gap="md" maw={400}>
+          <Text size="xl" fw={700} ta="center">No essays yet</Text>
+          <Text c="dimmed" ta="center">
+            Submit your first essay to get personalized feedback on your writing using the 6+1 Traits model.
+          </Text>
+          <Button component={Link} to="/new" size="md">New Essay</Button>
+        </Stack>
+      </Center>
     );
   }
 

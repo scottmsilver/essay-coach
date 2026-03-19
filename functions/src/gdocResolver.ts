@@ -1,7 +1,20 @@
-import { parseSections } from '../../shared/gdocTypes';
+import { WEBAPP_BASE, parseSections } from '../../shared/gdocTypes';
 import type { DocSource, GDocWebAppResponse } from '../../shared/gdocTypes';
 
-const WEBAPP_BASE = 'https://script.google.com/macros/s';
+/** Fetch with retry on 429 (rate limit). Max 2 retries with exponential backoff. */
+async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, { redirect: 'follow' });
+    if (res.status === 429 && attempt < maxRetries) {
+      lastError = new Error(`Rate limited (429)`);
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+      continue;
+    }
+    return res;
+  }
+  throw lastError ?? new Error('Fetch failed after retries');
+}
 
 /**
  * Resolve a DocSource reference to fresh text by calling the Apps Script web app.
@@ -16,12 +29,18 @@ export async function resolveDocSource(
   const params = new URLSearchParams({ docId: source.docId, tab: source.tab });
   const url = `${WEBAPP_BASE}/${deploymentId}/exec?${params}`;
 
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetchWithRetry(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch Google Doc (${res.status})`);
   }
 
-  const data: GDocWebAppResponse = await res.json();
+  let data: GDocWebAppResponse;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error('Invalid response from Google Docs service');
+  }
+
   if (data.error) {
     throw new Error(data.error);
   }

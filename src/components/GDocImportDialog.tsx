@@ -143,28 +143,34 @@ export default function GDocImportDialog({ opened, onClose, onImport, label }: P
           <Text fw={500}>
             Tab: &quot;{selectedTab}&quot; — {sections.length === 1 ? '1 section (no bookmarks)' : `${sections.length} sections`}
           </Text>
-          <Radio.Group
-            value={String(selectedSection)}
-            onChange={(val) => setSelectedSection(Number(val))}
-          >
-            <Stack gap="xs">
-              {sections.map((s, i) => (
-                <Radio
-                  key={i}
-                  value={String(i)}
-                  label={
-                    <Text size="sm">
-                      <Text span fw={500}>Section {i + 1}: </Text>
-                      {preview(s)}
-                    </Text>
-                  }
-                />
-              ))}
-            </Stack>
-          </Radio.Group>
-          <Button onClick={handleConfirm}>
-            Import Section {selectedSection + 1} as {label}
-          </Button>
+          {sections.length === 0 ? (
+            <Alert color="yellow">This document has no text content. Try a different tab or URL.</Alert>
+          ) : (
+            <>
+              <Radio.Group
+                value={String(selectedSection)}
+                onChange={(val) => setSelectedSection(Number(val))}
+              >
+                <Stack gap="xs">
+                  {sections.map((s, i) => (
+                    <Radio
+                      key={i}
+                      value={String(i)}
+                      label={
+                        <Text size="sm">
+                          <Text span fw={500}>Section {i + 1}: </Text>
+                          {preview(s)}
+                        </Text>
+                      }
+                    />
+                  ))}
+                </Stack>
+              </Radio.Group>
+              <Button onClick={handleConfirm}>
+                Import Section {selectedSection + 1} as {label}
+              </Button>
+            </>
+          )}
           <Button variant="subtle" onClick={() => {
             if (tabs.length > 1) {
               setStep('tab');

@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Button, Select, Group } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
@@ -56,6 +57,23 @@ export default function EssayPage() {
     const id = selectedDraftId ?? drafts[0].id;
     return drafts.find((d) => d.id === id) ?? drafts[0];
   }, [drafts, selectedDraftId]);
+
+  // Toast when evaluation completes (was pending on initial load, then arrives)
+  const wasWaiting = useRef(false);
+  useEffect(() => {
+    if (!loading && activeDraft && !activeDraft.evaluation) {
+      wasWaiting.current = true;
+    }
+    if (wasWaiting.current && activeDraft?.evaluation) {
+      wasWaiting.current = false;
+      notifications.show({
+        title: 'Evaluation Complete',
+        message: 'Your essay feedback is ready!',
+        color: 'green',
+        autoClose: 5000,
+      });
+    }
+  }, [loading, activeDraft]);
 
   const allAnnotations = useMemo(() => {
     if (!activeDraft?.evaluation) return [];

@@ -22,10 +22,11 @@ export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreCha
         const score = traitData.score;
         const isActive = activeKey === trait;
         const change = scoreChanges?.[trait];
+        const improved = change && change.delta > 0;
         return (
           <button
             key={trait}
-            className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''}`}
+            className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''} ${improved ? 'improved' : ''}`}
             onClick={() => onSelect(isActive ? null : trait)}
             title={traitData.feedback}
           >

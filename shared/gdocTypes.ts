@@ -1,3 +1,6 @@
+/** Apps Script web app base URL */
+export const WEBAPP_BASE = 'https://script.google.com/macros/s';
+
 /** Reference to a section within a Google Doc tab */
 export interface DocSource {
   docId: string;

@@ -187,6 +187,15 @@ body {
 .score-pill.active {
   outline: 1px solid;
 }
+.score-pill.improved {
+  animation: pill-glow 1.2s ease-out;
+}
+
+@keyframes pill-glow {
+  0% { box-shadow: 0 0 0 0 rgba(34, 120, 60, 0.4); }
+  50% { box-shadow: 0 0 8px 2px rgba(34, 120, 60, 0.25); }
+  100% { box-shadow: none; }
+}
 
 /* Muted score colors on light background */
 .score-pill.high {
@@ -224,8 +233,17 @@ body {
   font-size: 9px;
   font-weight: 500;
 }
-.score-pill-delta.up { color: #2d6a3e; }
+.score-pill-delta.up {
+  color: #2d6a3e;
+  animation: score-up 0.6s ease-out;
+}
 .score-pill-delta.down { color: #944040; }
+
+@keyframes score-up {
+  0% { transform: translateY(4px); opacity: 0; }
+  50% { transform: translateY(-2px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 
 .score-pill-priority {
   font-size: 9px;

@@ -33,3 +33,9 @@ Calibration test essays are in `functions/test-essays/`. Sources: Oregon DOE, AC
 - `functions/src/submitEssay.ts` — First submission handler
 - `functions/src/resubmitDraft.ts` — Revision submission handler
 - `functions/scripts/test-evaluate.ts` — CLI test harness for rubric calibration
+
+## gstack
+
+Use the `/browse` skill from gstack for all web browsing. Never use `mcp__chrome-devtools__*` tools.
+
+Available skills: `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/design-consultation`, `/review`, `/ship`, `/browse`, `/qa`, `/qa-only`, `/qa-design-review`, `/setup-browser-cookies`, `/retro`, `/document-release`.

@@ -1,16 +1,13 @@
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom';
-import { AppShell, Burger, Group, Avatar, Menu, Stack } from '@mantine/core';
+import { AppShell, Burger, Group, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useAuth } from '../hooks/useAuth';
 import { NAV_LINKS } from '../constants';
+import UserAvatarMenu from './UserAvatarMenu';
 
 export default function Layout() {
-  const { user, logOut } = useAuth();
   const { pathname } = useLocation();
   const isEssayRoute = /\/(essay|user\/[^/]+\/essay)\//.test(pathname);
   const [opened, { toggle, close }] = useDisclosure(false);
-
-  const initial = (user?.displayName?.[0] ?? user?.email?.[0] ?? '?').toUpperCase();
 
   return (
     <AppShell
@@ -47,22 +44,7 @@ export default function Layout() {
               ))}
             </Group>
 
-            <Menu shadow="md" width={160} position="bottom-end">
-              <Menu.Target>
-                <Avatar
-                  src={user?.photoURL}
-                  alt={user?.displayName ?? ''}
-                  radius="xl"
-                  size="sm"
-                  style={{ cursor: 'pointer' }}
-                >
-                  {initial}
-                </Avatar>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item onClick={logOut}>Sign out</Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
+            <UserAvatarMenu />
           </Group>
         </AppShell.Header>
       )}

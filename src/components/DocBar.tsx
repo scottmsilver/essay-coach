@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Burger, Drawer, Menu, Avatar, Stack } from '@mantine/core';
+import { Burger, Drawer, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { NAV_LINKS } from '../constants';
+import UserAvatarMenu from './UserAvatarMenu';
 
 interface DraftOption {
   id: string;
@@ -21,12 +22,10 @@ interface Props {
 }
 
 export default function DocBar({ title, activeDraftId, draftLabel, draftOptions, onPickDraft, children }: Props) {
-  const { user, logOut } = useAuth();
+  const { logOut } = useAuth();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useClickOutside<HTMLDivElement>(() => setPickerOpen(false), pickerOpen);
   const [drawerOpened, { open: openDrawer, close: closeDrawer }] = useDisclosure(false);
-
-  const initial = (user?.displayName?.[0] ?? user?.email?.[0] ?? '?').toUpperCase();
 
   return (
     <>
@@ -80,22 +79,7 @@ export default function DocBar({ title, activeDraftId, draftLabel, draftOptions,
           {children}
         </div>
         <div className="doc-bar-right">
-          <Menu shadow="md" width={160} position="bottom-end">
-            <Menu.Target>
-              <Avatar
-                src={user?.photoURL}
-                alt={user?.displayName ?? ''}
-                radius="xl"
-                size="sm"
-                style={{ cursor: 'pointer' }}
-              >
-                {initial}
-              </Avatar>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={logOut}>Sign out</Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <UserAvatarMenu />
         </div>
       </div>
     </>

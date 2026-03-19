@@ -1,6 +1,5 @@
+import { WEBAPP_BASE } from '../../shared/gdocTypes';
 import type { GDocWebAppResponse } from '../../shared/gdocTypes';
-
-const WEBAPP_BASE = 'https://script.google.com/macros/s';
 
 function getDeploymentId(): string {
   const id = import.meta.env.VITE_GDOC_WEBAPP_DEPLOYMENT_ID;
@@ -30,6 +29,21 @@ export function extractTabHint(input: string): string | null {
   }
 }
 
+/** Fetch with retry on 429 (rate limit). Max 2 retries with exponential backoff. */
+async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, { redirect: 'follow' });
+    if (res.status === 429 && attempt < maxRetries) {
+      lastError = new Error(`Rate limited (429)`);
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt));
+      continue;
+    }
+    return res;
+  }
+  throw lastError ?? new Error('Fetch failed after retries');
+}
+
 /** Fetch doc info from Apps Script web app */
 export async function fetchGDocInfo(
   docId: string,
@@ -40,11 +54,18 @@ export async function fetchGDocInfo(
   if (tab) params.set('tab', tab);
   const url = `${WEBAPP_BASE}/${deploymentId}/exec?${params}`;
 
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetchWithRetry(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch document (${res.status})`);
   }
-  const data: GDocWebAppResponse = await res.json();
+
+  let data: GDocWebAppResponse;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error('Invalid response from Google Docs service');
+  }
+
   if (data.error) {
     throw new Error(data.error);
   }

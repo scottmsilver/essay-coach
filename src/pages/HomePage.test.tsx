@@ -19,8 +19,8 @@ describe('HomePage', () => {
   it('shows empty state when no essays', () => {
     mockEssaysState = { essays: [], loading: false };
     renderWithRouter(<HomePage />);
-    expect(screen.getByText(/welcome/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/first essay/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/no essays yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/personalized feedback/i)).toBeInTheDocument();
   });
 
   it('shows essay list when essays exist', () => {
