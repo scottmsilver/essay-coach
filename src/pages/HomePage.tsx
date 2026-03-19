@@ -25,10 +25,7 @@ export default function HomePage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2>My Essays</h2>
-        <Button component={Link} to="/new" size="sm">New Essay</Button>
-      </div>
+      <h2 style={{ marginBottom: 20 }}>My Essays</h2>
       <ul className="essay-list">
         {essays.map((essay) => {
           const isShared = essay.ownerUid !== user?.uid;

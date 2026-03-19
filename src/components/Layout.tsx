@@ -45,8 +45,8 @@ export default function Layout() {
             </Group>
 
             <Group gap="sm">
-              <Button component={Link} to="/new" size="compact-sm" visibleFrom="sm">
-                + New Essay
+              <Button component={Link} to="/new" size="compact-sm">
+                + New
               </Button>
               <UserAvatarMenu />
             </Group>

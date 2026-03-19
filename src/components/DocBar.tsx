@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Burger, Drawer, Stack, ActionIcon } from '@mantine/core';
+import { Burger, Drawer, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -46,14 +46,13 @@ export default function DocBar({ title, activeDraftId, draftLabel, draftOptions,
 
       <div className="doc-bar">
         <div className="doc-bar-left">
-          <ActionIcon variant="subtle" color="gray" onClick={() => navigate('/')} aria-label="Back to essays" size="sm">
-            <span style={{ fontSize: 18, lineHeight: 1 }}>&larr;</span>
-          </ActionIcon>
-          <Burger opened={drawerOpened} onClick={openDrawer} size="sm" />
-          <h2 className="doc-bar-title">{title}</h2>
+          <button className="doc-bar-home" onClick={() => navigate('/')} title="Back to My Essays">
+            EC
+          </button>
+          <span className="doc-bar-title">{title}</span>
           {draftLabel && (
             <div className="doc-bar-draft" ref={pickerRef}>
-              <span className="doc-bar-draft-label">{draftLabel}</span>
+              <span className="doc-bar-draft-label">&middot; {draftLabel}</span>
               {draftOptions && draftOptions.length > 1 && (
                 <>
                   <button
@@ -80,9 +79,10 @@ export default function DocBar({ title, activeDraftId, draftLabel, draftOptions,
               )}
             </div>
           )}
-          {children}
         </div>
         <div className="doc-bar-right">
+          {children}
+          <Burger opened={drawerOpened} onClick={openDrawer} size="xs" hiddenFrom="sm" />
           <UserAvatarMenu />
         </div>
       </div>

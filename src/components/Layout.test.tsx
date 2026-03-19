@@ -17,8 +17,8 @@ describe('Layout', () => {
     expect(headerScope.getByText('My Essays')).toBeInTheDocument();
     expect(headerScope.getByText('Progress')).toBeInTheDocument();
     expect(headerScope.getByText('Sharing')).toBeInTheDocument();
-    // "New Essay" is a button, not a tab
-    expect(headerScope.getByText('+ New Essay')).toBeInTheDocument();
+    // "New" is a button, not a tab
+    expect(headerScope.getByText('+ New')).toBeInTheDocument();
   });
 
   it('renders user avatar with initials', () => {

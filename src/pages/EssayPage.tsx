@@ -232,11 +232,8 @@ export default function EssayPage() {
         draftLabel={`v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`}
         draftOptions={drafts.map((d) => ({ id: d.id, label: `v${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
         onPickDraft={setSelectedDraftId}
-      />
-
-      {/* Row 2 — Analysis bar */}
-      <div className="analysis-bar">
-        <div className="analysis-bar-left">
+      >
+        <Group gap="xs">
           <Select
             size="xs"
             value={activeView}
@@ -251,10 +248,40 @@ export default function EssayPage() {
               { value: 'transitions', label: 'Transitions' },
               { value: 'grammar', label: 'Grammar' },
             ]}
-            styles={{ input: { minWidth: 130 } }}
+            styles={{ input: { minWidth: 110 } }}
           />
-        </div>
-        {activeView === 'feedback' && (
+          <Button
+            size="compact-xs"
+            variant="default"
+            onClick={
+              activeView === 'grammar' ? handleGrammarReanalyze
+              : activeView === 'transitions' ? handleTransitionReanalyze
+              : handleFeedbackReanalyze
+            }
+            disabled={
+              activeView === 'grammar' ? grammarLoading
+              : activeView === 'transitions' ? transitionLoading
+              : retrying || retryCount >= 3
+            }
+            loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
+          >
+            Analyze
+          </Button>
+          {isLatestDraft && (
+            <Button
+              size="compact-xs"
+              component={Link}
+              to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
+            >
+              Revise
+            </Button>
+          )}
+        </Group>
+      </DocBar>
+
+      {/* Score bar — sticky below breadcrumb */}
+      {activeView === 'feedback' && (
+        <div className="score-bar">
           <div style={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center' }}>
             <ScorePillBar
               evaluation={evaluation}
@@ -274,36 +301,8 @@ export default function EssayPage() {
               </div>
             )}
           </div>
-        )}
-        <Group className="analysis-bar-right" gap="xs">
-          <Button
-            size="compact-sm"
-            variant="default"
-            onClick={
-              activeView === 'grammar' ? handleGrammarReanalyze
-              : activeView === 'transitions' ? handleTransitionReanalyze
-              : handleFeedbackReanalyze
-            }
-            disabled={
-              activeView === 'grammar' ? grammarLoading
-              : activeView === 'transitions' ? transitionLoading
-              : retrying || retryCount >= 3
-            }
-            loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
-          >
-            Analyze Again
-          </Button>
-          {isLatestDraft && (
-            <Button
-              size="compact-sm"
-              component={Link}
-              to={ownerUid ? `/user/${ownerUid}/essay/${essayId}/revise` : `/essay/${essayId}/revise`}
-            >
-              Revise
-            </Button>
-          )}
-        </Group>
-      </div>
+        </div>
+      )}
 
       {/* Feedback summary — only on overall/feedback tab */}
       {activeView === 'feedback' && (
