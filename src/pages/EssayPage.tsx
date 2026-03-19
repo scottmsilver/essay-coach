@@ -17,6 +17,7 @@ import AnalysisPanel from '../components/AnalysisPanel';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
+import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 
 type ViewMode = 'feedback' | 'transitions' | 'grammar';
 
@@ -46,6 +47,9 @@ export default function EssayPage() {
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarError, setGrammarError] = useState<string | null>(null);
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(
+    () => sessionStorage.getItem('essaycoach_notif_dismissed') === '1'
+  );
   const popoverRef = useClickOutside<HTMLDivElement>((e) => {
     const badge = (e.target as Element)?.closest?.('.score-pill');
     if (!badge) setActiveTrait(null);
@@ -58,7 +62,7 @@ export default function EssayPage() {
     return drafts.find((d) => d.id === id) ?? drafts[0];
   }, [drafts, selectedDraftId]);
 
-  // Toast when evaluation completes (was pending on initial load, then arrives)
+  // Toast + browser notification when evaluation completes
   const wasWaiting = useRef(false);
   useEffect(() => {
     if (!loading && activeDraft && !activeDraft.evaluation) {
@@ -72,8 +76,15 @@ export default function EssayPage() {
         color: 'green',
         autoClose: 5000,
       });
+      // Browser notification if tab is backgrounded
+      if (essay) {
+        const traits = activeDraft.evaluation.traits;
+        const scores = Object.values(traits).map((t: { score: number }) => t.score);
+        const avg = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
+        notifyEvaluationComplete(essay.title, avg);
+      }
     }
-  }, [loading, activeDraft]);
+  }, [loading, activeDraft, essay]);
 
   const allAnnotations = useMemo(() => {
     if (!activeDraft?.evaluation) return [];
@@ -100,6 +111,8 @@ export default function EssayPage() {
   const handleTransitionsTab = useCallback(async () => {
     setActiveView('transitions');
     if (!activeDraft || activeDraft.transitionAnalysis) return;
+    // Don't fire if already in progress (pending/thinking/generating from parallel submit)
+    if (activeDraft.transitionStatus && activeDraft.transitionStatus.stage !== 'error') return;
 
     setTransitionLoading(true);
     setTransitionError(null);
@@ -179,50 +192,20 @@ export default function EssayPage() {
     }
   };
 
-  if (!activeDraft.evaluation) {
-    const status = activeDraft.evaluationStatus;
-    const age = Date.now() - activeDraft.submittedAt.getTime();
-    const isRecent = age < 180000;
-    if (status?.stage === 'error') {
-      // Fall through to the error/retry UI below
-    } else if (status || isRecent) {
-      return (
-        <div>
-          <h2>{essay.title}</h2>
-          <div className="loading-state" style={{ marginTop: 24 }}>
-            <div className="spinner" />
-            <p className="progress-message">{status?.message || 'Evaluating your essay...'}</p>
-            {status?.stage === 'thinking' && (
-              <p className="progress-stage">Gemini is thinking...</p>
-            )}
-            {status?.stage === 'generating' && (
-              <p className="progress-stage">Writing your feedback...</p>
-            )}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div>
-        <h2>{essay.title}</h2>
-        <div className="error-state" style={{ marginTop: 24 }}>
-          <p>Evaluation failed. Your essay has been saved.</p>
-          {!ownerUid && retryCount < 3 ? (
-            <Button onClick={handleRetry} size="sm" mt={12} disabled={retrying} loading={retrying}>
-              Retry
-            </Button>
-          ) : ownerUid ? (
-            <p style={{ marginTop: 8 }}>Only the essay owner can retry evaluation.</p>
-          ) : (
-            <p style={{ marginTop: 8 }}>Maximum retries reached. Please try again later.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const evaluation = activeDraft?.evaluation ?? null;
+  const comparison = evaluation?.comparisonToPrevious ?? null;
+  const isPending = !evaluation;
+  const evalStatus = activeDraft?.evaluationStatus;
+  const isEvalError = isPending && evalStatus?.stage === 'error';
+  const age = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
+  const isStale = isPending && !evalStatus && age >= 180000;
 
-  const evaluation = activeDraft.evaluation;
-  const comparison = evaluation.comparisonToPrevious;
+  // Show notification permission banner when evaluation is pending
+  const showNotifBanner = isPending && !isEvalError && !isStale && !notifBannerDismissed && shouldAskPermission();
+  const dismissNotifBanner = () => {
+    setNotifBannerDismissed(true);
+    sessionStorage.setItem('essaycoach_notif_dismissed', '1');
+  };
 
   return (
     <div className="essay-page">
@@ -250,24 +233,26 @@ export default function EssayPage() {
             ]}
             styles={{ input: { minWidth: 110 } }}
           />
-          <Button
-            size="compact-xs"
-            variant="default"
-            onClick={
-              activeView === 'grammar' ? handleGrammarReanalyze
-              : activeView === 'transitions' ? handleTransitionReanalyze
-              : handleFeedbackReanalyze
-            }
-            disabled={
-              activeView === 'grammar' ? grammarLoading
-              : activeView === 'transitions' ? transitionLoading
-              : retrying || retryCount >= 3
-            }
-            loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
-          >
-            Analyze
-          </Button>
-          {isLatestDraft && (
+          {evaluation && (
+            <Button
+              size="compact-xs"
+              variant="default"
+              onClick={
+                activeView === 'grammar' ? handleGrammarReanalyze
+                : activeView === 'transitions' ? handleTransitionReanalyze
+                : handleFeedbackReanalyze
+              }
+              disabled={
+                activeView === 'grammar' ? grammarLoading
+                : activeView === 'transitions' ? transitionLoading
+                : retrying || retryCount >= 3
+              }
+              loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
+            >
+              Analyze
+            </Button>
+          )}
+          {isLatestDraft && evaluation && (
             <Button
               size="compact-xs"
               component={Link}
@@ -279,33 +264,82 @@ export default function EssayPage() {
         </Group>
       </DocBar>
 
+      {/* Notification permission banner */}
+      {showNotifBanner && (
+        <div className="notification-banner">
+          <span className="notification-banner-text">
+            Want us to notify you when feedback is ready?
+          </span>
+          <Button size="compact-xs" onClick={async () => {
+            await requestPermission();
+            dismissNotifBanner();
+          }}>
+            Enable Notifications
+          </Button>
+          <Button size="compact-xs" variant="subtle" onClick={dismissNotifBanner}>
+            Dismiss
+          </Button>
+        </div>
+      )}
+
       {/* Score bar — sticky below breadcrumb */}
       {activeView === 'feedback' && (
         <div className="score-bar">
           <div style={{ position: 'relative', flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <ScorePillBar
-              evaluation={evaluation}
-              activeKey={activeTrait}
-              onSelect={setActiveTrait}
-              scoreChanges={comparison?.scoreChanges}
-            />
-            {activeTrait && (
-              <div className="trait-popover" ref={popoverRef}>
-                <div className="trait-popover-header">
-                  <strong>{TRAIT_LABELS[activeTrait]}</strong>
-                  <span style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}>
-                    {evaluation.traits[activeTrait].score}/6
-                  </span>
-                </div>
-                <p className="trait-popover-text">{evaluation.traits[activeTrait].feedback}</p>
-              </div>
+            {evaluation ? (
+              <>
+                <ScorePillBar
+                  evaluation={evaluation}
+                  activeKey={activeTrait}
+                  onSelect={setActiveTrait}
+                  scoreChanges={comparison?.scoreChanges}
+                />
+                {activeTrait && (
+                  <div className="trait-popover" ref={popoverRef}>
+                    <div className="trait-popover-header">
+                      <strong>{TRAIT_LABELS[activeTrait]}</strong>
+                      <span style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}>
+                        {evaluation.traits[activeTrait].score}/6
+                      </span>
+                    </div>
+                    <p className="trait-popover-text">{evaluation.traits[activeTrait].feedback}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <ScorePillBar skeleton />
             )}
           </div>
+          {/* Evaluation status indicator */}
+          {isPending && !isEvalError && !isStale && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12, flexShrink: 0 }}>
+              <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, margin: 0 }} />
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                {evalStatus?.message || 'Evaluating...'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Feedback summary — only on overall/feedback tab */}
-      {activeView === 'feedback' && (
+      {/* Error state for evaluation */}
+      {isPending && (isEvalError || isStale) && activeView === 'feedback' && (
+        <div className="error-state" style={{ margin: '16px 24px' }}>
+          <p>Evaluation failed. Your essay has been saved.</p>
+          {!ownerUid && retryCount < 3 ? (
+            <Button onClick={handleRetry} size="sm" mt={8} disabled={retrying} loading={retrying}>
+              Retry
+            </Button>
+          ) : ownerUid ? (
+            <p style={{ marginTop: 8 }}>Only the essay owner can retry evaluation.</p>
+          ) : (
+            <p style={{ marginTop: 8 }}>Maximum retries reached. Please try again later.</p>
+          )}
+        </div>
+      )}
+
+      {/* Feedback summary — only on overall/feedback tab, only when evaluation exists */}
+      {activeView === 'feedback' && evaluation && (
         <div className="feedback-summary">
           {evaluation.overallFeedback && (
             <p className="feedback-summary-text">{evaluation.overallFeedback}</p>
@@ -337,14 +371,20 @@ export default function EssayPage() {
         </div>
       )}
 
-      {/* Essay with inline annotations — the main event */}
+      {/* Essay with inline annotations or plain text when pending */}
       {activeView === 'feedback' && (
-        <AnnotatedEssay
-          content={activeDraft.content}
-          annotations={allAnnotations}
-          readOnly
-          activeTrait={activeTrait}
-        />
+        evaluation ? (
+          <AnnotatedEssay
+            content={activeDraft.content}
+            annotations={allAnnotations}
+            readOnly
+            activeTrait={activeTrait}
+          />
+        ) : (
+          <div className="skeleton-essay">
+            <div className="skeleton-essay-text">{activeDraft.content}</div>
+          </div>
+        )
       )}
 
       {activeView === 'transitions' && (
@@ -355,7 +395,7 @@ export default function EssayPage() {
           status={activeDraft.transitionStatus}
           onRetry={handleTransitionsTab}
           defaultMessage="Analyzing transitions..."
-          placeholder="Click the Transitions tab to analyze this essay's transitions."
+          placeholder="Transitions analysis is loading..."
         >
           <TransitionView content={activeDraft.content} analysis={activeDraft.transitionAnalysis!} />
         </AnalysisPanel>
@@ -369,7 +409,7 @@ export default function EssayPage() {
           status={activeDraft.grammarStatus}
           onRetry={handleGrammarTab}
           defaultMessage="Analyzing grammar..."
-          placeholder="Click the Grammar tab to analyze this essay's grammar."
+          placeholder="Grammar analysis is loading..."
         >
           <GrammarView content={activeDraft.content} analysis={activeDraft.grammarAnalysis!} />
         </AnalysisPanel>

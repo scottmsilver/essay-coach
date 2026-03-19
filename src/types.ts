@@ -127,7 +127,7 @@ export interface GrammarAnalysis {
 }
 
 export interface EvaluationStatus {
-  stage: 'thinking' | 'generating' | 'error';
+  stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
 }
 

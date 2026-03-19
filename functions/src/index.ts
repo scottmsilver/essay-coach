@@ -11,3 +11,5 @@ export { unshareEssays } from './unshareEssays';
 export { removeSharedWithMe } from './removeSharedWithMe';
 export { resolvePendingShares } from './resolvePendingShares';
 export { evaluateEssay } from './evaluateEssay';
+export { onDraftCreated } from './onDraftCreated';
+export { suggestTitle } from './suggestTitle';

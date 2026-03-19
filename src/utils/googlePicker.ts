@@ -123,10 +123,11 @@ export async function openGooglePicker(): Promise<PickerResult | null> {
             name: doc[google.picker.Document.NAME],
             url: doc[google.picker.Document.URL],
           });
-        } else {
+        } else if (action === google.picker.Action.CANCEL) {
           picker.dispose();
           resolve(null);
         }
+        // Action.LOADED — picker just became visible, do nothing
       })
       .build();
 

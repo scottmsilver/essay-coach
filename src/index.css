@@ -962,3 +962,51 @@ mark {
   border-radius: 2px;
 }
 
+/* ═══ Skeleton pulse animation ═══ */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+.skeleton-pill {
+  background: var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+  cursor: default !important;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+.skeleton-text {
+  background: var(--color-border);
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ═══ Notification banner ═══ */
+.notification-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--color-primary-light);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.notification-banner-text {
+  flex: 1;
+}
+
+/* ═══ Skeleton essay placeholder ═══ */
+.skeleton-essay {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 32px;
+  margin: 16px 24px 0;
+}
+.skeleton-essay-text {
+  white-space: pre-wrap;
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--color-text);
+}
+

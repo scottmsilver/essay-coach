@@ -27,6 +27,15 @@ export default function AnalysisPanel({ data, error, loading, status, onRetry, d
     );
   }
 
+  if (status?.stage === 'pending') {
+    return (
+      <div className="loading-state">
+        <p className="progress-message">{status.message || 'Queued...'}</p>
+        <p className="progress-stage">Analysis will begin shortly</p>
+      </div>
+    );
+  }
+
   if (loading || status) {
     return (
       <div className="loading-state">

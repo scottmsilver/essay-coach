@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Button, Text } from '@mantine/core';
-import { functions, db } from '../firebase';
+import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import DocBar from '../components/DocBar';
 import { useEssay } from '../hooks/useEssay';
@@ -14,6 +13,7 @@ import { fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
 import { scoreColor, collectAnnotations, classifyAnnotation } from '../utils';
 import ScorePillBar from '../components/ScorePillBar';
+import { fireAllAnalyses } from '../utils/submitEssay';
 
 export default function RevisionPage() {
   const { essayId, ownerUid } = useParams<{ essayId: string; ownerUid?: string }>();
@@ -86,6 +86,8 @@ export default function RevisionPage() {
           draftNumber: newDraftNumber,
           content: essayContent,
           submittedAt: serverTimestamp(),
+          grammarStatus: { stage: 'pending', message: 'Queued...' },
+          transitionStatus: { stage: 'pending', message: 'Queued...' },
         }),
         updateDoc(essayRef, {
           currentDraftNumber: newDraftNumber,
@@ -96,10 +98,8 @@ export default function RevisionPage() {
       localStorage.removeItem(`essaycoach_autosave_${essayId}`);
       navigate(`/essay/${essayId}`);
 
-      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
-      evaluateEssay({ essayId, draftId: draftRef.id }).catch((err) => {
-        console.error('Background evaluation failed:', err);
-      });
+      // Fire all 3 analyses in parallel (fire-and-forget)
+      fireAllAnalyses(essayId!, draftRef.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to resubmit. Please try again.');
       setRetryCount((c) => c + 1);

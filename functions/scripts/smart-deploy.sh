@@ -39,13 +39,16 @@ declare -A FILE_TO_FUNCTIONS=(
   ["src/evaluateEssay.ts"]="evaluateEssay"
   ["src/prompt.ts"]="submitEssay resubmitDraft"
   ["src/gemini.ts"]="submitEssay resubmitDraft"
-  ["src/transitions.ts"]="analyzeTransitions"
-  ["src/sentenceSplitter.ts"]="analyzeTransitions"
-  ["src/grammar.ts"]="analyzeGrammar"
+  ["src/streamGemini.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar evaluateEssay onDraftCreated"
+  ["src/transitions.ts"]="analyzeTransitions onDraftCreated"
+  ["src/sentenceSplitter.ts"]="analyzeTransitions onDraftCreated"
+  ["src/grammar.ts"]="analyzeGrammar onDraftCreated"
   ["src/resolveEssayOwner.ts"]="resubmitDraft analyzeTransitions analyzeGrammar"
-  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar shareEssays unshareEssays removeSharedWithMe"
+  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar shareEssays unshareEssays removeSharedWithMe suggestTitle"
   ["src/validation.ts"]="submitEssay resubmitDraft"
-  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
+  ["src/onDraftCreated.ts"]="onDraftCreated"
+  ["src/suggestTitle.ts"]="suggestTitle"
+  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
 )
 
 # Files that trigger a full deploy if changed
@@ -61,7 +64,7 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
   if [[ -z "$LAST_SHA" ]] && ! $FORCE_ALL; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
-  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
+  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
 else
   # Get changed files since last deploy
   CHANGED_FILES=$(git diff --name-only "$LAST_SHA" -- . 2>/dev/null || echo "")
@@ -86,7 +89,7 @@ else
   done
 
   if $NEED_FULL; then
-    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay"
+    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
   else
     # Map changed files to affected functions
     DEPLOY_SET=""

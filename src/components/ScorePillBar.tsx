@@ -7,14 +7,30 @@ interface ScoreChange {
 }
 
 interface Props {
-  evaluation: Evaluation;
-  activeKey: TraitKey | null;
-  onSelect: (key: TraitKey | null) => void;
+  evaluation?: Evaluation;
+  activeKey?: TraitKey | null;
+  onSelect?: (key: TraitKey | null) => void;
   scoreChanges?: Partial<Record<TraitKey, ScoreChange>>;
   showPriority?: boolean;
+  skeleton?: boolean;
 }
 
-export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreChanges, showPriority }: Props) {
+export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreChanges, showPriority, skeleton }: Props) {
+  if (skeleton) {
+    return (
+      <div className="analysis-bar-scores">
+        {TRAIT_KEYS.map((trait) => (
+          <span key={trait} className="score-pill skeleton-pill">
+            <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>
+            <span className="score-pill-value">-</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (!evaluation) return null;
+
   return (
     <div className="analysis-bar-scores">
       {TRAIT_KEYS.map((trait) => {
@@ -27,7 +43,7 @@ export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreCha
           <button
             key={trait}
             className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''} ${improved ? 'improved' : ''}`}
-            onClick={() => onSelect(isActive ? null : trait)}
+            onClick={() => onSelect?.(isActive ? null : trait)}
             title={traitData.feedback}
           >
             <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>

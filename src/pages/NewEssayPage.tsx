@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -9,6 +9,7 @@ import { WRITING_TYPES, type WritingType, type DocSource } from '../types';
 import { countWords } from '../utils';
 import { handleRichPaste } from '../utils/pasteHandler';
 import GDocImportDialog from '../components/GDocImportDialog';
+import { fireAllAnalyses } from '../utils/submitEssay';
 
 export default function NewEssayPage() {
   const navigate = useNavigate();
@@ -23,6 +24,9 @@ export default function NewEssayPage() {
   const [contentSource, setContentSource] = useState<DocSource | null>(null);
   const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | null>(null);
   const [lastImportedUrl, setLastImportedUrl] = useState('');
+  const [titleIsGenerated, setTitleIsGenerated] = useState(false);
+  const [titleSuggesting, setTitleSuggesting] = useState(false);
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const wordCount = countWords(content);
 
@@ -47,6 +51,40 @@ export default function NewEssayPage() {
     setContentSource(null);
     setContent('');
   };
+
+  // Auto-suggest title when assignment prompt changes
+  const titleIsGeneratedRef = useRef(false);
+  const titleRef = useRef('');
+  titleIsGeneratedRef.current = titleIsGenerated;
+  titleRef.current = title;
+
+  const suggestTitleFromPrompt = useCallback(async (promptText: string) => {
+    if (promptText.trim().length < 10) return;
+    // Don't overwrite a manually-typed title
+    if (!titleIsGeneratedRef.current && titleRef.current) return;
+    setTitleSuggesting(true);
+    try {
+      const suggest = httpsCallable<{ prompt: string }, { title: string }>(functions, 'suggestTitle', { timeout: 30000 });
+      const result = await suggest({ prompt: promptText });
+      if (result.data.title) {
+        setTitle(result.data.title);
+        setTitleIsGenerated(true);
+      }
+    } catch {
+      // Silent fail — student can type manually
+    } finally {
+      setTitleSuggesting(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!assignmentPrompt) return;
+    clearTimeout(titleDebounceRef.current);
+    titleDebounceRef.current = setTimeout(() => {
+      suggestTitleFromPrompt(assignmentPrompt);
+    }, 1000);
+    return () => clearTimeout(titleDebounceRef.current);
+  }, [assignmentPrompt, suggestTitleFromPrompt]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,17 +111,16 @@ export default function NewEssayPage() {
           draftNumber: 1,
           content,
           submittedAt: serverTimestamp(),
+          grammarStatus: { stage: 'pending', message: 'Queued...' },
+          transitionStatus: { stage: 'pending', message: 'Queued...' },
         }),
       ]);
 
       // Navigate immediately — EssayPage will show the progress UI
       navigate(`/essay/${essayRef.id}`);
 
-      // Trigger evaluation in background (fire-and-forget)
-      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
-      evaluateEssay({ essayId: essayRef.id, draftId: draftRef.id }).catch((err) => {
-        console.error('Background evaluation failed:', err);
-      });
+      // Fire all 3 analyses in parallel (fire-and-forget)
+      fireAllAnalyses(essayRef.id, draftRef.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to submit essay. Please try again.');
       setSubmitting(false);
@@ -94,15 +131,6 @@ export default function NewEssayPage() {
     <div>
       <h2>New Essay</h2>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-        <TextInput
-          label="Title"
-          value={title}
-          onChange={(e) => setTitle(e.currentTarget.value)}
-          maxLength={200}
-          required
-          placeholder="e.g., Hamlet Analysis"
-          mb="md"
-        />
         <Select
           label="Writing Type"
           value={writingType}
@@ -139,6 +167,24 @@ export default function NewEssayPage() {
           mb="md"
           readOnly={!!promptSource}
         />
+        <div style={{ position: 'relative' }}>
+          <TextInput
+            label="Title"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.currentTarget.value);
+              setTitleIsGenerated(false);
+            }}
+            maxLength={200}
+            required
+            placeholder="e.g., Hamlet Analysis"
+            mb="md"
+            rightSection={titleSuggesting ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, margin: 0 }} /> : undefined}
+          />
+          {titleIsGenerated && title && (
+            <Text size="xs" c="dimmed" style={{ position: 'absolute', right: 0, top: 0 }}>AI-suggested</Text>
+          )}
+        </div>
         {/* Essay Content */}
         <Group justify="space-between" mb={4}>
           <Text fw={500} size="sm">Your Essay <span style={{ color: 'red' }}>*</span></Text>
