@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithRouter } from '../test-utils';
 import Layout from './Layout';
 
@@ -9,16 +9,9 @@ describe('Layout', () => {
     expect(screen.getByText('EssayCoach')).toBeInTheDocument();
   });
 
-  it('renders navigation tabs and new essay button in header', () => {
+  it('renders "+ New Essay" button in header', () => {
     renderWithRouter(<Layout />, { route: '/' });
-    const header = document.querySelector('.mantine-AppShell-header')!;
-    const headerScope = within(header as HTMLElement);
-    // Tabs are views (no "New Essay" tab — it's a button now)
-    expect(headerScope.getByText('My Essays')).toBeInTheDocument();
-    expect(headerScope.getByText('Progress')).toBeInTheDocument();
-    expect(headerScope.getByText('Sharing')).toBeInTheDocument();
-    // "New" is a button, not a tab
-    expect(headerScope.getByText('+ New')).toBeInTheDocument();
+    expect(screen.getByText('+ New Essay')).toBeInTheDocument();
   });
 
   it('renders user avatar with initials', () => {
@@ -28,20 +21,20 @@ describe('Layout', () => {
     expect(screen.getByText('T')).toBeInTheDocument();
   });
 
-  it('hides header on essay routes', () => {
+  it('shows header on home route', () => {
+    renderWithRouter(<Layout />, { route: '/' });
+    const header = document.querySelector('.mantine-AppShell-header');
+    expect(header).not.toBeNull();
+  });
+
+  it('shows header on essay routes', () => {
     renderWithRouter(<Layout />, { route: '/essay/e1' });
     const header = document.querySelector('.mantine-AppShell-header');
-    expect(header).toBeNull();
+    expect(header).not.toBeNull();
   });
 
-  it('hides header on shared essay routes', () => {
+  it('shows header on shared essay routes', () => {
     renderWithRouter(<Layout />, { route: '/user/u1/essay/e1' });
-    const header = document.querySelector('.mantine-AppShell-header');
-    expect(header).toBeNull();
-  });
-
-  it('shows header on non-essay routes', () => {
-    renderWithRouter(<Layout />, { route: '/' });
     const header = document.querySelector('.mantine-AppShell-header');
     expect(header).not.toBeNull();
   });

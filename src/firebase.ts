@@ -16,5 +16,6 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
 export const db = getFirestore(app);
 export const functions = getFunctions(app);

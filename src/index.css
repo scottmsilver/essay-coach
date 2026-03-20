@@ -47,15 +47,6 @@ body {
   line-height: 1.6;
 }
 
-/* Brand */
-.brand-link {
-  text-decoration: none;
-  color: var(--color-primary);
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 20px;
-}
-
 /* Header depth — subtle shadow instead of flat hairline */
 .mantine-AppShell-header {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -84,142 +75,6 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
   font-family: var(--font-body);
   font-size: 17px;
   line-height: 1.8;
-}
-
-/* Nav tabs — header links */
-.nav-tab {
-  text-decoration: none;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 6px;
-  transition: background 0.15s, color 0.15s;
-}
-.nav-tab:hover { background: rgba(0,0,0,0.04); color: var(--color-text); }
-.nav-tab-active { color: var(--color-primary); background: var(--color-primary-light); }
-
-/* Nav tabs — mobile drawer links */
-.nav-tab-mobile {
-  text-decoration: none;
-  color: var(--color-text);
-  font-size: 14px;
-  font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 6px;
-  display: block;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-family);
-  text-align: left;
-  width: 100%;
-}
-.nav-tab-mobile:hover { background: rgba(0,0,0,0.04); }
-.nav-tab-mobile-active { color: var(--color-primary); background: var(--color-primary-light); }
-
-/* ═══ Document Breadcrumb Bar (Google Docs style) ═══ */
-.doc-bar {
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  height: 40px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  gap: 6px;
-  font-size: 13px;
-}
-.doc-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
-}
-.doc-bar-home {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 400;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-.doc-bar-home:hover { background: var(--color-primary-hover); }
-.doc-bar-title {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0;
-}
-.doc-bar-draft {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.doc-bar-draft-label {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.doc-bar-draft-pick {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: 10px;
-  padding: 0 3px;
-  border-radius: 3px;
-  line-height: 1;
-}
-.doc-bar-draft-pick:hover { color: var(--color-text); background: var(--color-bg); }
-.doc-bar-draft-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 4px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  z-index: 100;
-  min-width: 180px;
-  display: flex;
-  flex-direction: column;
-}
-.doc-bar-draft-item {
-  display: block;
-  width: 100%;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-family: var(--font-ui);
-}
-.doc-bar-draft-item:hover { background: var(--color-bg); color: var(--color-text); }
-.doc-bar-draft-item.active { color: var(--color-primary); font-weight: 600; }
-.doc-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 /* ═══ Score Bar (sticky, below breadcrumb) ═══ */
@@ -332,7 +187,7 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 .main-content { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-bottom: 32px; }
 
 /* Full-bleed on essay pages — Google Docs style */
-.main-content:has(.essay-page) { max-width: none; padding: 0; }
+.main-content:has(.essay-page) { max-width: none; padding-left: 0; padding-right: 0; padding-bottom: 0; }
 .essay-page > .annotated-essay,
 .essay-page > .transition-view, .essay-page > .grammar-view,
 .essay-page > .loading-state, .essay-page > .error-state,
@@ -354,16 +209,15 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 }
 .login-page h1 { font-size: 36px; color: var(--color-primary); margin-bottom: 8px; }
 .login-page p { color: var(--color-text-secondary); margin-bottom: 32px; }
-.google-sign-in {
+.google-sign-in.mantine-Button-root {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  padding: 12px 24px;
   border-radius: 8px;
   font-size: 16px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+}
+.google-sign-in .mantine-Button-label {
+  color: var(--color-text) !important;
 }
 .google-sign-in:hover { background: var(--color-bg); }
 
@@ -1034,5 +888,194 @@ mark {
 }
 .revision-editor-active {
   border: 2px solid var(--color-primary) !important;
+}
+
+/* ═══ Unified App Header ═══ */
+.app-header {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+.app-header-home {
+  height: 52px;
+  justify-content: space-between;
+}
+.app-header-brand {
+  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 24px;
+  text-decoration: none;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.app-header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.app-header-essay {
+  display: flex;
+  padding: 0;
+}
+.app-header-essay-rows {
+  flex: 1;
+  min-width: 0;
+  padding: 0 20px;
+}
+.app-header-row1 {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  gap: 8px;
+  min-width: 0;
+}
+.app-header-sep {
+  color: var(--color-text-muted);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.app-header-title {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-header-draft {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.app-header-draft-label {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.app-header-draft-pick {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.app-header-draft-pick:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+.app-header-row2 {
+  display: flex;
+  align-items: center;
+  height: 33px;
+  padding-bottom: 12px;
+  gap: 5px;
+}
+.app-header-row2 .mantine-Button-root {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.app-header-row2 .mantine-Select-input {
+  height: 26px;
+  min-height: 26px;
+  font-size: 12px;
+}
+.app-header-avatar-col {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+.draft-picker-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.draft-picker-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.draft-picker-item:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.draft-picker-item.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.view-selector-blue .mantine-Select-input {
+  border-color: var(--color-primary);
+}
+
+/* ═══ Mobile responsive — App Header ═══ */
+@media (max-width: 600px) {
+  .app-header {
+    padding: 0 12px;
+  }
+  .app-header-brand {
+    font-size: 16px;
+  }
+  .app-header-essay-rows {
+    padding: 0 12px;
+  }
+  .app-header-row1 {
+    gap: 6px;
+  }
+  .app-header-sep {
+    display: none;
+  }
+  .app-header-title {
+    font-size: 12px;
+  }
+  .app-header-draft-label {
+    font-size: 10px;
+  }
+  .app-header-row2 {
+    gap: 4px;
+  }
+  .app-header-avatar-col {
+    padding: 0 8px;
+  }
+  /* Tighter content padding on mobile */
+  .main-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .essay-page > .annotated-essay,
+  .essay-page > .transition-view, .essay-page > .grammar-view,
+  .essay-page > .loading-state, .essay-page > .error-state,
+  .essay-page > .revision-layout {
+    padding: 16px 12px;
+  }
+  /* Score pills wrap tighter on mobile */
+  .score-bar {
+    padding: 8px 12px;
+  }
 }
 

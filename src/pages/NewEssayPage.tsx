@@ -10,6 +10,7 @@ import { countWords } from '../utils';
 import { handleRichPaste } from '../utils/pasteHandler';
 import GDocImportDialog from '../components/GDocImportDialog';
 import { fireAllAnalyses } from '../utils/submitEssay';
+import { openGooglePicker } from '../utils/googlePicker';
 
 export default function NewEssayPage() {
   const navigate = useNavigate();
@@ -50,6 +51,20 @@ export default function NewEssayPage() {
   const clearContentSource = () => {
     setContentSource(null);
     setContent('');
+  };
+
+  const handlePickerImport = async (target: 'prompt' | 'essay') => {
+    try {
+      const result = await openGooglePicker(user?.email ?? undefined);
+      if (!result) return; // user cancelled
+      // Open the dialog with the URL pre-filled — it will auto-fetch
+      setLastImportedUrl(result.url);
+      setImportTarget(target);
+    } catch (err) {
+      console.error('Picker failed:', err);
+      // Fall back to dialog without pre-fill
+      setImportTarget(target);
+    }
   };
 
   // Auto-suggest title when assignment prompt changes
@@ -144,11 +159,11 @@ export default function NewEssayPage() {
           {promptSource ? (
             <Group gap="xs">
               <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => setImportTarget('prompt')}>Change</Button>
+              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>Change</Button>
               <Button variant="subtle" size="compact-xs" color="red" onClick={clearPromptSource}>Clear</Button>
             </Group>
           ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => setImportTarget('prompt')}>
+            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>
               Import from Google Docs
             </Button>
           )}
@@ -191,11 +206,11 @@ export default function NewEssayPage() {
           {contentSource ? (
             <Group gap="xs">
               <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => setImportTarget('essay')}>Change</Button>
+              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>Change</Button>
               <Button variant="subtle" size="compact-xs" color="red" onClick={clearContentSource}>Clear</Button>
             </Group>
           ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => setImportTarget('essay')}>
+            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>
               Import from Google Docs
             </Button>
           )}

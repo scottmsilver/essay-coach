@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Modal, TextInput, Button, Radio, Stack, Text, Loader, Alert,
   Group, Divider, Accordion, ScrollArea, Box,
@@ -8,6 +8,7 @@ import { parseSections } from '../../shared/gdocTypes';
 import { countWords } from '../utils';
 import type { DocSource, GDocBookmark } from '../../shared/gdocTypes';
 import { openGooglePicker } from '../utils/googlePicker';
+import { useAuth } from '../hooks/useAuth';
 
 interface Props {
   opened: boolean;
@@ -20,6 +21,7 @@ interface Props {
 type Step = 'url' | 'tab' | 'content';
 
 export default function GDocImportDialog({ opened, onClose, onImport, label, initialUrl }: Props) {
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>('url');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,10 +37,16 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   const [sections, setSections] = useState<string[]>([]);
   const [selectedSection, setSelectedSection] = useState<number>(0);
 
-  // Pre-fill URL from prop when dialog opens
+  // Pre-fill URL from prop when dialog opens, and auto-fetch if URL is provided
+  const autoFetchedRef = useRef('');
   useEffect(() => {
     if (opened && initialUrl) {
       setUrl(initialUrl);
+      // Auto-fetch if this is a new URL we haven't fetched yet
+      if (initialUrl !== autoFetchedRef.current) {
+        autoFetchedRef.current = initialUrl;
+        handleFetchTabs(initialUrl);
+      }
     }
   }, [opened, initialUrl]);
 
@@ -48,6 +56,7 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
     setLoading(false);
     setError(null);
     setPickerError(null);
+    autoFetchedRef.current = '';
     setDocId('');
     setTabs([]);
     setSelectedTab(null);
@@ -138,7 +147,7 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   const handlePicker = async () => {
     setPickerError(null);
     try {
-      const result = await openGooglePicker();
+      const result = await openGooglePicker(user?.email ?? undefined);
       if (!result) return; // user cancelled
       setUrl(result.url);
       await handleFetchTabs(result.url);

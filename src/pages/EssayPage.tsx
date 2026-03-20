@@ -11,7 +11,7 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { scoreColor, relativeTime, collectAnnotations, classifyAnnotation } from '../utils';
 import { TRAIT_LABELS, TRAIT_KEYS } from '../types';
 import type { TraitKey, TransitionAnalysis, GrammarAnalysis } from '../types';
-import DocBar from '../components/DocBar';
+import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
 import ScorePillBar from '../components/ScorePillBar';
 import AnalysisPanel from '../components/AnalysisPanel';
 import AnnotatedEssay from '../components/AnnotatedEssay';
@@ -21,7 +21,7 @@ import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from
 import { handleRichPaste } from '../utils/pasteHandler';
 import { fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
-import { fireAllAnalyses } from '../utils/submitEssay';
+import { fireAllAnalyses, FUNCTION_TIMEOUT } from '../utils/submitEssay';
 
 type ViewMode = 'feedback' | 'transitions' | 'grammar';
 
@@ -75,6 +75,13 @@ export default function EssayPage() {
     return drafts.find((d) => d.id === id) ?? drafts[0];
   }, [drafts, selectedDraftId]);
 
+  const focusHighestPriorityTrait = useCallback((evaluation: { traits: Record<string, { revisionPriority: number | null }> }) => {
+    const prioritized = TRAIT_KEYS
+      .filter((t) => evaluation.traits[t].revisionPriority !== null)
+      .sort((a, b) => (evaluation.traits[a].revisionPriority! - evaluation.traits[b].revisionPriority!));
+    if (prioritized.length > 0) setActiveTrait(prioritized[0]);
+  }, []);
+
   // Auto-enter revision mode if URL ends with /revise and data is ready
   const reviseInitRef = useRef(false);
   useEffect(() => {
@@ -82,13 +89,8 @@ export default function EssayPage() {
     reviseInitRef.current = true;
     const saved = localStorage.getItem(`essaycoach_autosave_${essayId}`);
     setRevisionContent(saved ?? activeDraft.content);
-    if (activeDraft.evaluation) {
-      const prioritized = TRAIT_KEYS
-        .filter((t) => activeDraft.evaluation!.traits[t].revisionPriority !== null)
-        .sort((a, b) => (activeDraft.evaluation!.traits[a].revisionPriority! - activeDraft.evaluation!.traits[b].revisionPriority!));
-      if (prioritized.length > 0) setActiveTrait(prioritized[0]);
-    }
-  }, [revising, activeDraft, essayId]);
+    if (activeDraft.evaluation) focusHighestPriorityTrait(activeDraft.evaluation);
+  }, [revising, activeDraft, essayId, focusHighestPriorityTrait]);
 
   // Toast + browser notification when evaluation completes
   const wasWaiting = useRef(false);
@@ -127,7 +129,7 @@ export default function EssayPage() {
       const analyzeGrammar = httpsCallable<
         { essayId: string; draftId: string; ownerUid?: string },
         GrammarAnalysis
-      >(functions, 'analyzeGrammar', { timeout: 180000 });
+      >(functions, 'analyzeGrammar', { timeout: FUNCTION_TIMEOUT });
       await analyzeGrammar({ essayId: essayId!, draftId, ownerUid });
     } catch {
       setGrammarError('Failed to analyze grammar. Please try again.');
@@ -136,26 +138,29 @@ export default function EssayPage() {
     }
   }, [essayId, ownerUid]);
 
-  const handleTransitionsTab = useCallback(async () => {
-    setActiveView('transitions');
-    if (!activeDraft || activeDraft.transitionAnalysis) return;
-    // Don't fire if already in progress (pending/thinking/generating from parallel submit)
-    if (activeDraft.transitionStatus && activeDraft.transitionStatus.stage !== 'error') return;
-
+  // Shared transition analysis caller
+  const runTransitionAnalysis = useCallback(async (draftId: string) => {
     setTransitionLoading(true);
     setTransitionError(null);
     try {
       const analyzeTransitions = httpsCallable<
         { essayId: string; draftId: string; ownerUid?: string },
         TransitionAnalysis
-      >(functions, 'analyzeTransitions', { timeout: 180000 });
-      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft.id, ownerUid });
+      >(functions, 'analyzeTransitions', { timeout: FUNCTION_TIMEOUT });
+      await analyzeTransitions({ essayId: essayId!, draftId, ownerUid });
     } catch {
       setTransitionError('Failed to analyze transitions. Please try again.');
     } finally {
       setTransitionLoading(false);
     }
-  }, [activeDraft, essayId, ownerUid, setActiveView]);
+  }, [essayId, ownerUid]);
+
+  const handleTransitionsTab = useCallback(async () => {
+    setActiveView('transitions');
+    if (!activeDraft || activeDraft.transitionAnalysis) return;
+    if (activeDraft.transitionStatus && activeDraft.transitionStatus.stage !== 'error') return;
+    await runTransitionAnalysis(activeDraft.id);
+  }, [activeDraft, runTransitionAnalysis, setActiveView]);
 
   const handleGrammarTab = useCallback(async () => {
     setActiveView('grammar');
@@ -174,26 +179,14 @@ export default function EssayPage() {
 
   const handleTransitionReanalyze = useCallback(async () => {
     if (!activeDraft) return;
-    setTransitionLoading(true);
-    setTransitionError(null);
-    try {
-      const analyzeTransitions = httpsCallable<
-        { essayId: string; draftId: string; ownerUid?: string },
-        TransitionAnalysis
-      >(functions, 'analyzeTransitions', { timeout: 180000 });
-      await analyzeTransitions({ essayId: essayId!, draftId: activeDraft.id, ownerUid });
-    } catch {
-      setTransitionError('Failed to analyze transitions. Please try again.');
-    } finally {
-      setTransitionLoading(false);
-    }
-  }, [activeDraft, essayId, ownerUid]);
+    await runTransitionAnalysis(activeDraft.id);
+  }, [activeDraft, runTransitionAnalysis]);
 
   const handleFeedbackReanalyze = useCallback(async () => {
     if (!activeDraft || !user) return;
     setRetrying(true);
     try {
-      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: FUNCTION_TIMEOUT });
       await evaluateEssay({ essayId: essayId!, draftId: activeDraft.id, ownerUid, force: true });
     } catch {
       setRetryCount((c) => c + 1);
@@ -209,13 +202,8 @@ export default function EssayPage() {
     navigate(`${basePath}/revise`, { replace: true });
     const saved = localStorage.getItem(`essaycoach_autosave_${essayId}`);
     setRevisionContent(saved ?? activeDraft.content);
-    if (activeDraft.evaluation) {
-      const prioritized = TRAIT_KEYS
-        .filter((t) => activeDraft.evaluation!.traits[t].revisionPriority !== null)
-        .sort((a, b) => (activeDraft.evaluation!.traits[a].revisionPriority! - activeDraft.evaluation!.traits[b].revisionPriority!));
-      if (prioritized.length > 0) setActiveTrait(prioritized[0]);
-    }
-  }, [activeDraft, essayId, navigate, basePath]);
+    if (activeDraft.evaluation) focusHighestPriorityTrait(activeDraft.evaluation);
+  }, [activeDraft, essayId, navigate, basePath, focusHighestPriorityTrait]);
 
   const exitRevisionMode = useCallback(() => {
     setRevising(false);
@@ -285,16 +273,14 @@ export default function EssayPage() {
     }
   }, [essayId, user, activeDraft, ownerUid, essay, revisionContent, navigate, basePath, resubmitRetryCount]);
 
-  if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
-  if (!essay || !activeDraft) return <div>Essay not found.</div>;
-
-  const isLatestDraft = activeDraft.id === drafts[0].id;
+  const setEssayHeader = useSetEssayHeader();
+  const isLatestDraft = drafts.length > 0 && activeDraft?.id === drafts[0].id;
 
   const handleRetry = async () => {
-    if (retryCount >= 3) return;
+    if (retryCount >= 3 || !activeDraft) return;
     setRetrying(true);
     try {
-      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: 180000 });
+      const evaluateEssay = httpsCallable(functions, 'evaluateEssay', { timeout: FUNCTION_TIMEOUT });
       await evaluateEssay({ essayId: essayId!, draftId: activeDraft.id });
     } catch {
       setRetryCount((c) => c + 1);
@@ -318,18 +304,20 @@ export default function EssayPage() {
     sessionStorage.setItem('essaycoach_notif_dismissed', '1');
   };
 
-  return (
-    <div className="essay-page">
-      <DocBar
-        title={essay.title}
-        activeDraftId={activeDraft.id}
-        draftLabel={revising
-          ? '· Revising'
-          : `v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`
-        }
-        draftOptions={drafts.map((d) => ({ id: d.id, label: `v${d.draftNumber} — ${relativeTime(d.submittedAt)}` }))}
-        onPickDraft={setSelectedDraftId}
-      >
+  useEffect(() => {
+    if (!essay || !activeDraft) {
+      setEssayHeader(null);
+      return;
+    }
+    setEssayHeader({
+      title: essay.title,
+      draftLabel: revising
+        ? '· Revising'
+        : `v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`,
+      activeDraftId: activeDraft.id,
+      draftOptions: drafts.map((d) => ({ id: d.id, label: `v${d.draftNumber} — ${relativeTime(d.submittedAt)}` })),
+      onPickDraft: setSelectedDraftId,
+      toolbar: (
         <Group gap="xs">
           {revising ? (
             <>
@@ -350,6 +338,7 @@ export default function EssayPage() {
           ) : (
             <>
               <Select
+                className="view-selector-blue"
                 size="xs"
                 value={activeView}
                 onChange={(val) => {
@@ -392,8 +381,16 @@ export default function EssayPage() {
             </>
           )}
         </Group>
-      </DocBar>
+      ),
+    });
+    return () => setEssayHeader(null);
+  }, [essay, activeDraft, drafts, revising, resubmitting, resubmitRetryCount, refetching, activeView, evaluation, isLatestDraft, ownerUid, grammarLoading, transitionLoading, retrying, retryCount]);
 
+  if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
+  if (!essay || !activeDraft) return <div>Essay not found.</div>;
+
+  return (
+    <div className="essay-page">
       {/* Notification permission banner */}
       {showNotifBanner && (
         <div className="notification-banner">

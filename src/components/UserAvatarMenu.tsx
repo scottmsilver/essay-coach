@@ -1,4 +1,5 @@
 import { Menu, Avatar } from '@mantine/core';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export default function UserAvatarMenu() {
@@ -6,7 +7,7 @@ export default function UserAvatarMenu() {
   const initial = (user?.displayName?.[0] ?? user?.email?.[0] ?? '?').toUpperCase();
 
   return (
-    <Menu shadow="md" width={160} position="bottom-end">
+    <Menu shadow="md" width={180} position="bottom-end">
       <Menu.Target>
         <Avatar
           src={user?.photoURL}
@@ -19,7 +20,11 @@ export default function UserAvatarMenu() {
         </Avatar>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item onClick={logOut}>Sign out</Menu.Item>
+        <Menu.Label>{user?.email}</Menu.Label>
+        <Menu.Item component={Link} to="/progress">Progress</Menu.Item>
+        <Menu.Item component={Link} to="/sharing">Sharing</Menu.Item>
+        <Menu.Divider />
+        <Menu.Item color="red" onClick={logOut}>Sign out</Menu.Item>
       </Menu.Dropdown>
     </Menu>
   );

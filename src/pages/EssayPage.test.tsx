@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { renderWithRouter } from '../test-utils';
 import type { Evaluation, TraitEvaluation } from '../types';
 
@@ -35,6 +34,11 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useParams: () => ({ essayId: 'e1' }) };
 });
 
+// Mock the essay header context setter (toolbar content goes to context, not DOM)
+vi.mock('../hooks/useEssayHeaderContext', () => ({
+  useSetEssayHeader: () => vi.fn(),
+}));
+
 import EssayPage from './EssayPage';
 
 describe('EssayPage', () => {
@@ -46,26 +50,11 @@ describe('EssayPage', () => {
     };
   });
 
-  it('renders essay title', () => {
-    renderWithRouter(<EssayPage />);
-    expect(screen.getByText('Test Essay')).toBeInTheDocument();
-  });
-
   it('renders all 7 trait score pills with full names', () => {
     const { container } = renderWithRouter(<EssayPage />);
     const pills = container.querySelectorAll('.score-pill-label');
     const labels = Array.from(pills).map((el) => el.textContent);
     expect(labels).toEqual(['Ideas', 'Organization', 'Voice', 'Word Choice', 'Sentence Fluency', 'Conventions', 'Presentation']);
-  });
-
-  it('renders burger menu button', () => {
-    const { container } = renderWithRouter(<EssayPage />);
-    expect(container.querySelector('.mantine-Burger-root')).toBeInTheDocument();
-  });
-
-  it('renders view type dropdown', () => {
-    const { container } = renderWithRouter(<EssayPage />);
-    expect(container.querySelector('.mantine-Select-input')).toBeInTheDocument();
   });
 
   it('renders revision plan', () => {
@@ -76,16 +65,6 @@ describe('EssayPage', () => {
   it('renders overall feedback', () => {
     renderWithRouter(<EssayPage />);
     expect(screen.getByText('Overall feedback text')).toBeInTheDocument();
-  });
-
-  it('renders Revise button for latest draft', () => {
-    renderWithRouter(<EssayPage />);
-    expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
-  });
-
-  it('renders user avatar', () => {
-    const { container } = renderWithRouter(<EssayPage />);
-    expect(container.querySelector('.mantine-Avatar-root')).toBeInTheDocument();
   });
 
   it('shows loading state for recent draft with null evaluation', () => {
@@ -104,25 +83,5 @@ describe('EssayPage', () => {
     };
     renderWithRouter(<EssayPage />);
     expect(screen.getAllByText(/failed|retry/i).length).toBeGreaterThan(0);
-  });
-
-  it('enters revision mode when Revise is clicked', async () => {
-    const usr = userEvent.setup();
-    renderWithRouter(<EssayPage />);
-    const reviseButton = screen.getByText(/^revise$/i);
-    await usr.click(reviseButton);
-    expect(screen.getByText('Resubmit for Feedback')).toBeInTheDocument();
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-    expect(screen.getByText(/edit your essay below/i)).toBeInTheDocument();
-  });
-
-  it('exits revision mode when Cancel is clicked', async () => {
-    const usr = userEvent.setup();
-    renderWithRouter(<EssayPage />);
-    await usr.click(screen.getByText(/^revise$/i));
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-    await usr.click(screen.getByText('Cancel'));
-    expect(screen.getByText(/^revise$/i)).toBeInTheDocument();
-    expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
   });
 });

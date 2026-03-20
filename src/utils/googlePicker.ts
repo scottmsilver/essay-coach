@@ -60,18 +60,19 @@ function isTokenValid(): boolean {
   return !!accessToken && Date.now() < tokenExpiry;
 }
 
-function requestToken(): Promise<string> {
+function requestToken(loginHint?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initTokenClient({
       client_id: getClientId(),
       scope: SCOPE,
+      ...( loginHint ? { login_hint: loginHint } : {}),
       callback: (response) => {
         if (response.error) {
           reject(new Error(response.error));
           return;
         }
         accessToken = response.access_token;
-        tokenExpiry = Date.now() + response.expires_in * 1000 - 60_000; // 1min buffer
+        tokenExpiry = Date.now() + response.expires_in * 1000 - 60_000;
         resolve(response.access_token);
       },
       error_callback: (error) => {
@@ -82,9 +83,16 @@ function requestToken(): Promise<string> {
   });
 }
 
-async function getToken(): Promise<string> {
+async function getToken(loginHint?: string): Promise<string> {
   if (isTokenValid()) return accessToken!;
-  return requestToken();
+  // Check if we have a token from the sign-in flow
+  const storedToken = sessionStorage.getItem('google_access_token');
+  if (storedToken && !accessToken) {
+    accessToken = storedToken;
+    tokenExpiry = Date.now() + 50 * 60 * 1000;
+    return storedToken;
+  }
+  return requestToken(loginHint);
 }
 
 // ---- Picker ----
@@ -99,16 +107,17 @@ export interface PickerResult {
  * Opens the Google Picker and returns the selected document.
  * Handles script loading, OAuth consent, and Picker lifecycle.
  * Returns null if the user cancels.
+ * @param userEmail - the signed-in user's email, used to select the right account when multiple are signed in
  */
-export async function openGooglePicker(): Promise<PickerResult | null> {
+export async function openGooglePicker(userEmail?: string): Promise<PickerResult | null> {
   await Promise.all([ensurePickerApi(), ensureGis()]);
-  const token = await getToken();
+  const token = await getToken(userEmail);
 
   return new Promise((resolve) => {
     const view = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS);
     view.setMimeTypes('application/vnd.google-apps.document');
 
-    const picker = new google.picker.PickerBuilder()
+    const builder = new google.picker.PickerBuilder()
       .setOAuthToken(token)
       .addView(view)
       .setTitle('Select a Google Doc')
@@ -128,9 +137,14 @@ export async function openGooglePicker(): Promise<PickerResult | null> {
           resolve(null);
         }
         // Action.LOADED — picker just became visible, do nothing
-      })
-      .build();
+      });
 
+    // When multiple Google accounts are signed in, tell the Picker which one to use
+    if (userEmail) {
+      (builder as unknown as { setAuthUser(email: string): void }).setAuthUser(userEmail);
+    }
+
+    const picker = builder.build();
     picker.setVisible(true);
   });
 }

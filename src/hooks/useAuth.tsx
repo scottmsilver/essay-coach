@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, googleProvider, db, functions } from '../firebase';
@@ -53,8 +53,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const signIn = async () => { await signInWithPopup(auth, googleProvider); };
-  const logOut = async () => { await signOut(auth); setAllowed(null); };
+  const signIn = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      // Store the access token so the Google Picker can reuse it
+      sessionStorage.setItem('google_access_token', credential.accessToken);
+    }
+  };
+  const logOut = async () => {
+    sessionStorage.removeItem('google_access_token');
+    await signOut(auth);
+    setAllowed(null);
+  };
 
   return (
     <AuthContext.Provider value={{ user, loading, allowed, signIn, logOut }}>

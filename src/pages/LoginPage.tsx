@@ -42,7 +42,7 @@ export default function LoginPage() {
         </div>
       ) : (
         <>
-          <Button className="google-sign-in" onClick={signIn} size="lg" fullWidth>
+          <Button onClick={signIn} size="lg" variant="outline" color="dark" fullWidth style={{ maxWidth: 320 }}>
             Sign in with Google
           </Button>
           {import.meta.env.DEV && (
