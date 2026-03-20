@@ -42,29 +42,37 @@ describe('GDocImportDialog', () => {
 
   // ---- URL Step ----
 
-  it('renders URL input and Browse My Docs button', () => {
+  it('renders Browse Google Docs button', () => {
     renderDialog();
-    expect(screen.getByLabelText(/google docs url/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /fetch document/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /browse my docs/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /browse google docs/i })).toBeInTheDocument();
   });
 
-  it('disables Fetch button when URL is empty', () => {
-    renderDialog();
-    expect(screen.getByRole('button', { name: /fetch document/i })).toBeDisabled();
-  });
+  it('auto-fetches when initialUrl prop is provided', async () => {
+    mockFetchGDocInfo
+      .mockResolvedValueOnce({
+        tabs: [{ title: 'Tab 1', id: 't1' }],
+        text: '',
+        bookmarks: [],
+      })
+      .mockResolvedValueOnce({
+        tabTitle: 'Tab 1',
+        tabId: 't1',
+        textLength: 50,
+        text: 'Some essay text here.',
+        bookmarks: [],
+        tabs: [{ title: 'Tab 1', id: 't1' }],
+      });
 
-  it('pre-fills URL from initialUrl prop', () => {
     renderDialog({ initialUrl: 'https://docs.google.com/document/d/abc123/edit' });
-    expect(screen.getByLabelText(/google docs url/i)).toHaveValue(
-      'https://docs.google.com/document/d/abc123/edit'
-    );
+
+    await waitFor(() => {
+      expect(mockFetchGDocInfo).toHaveBeenCalledWith('abc123');
+    });
   });
 
   // ---- No bookmarks flow ----
 
   it('shows document preview with "Import entire document" when no bookmarks', async () => {
-    const user = userEvent.setup();
     mockFetchGDocInfo
       .mockResolvedValueOnce({
         tabs: [{ title: 'Tab 1', id: 't1' }],
@@ -80,10 +88,7 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    const urlInput = screen.getByLabelText(/google docs url/i);
-    await user.type(urlInput, 'https://docs.google.com/document/d/test123/edit');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/test123/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/document preview/i)).toBeInTheDocument();
@@ -94,7 +99,6 @@ describe('GDocImportDialog', () => {
   });
 
   it('imports entire tab text when clicking "Import entire document"', async () => {
-    const user = userEvent.setup();
     const essayText = 'Full essay content here.';
     mockFetchGDocInfo
       .mockResolvedValueOnce({
@@ -111,9 +115,8 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    await user.type(screen.getByLabelText(/google docs url/i), 'test-doc-id');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    const user = userEvent.setup();
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/test-doc-id/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/import entire (document|tab)/i)).toBeInTheDocument();
@@ -123,14 +126,13 @@ describe('GDocImportDialog', () => {
     expect(mockOnImport).toHaveBeenCalledWith(
       essayText,
       { docId: 'test-doc-id', tab: 'Tab 1', sectionIndex: 0 },
-      'test-doc-id'
+      'https://docs.google.com/document/d/test-doc-id/edit'
     );
   });
 
   // ---- Bookmarks flow ----
 
   it('shows section radio list with word counts when bookmarks exist', async () => {
-    const user = userEvent.setup();
     mockFetchGDocInfo
       .mockResolvedValueOnce({
         tabs: [{ title: 'Tab 1', id: 't1' }],
@@ -146,9 +148,7 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    await user.type(screen.getByLabelText(/google docs url/i), 'doc-with-bookmarks');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/doc-with-bookmarks/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/2 sections found/i)).toBeInTheDocument();
@@ -180,9 +180,7 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    await user.type(screen.getByLabelText(/google docs url/i), 'doc-no-bm');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/doc-no-bm/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/i only want part of this (document|tab)/i)).toBeInTheDocument();
@@ -225,9 +223,7 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    await user.type(screen.getByLabelText(/google docs url/i), 'doc-refresh');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/doc-refresh/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/document preview/i)).toBeInTheDocument();
@@ -248,13 +244,13 @@ describe('GDocImportDialog', () => {
 
   // ---- Google Picker ----
 
-  it('calls openGooglePicker when Browse My Docs is clicked', async () => {
+  it('calls openGooglePicker when Browse Google Docs is clicked', async () => {
     const user = userEvent.setup();
     const mockPicker = openGooglePicker as ReturnType<typeof vi.fn>;
     mockPicker.mockResolvedValueOnce(null); // user cancels
 
     renderDialog();
-    await user.click(screen.getByRole('button', { name: /browse my docs/i }));
+    await user.click(screen.getByRole('button', { name: /browse google docs/i }));
 
     expect(mockPicker).toHaveBeenCalled();
   });
@@ -265,19 +261,18 @@ describe('GDocImportDialog', () => {
     mockPicker.mockRejectedValueOnce(new Error('Popup blocked'));
 
     renderDialog();
-    await user.click(screen.getByRole('button', { name: /browse my docs/i }));
+    await user.click(screen.getByRole('button', { name: /browse google docs/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/popup blocked/i)).toBeInTheDocument();
     });
-    // URL input is still usable
-    expect(screen.getByLabelText(/google docs url/i)).toBeInTheDocument();
+    // Browse button is still available after error
+    expect(screen.getByRole('button', { name: /browse google docs/i })).toBeInTheDocument();
   });
 
   // ---- Empty content ----
 
   it('shows alert when document has no text', async () => {
-    const user = userEvent.setup();
     mockFetchGDocInfo
       .mockResolvedValueOnce({
         tabs: [{ title: 'Tab 1', id: 't1' }],
@@ -293,9 +288,7 @@ describe('GDocImportDialog', () => {
         tabs: [{ title: 'Tab 1', id: 't1' }],
       });
 
-    renderDialog();
-    await user.type(screen.getByLabelText(/google docs url/i), 'empty-doc');
-    await user.click(screen.getByRole('button', { name: /fetch document/i }));
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/empty-doc/edit' });
 
     await waitFor(() => {
       expect(screen.getByText(/no text content/i)).toBeInTheDocument();

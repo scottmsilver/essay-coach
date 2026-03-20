@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Modal, TextInput, Button, Radio, Stack, Text, Loader, Alert,
-  Group, Divider, Accordion, ScrollArea, Box,
+  Modal, Button, Radio, Stack, Text, Loader, Alert,
+  Group, Accordion, ScrollArea, Box,
 } from '@mantine/core';
 import { extractDocId, fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
@@ -16,14 +16,16 @@ interface Props {
   onImport: (text: string, source: DocSource, url: string) => void;
   label: string; // "essay" or "prompt"
   initialUrl?: string;
+  initialDocName?: string;
 }
 
 type Step = 'url' | 'tab' | 'content';
 
-export default function GDocImportDialog({ opened, onClose, onImport, label, initialUrl }: Props) {
+export default function GDocImportDialog({ opened, onClose, onImport, label, initialUrl, initialDocName }: Props) {
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('url');
   const [url, setUrl] = useState('');
+  const [docName, setDocName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
@@ -42,17 +44,19 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   useEffect(() => {
     if (opened && initialUrl) {
       setUrl(initialUrl);
+      if (initialDocName) setDocName(initialDocName);
       // Auto-fetch if this is a new URL we haven't fetched yet
       if (initialUrl !== autoFetchedRef.current) {
         autoFetchedRef.current = initialUrl;
         handleFetchTabs(initialUrl);
       }
     }
-  }, [opened, initialUrl]);
+  }, [opened, initialUrl, initialDocName]);
 
   const reset = () => {
     setStep('url');
     setUrl(initialUrl ?? '');
+    setDocName(initialDocName ?? '');
     setLoading(false);
     setError(null);
     setPickerError(null);
@@ -150,6 +154,7 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
       const result = await openGooglePicker(user?.email ?? undefined);
       if (!result) return; // user cancelled
       setUrl(result.url);
+      setDocName(result.name);
       await handleFetchTabs(result.url);
     } catch (err) {
       setPickerError(
@@ -166,31 +171,41 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
     <Modal opened={opened} onClose={handleClose} title={`Import ${label} from Google Docs`} size="lg">
       {error && <Alert color="red" mb="md">{error}</Alert>}
 
-      {/* Step 1: URL entry + Picker */}
+      {/* Step 1: Pick a document */}
       {step === 'url' && (
         <Stack>
-          <TextInput
-            label="Google Docs URL"
-            placeholder="https://docs.google.com/document/d/..."
-            value={url}
-            onChange={(e) => setUrl(e.currentTarget.value)}
-            disabled={loading}
-          />
-          <Button onClick={() => handleFetchTabs()} disabled={!url.trim() || loading} loading={loading}>
-            Fetch Document
-          </Button>
-          <Divider label="or" labelPosition="center" />
-          <Button
-            variant="light"
-            onClick={handlePicker}
-            disabled={loading}
-          >
-            Browse My Docs
-          </Button>
-          {pickerError && (
-            <Alert color="yellow" variant="light">
-              {pickerError} — you can still paste a URL above.
-            </Alert>
+          {loading ? (
+            <Group gap="sm" align="center">
+              <Loader size="sm" />
+              <div>
+                {docName ? (
+                  <Group gap="xs">
+                    <Text size="lg">📄</Text>
+                    <div>
+                      <Text size="sm" fw={600}>{docName}</Text>
+                      <Text size="xs" c="dimmed">Loading document...</Text>
+                    </div>
+                  </Group>
+                ) : (
+                  <Text size="sm" c="dimmed">Loading document...</Text>
+                )}
+              </div>
+            </Group>
+          ) : (
+            <>
+              <Button
+                variant="light"
+                onClick={handlePicker}
+                leftSection={<span>📄</span>}
+              >
+                Browse Google Docs
+              </Button>
+              {pickerError && (
+                <Alert color="yellow" variant="light">
+                  {pickerError}
+                </Alert>
+              )}
+            </>
           )}
         </Stack>
       )}

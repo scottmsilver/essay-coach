@@ -25,6 +25,7 @@ export default function NewEssayPage() {
   const [contentSource, setContentSource] = useState<DocSource | null>(null);
   const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | null>(null);
   const [lastImportedUrl, setLastImportedUrl] = useState('');
+  const [lastImportedDocName, setLastImportedDocName] = useState('');
   const [titleIsGenerated, setTitleIsGenerated] = useState(false);
   const [titleSuggesting, setTitleSuggesting] = useState(false);
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -59,6 +60,7 @@ export default function NewEssayPage() {
       if (!result) return; // user cancelled
       // Open the dialog with the URL pre-filled — it will auto-fetch
       setLastImportedUrl(result.url);
+      setLastImportedDocName(result.name);
       setImportTarget(target);
     } catch (err) {
       console.error('Picker failed:', err);
@@ -241,6 +243,7 @@ export default function NewEssayPage() {
         onImport={handleImport}
         label={importTarget === 'prompt' ? 'prompt' : 'essay'}
         initialUrl={lastImportedUrl}
+        initialDocName={lastImportedDocName}
       />
     </div>
   );
