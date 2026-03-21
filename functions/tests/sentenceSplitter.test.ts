@@ -39,12 +39,10 @@ describe('splitSentences (regex)', () => {
   });
 
   it('handles ellipses', () => {
-    // lowercase after ellipsis: not a sentence break
     expect(splitSentences('Wait... really? Yes.')).toEqual([
       'Wait... really?',
       'Yes.',
     ]);
-    // uppercase after ellipsis: sentence break
     expect(splitSentences('Wait... Really? Yes.')).toEqual([
       'Wait...',
       'Really?',
@@ -52,21 +50,93 @@ describe('splitSentences (regex)', () => {
     ]);
   });
 
+  // --- Middle initials ---
+
+  it('does not split on middle initials like "Sarah J. Maas"', () => {
+    expect(splitSentences('Sarah J. Maas wrote a novel. It was popular.')).toEqual([
+      'Sarah J. Maas wrote a novel.',
+      'It was popular.',
+    ]);
+  });
+
+  it('does not split on middle initials in longer sentences', () => {
+    expect(splitSentences(
+      "In her analysis, Sarah J. Maas's A Court of Thorns and Roses spotlights resilience. The hero's journey applies."
+    )).toEqual([
+      "In her analysis, Sarah J. Maas's A Court of Thorns and Roses spotlights resilience.",
+      "The hero's journey applies.",
+    ]);
+  });
+
+  it('does not split on middle initials with multiple names', () => {
+    expect(splitSentences('Martin Luther King Jr. led the movement. His legacy endures.')).toEqual([
+      'Martin Luther King Jr. led the movement.',
+      'His legacy endures.',
+    ]);
+  });
+
+  it('does not split on middle initials: Michael B. Jordan', () => {
+    expect(splitSentences('Michael B. Jordan starred in the film. It was a hit.')).toEqual([
+      'Michael B. Jordan starred in the film.',
+      'It was a hit.',
+    ]);
+  });
+
+  it('does not split on middle initials: Samuel L. Jackson', () => {
+    expect(splitSentences('Samuel L. Jackson is a famous actor. He has starred in many films.')).toEqual([
+      'Samuel L. Jackson is a famous actor.',
+      'He has starred in many films.',
+    ]);
+  });
+
+  it('does not split on middle initials: J. K. Rowling', () => {
+    expect(splitSentences('J. K. Rowling wrote Harry Potter. The series became iconic.')).toEqual([
+      'J. K. Rowling wrote Harry Potter.',
+      'The series became iconic.',
+    ]);
+  });
+
+  it('does not split on middle initials with possessive: Sarah J. Maas\'s', () => {
+    expect(splitSentences(
+      "Overlaying this journey upon Sarah J. Maas's A Court of Thorns and Roses spotlights resilience."
+    )).toEqual([
+      "Overlaying this journey upon Sarah J. Maas's A Court of Thorns and Roses spotlights resilience.",
+    ]);
+  });
+
+  it('still splits after single-letter labels like "section A."', () => {
+    expect(splitSentences('Go to section A. The next part is important.')).toEqual([
+      'Go to section A.',
+      'The next part is important.',
+    ]);
+  });
+
+  it('still splits after lowercase word + single letter: "item b."', () => {
+    expect(splitSentences('See item b. The answer is there.')).toEqual([
+      'See item b.',
+      'The answer is there.',
+    ]);
+  });
+
+  // --- U.S. and multi-letter initials ---
+
   it('does not split on U.S. or similar initials', () => {
-    const result = splitSentences('They discussed U.S. policy. It was important.');
-    expect(result).toEqual([
+    expect(splitSentences('They discussed U.S. policy. It was important.')).toEqual([
       'They discussed U.S. policy.',
       'It was important.',
     ]);
   });
 
+  // --- Quotes ---
+
   it('handles smart quotes', () => {
-    const result = splitSentences('He said \u201Chello.\u201D She waved.');
-    expect(result).toEqual([
+    expect(splitSentences('He said \u201Chello.\u201D She waved.')).toEqual([
       'He said \u201Chello.\u201D',
       'She waved.',
     ]);
   });
+
+  // --- Edge cases ---
 
   it('returns empty array for empty/whitespace input', () => {
     expect(splitSentences('')).toEqual([]);
@@ -76,6 +146,28 @@ describe('splitSentences (regex)', () => {
   it('returns single sentence when no boundaries found', () => {
     expect(splitSentences('Just a fragment without ending punctuation')).toEqual([
       'Just a fragment without ending punctuation',
+    ]);
+  });
+
+  it('handles multiple sentences with mixed punctuation', () => {
+    expect(splitSentences('Is this real? Yes it is! And it works.')).toEqual([
+      'Is this real?',
+      'Yes it is!',
+      'And it works.',
+    ]);
+  });
+
+  it('handles et al. citation', () => {
+    expect(splitSentences('Smith et al. found this result. It was significant.')).toEqual([
+      'Smith et al. found this result.',
+      'It was significant.',
+    ]);
+  });
+
+  it('handles page references like p. 42', () => {
+    expect(splitSentences('As noted on p. 42 of the text. The author agrees.')).toEqual([
+      'As noted on p. 42 of the text.',
+      'The author agrees.',
     ]);
   });
 });
@@ -99,60 +191,48 @@ describe('splitSentencesAI', () => {
   it('returns parsed sentence arrays from Gemma response', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    const gemmaResult = [
-      ['First sentence.', 'Second sentence.'],
-      ['Third sentence.', 'Fourth sentence.'],
-    ];
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify(gemmaResult),
-    });
+    // Mock returns correct flat array for each paragraph call
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: JSON.stringify(['First sentence.', 'Second sentence.']) })
+      .mockResolvedValueOnce({ text: JSON.stringify(['Third sentence.', 'Fourth sentence.']) });
 
     const result = await splitSentencesAI('fake-key', [
       'First sentence. Second sentence.',
       'Third sentence. Fourth sentence.',
     ]);
-    expect(result).toEqual(gemmaResult);
+    expect(result).toEqual([
+      ['First sentence.', 'Second sentence.'],
+      ['Third sentence.', 'Fourth sentence.'],
+    ]);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
   });
 
   it('strips markdown code fence from Gemma response', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    const gemmaResult = [['Hello.', 'World.']];
-    mockGenerateContent.mockResolvedValue({
-      text: '```json\n' + JSON.stringify(gemmaResult) + '\n```',
+    mockGenerateContent.mockResolvedValueOnce({
+      text: '```json\n' + JSON.stringify(['Hello.', 'World.']) + '\n```',
     });
 
     const result = await splitSentencesAI('fake-key', ['Hello. World.']);
-    expect(result).toEqual(gemmaResult);
+    expect(result).toEqual([['Hello.', 'World.']]);
   });
 
-  it('falls back to regex when Gemma returns wrong number of arrays', async () => {
+  it('falls back to regex for paragraph where Gemma returns invalid JSON', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify([['Only one.']]),
-    });
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: 'not valid json at all' })
+      .mockResolvedValueOnce({ text: JSON.stringify(['Good sentence.', 'Another one.']) });
 
     const result = await splitSentencesAI('fake-key', [
-      'First paragraph. Two sentences.',
-      'Second paragraph. Also two.',
+      'Hello world. Goodbye.',
+      'Good sentence. Another one.',
     ]);
-    // Should fall back to regex — verify it returns 2 arrays
-    expect(result).toHaveLength(2);
-    expect(result[0]).toContain('First paragraph.');
-    expect(result[1]).toContain('Second paragraph.');
-  });
-
-  it('falls back to regex when Gemma returns invalid JSON', async () => {
-    const { splitSentencesAI } = await import('../src/sentenceSplitter');
-
-    mockGenerateContent.mockResolvedValue({
-      text: 'not valid json at all',
-    });
-
-    const result = await splitSentencesAI('fake-key', ['Hello world. Goodbye.']);
-    expect(result).toHaveLength(1);
+    // First paragraph falls back to regex, second uses Gemma
     expect(result[0]).toContain('Hello world.');
+    expect(result[0]).toContain('Goodbye.');
+    expect(result[1]).toEqual(['Good sentence.', 'Another one.']);
   });
 
   it('falls back to regex when Gemma API throws', async () => {
@@ -166,11 +246,11 @@ describe('splitSentencesAI', () => {
     expect(result[0]).toContain('Another one.');
   });
 
-  it('falls back to regex when inner arrays contain non-strings', async () => {
+  it('falls back to regex when inner array contains non-strings', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify([[123, 456]]),
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify([123, 456]),
     });
 
     const result = await splitSentencesAI('fake-key', ['Hello. World.']);
@@ -181,9 +261,8 @@ describe('splitSentencesAI', () => {
   it('falls back to regex when Gemma mutates the text', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    // Gemma changed "Hello" to "Hi" — text mismatch should trigger fallback
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify([['Hi world.', 'Goodbye.']]),
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify(['Hi world.', 'Goodbye.']),
     });
 
     const result = await splitSentencesAI('fake-key', ['Hello world. Goodbye.']);
@@ -195,8 +274,8 @@ describe('splitSentencesAI', () => {
   it('filters empty strings from Gemma response', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify([['Hello world.', '', 'Goodbye.']]),
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify(['Hello world.', '', 'Goodbye.']),
     });
 
     const result = await splitSentencesAI('fake-key', ['Hello world. Goodbye.']);
@@ -206,12 +285,34 @@ describe('splitSentencesAI', () => {
   it('strips code fence with preamble text', async () => {
     const { splitSentencesAI } = await import('../src/sentenceSplitter');
 
-    const gemmaResult = [['Hello.', 'World.']];
-    mockGenerateContent.mockResolvedValue({
-      text: 'Here are the sentences:\n```json\n' + JSON.stringify(gemmaResult) + '\n```',
+    mockGenerateContent.mockResolvedValueOnce({
+      text: 'Here are the sentences:\n```json\n' + JSON.stringify(['Hello.', 'World.']) + '\n```',
     });
 
     const result = await splitSentencesAI('fake-key', ['Hello. World.']);
-    expect(result).toEqual(gemmaResult);
+    expect(result).toEqual([['Hello.', 'World.']]);
+  });
+
+  it('handles per-paragraph fallback independently', async () => {
+    const { splitSentencesAI } = await import('../src/sentenceSplitter');
+
+    // Paragraph 0: Gemma succeeds
+    // Paragraph 1: Gemma throws
+    // Paragraph 2: Gemma succeeds
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: JSON.stringify(['First.', 'Second.']) })
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValueOnce({ text: JSON.stringify(['Fifth.', 'Sixth.']) });
+
+    const result = await splitSentencesAI('fake-key', [
+      'First. Second.',
+      'Third. Fourth.',
+      'Fifth. Sixth.',
+    ]);
+
+    expect(result[0]).toEqual(['First.', 'Second.']);     // Gemma
+    expect(result[1]).toContain('Third.');                 // regex fallback
+    expect(result[1]).toContain('Fourth.');                // regex fallback
+    expect(result[2]).toEqual(['Fifth.', 'Sixth.']);       // Gemma
   });
 });

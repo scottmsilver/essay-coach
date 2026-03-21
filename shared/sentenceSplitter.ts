@@ -58,6 +58,8 @@ function isSentenceEnd(text: string, dotIdx: number): boolean {
       // Also check if this is the end of an initials sequence
       const beforeWord = before.slice(0, -(wordMatch[1].length));
       if (/[A-Z]\.\s*$/.test(beforeWord)) return false;
+      // Middle initial: "Sarah J. Maas" — single letter preceded by a capitalized word (name)
+      if (/[A-Z][a-z]+\s+$/.test(beforeWord)) return false;
     }
 
     // Check for decimal numbers: digit before period, digit after
