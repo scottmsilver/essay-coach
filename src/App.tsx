@@ -22,11 +22,13 @@ export default function App() {
             <Route path="/essay/:essayId" element={<EssayPage />} />
             <Route path="/essay/:essayId/transitions" element={<EssayPage />} />
             <Route path="/essay/:essayId/grammar" element={<EssayPage />} />
+            <Route path="/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/user/:ownerUid/essay/:essayId" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/transitions" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/grammar" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/sharing" element={<SharingPage />} />
             <Route path="/debug/clipboard" element={<ClipboardDebugPage />} />

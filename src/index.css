@@ -189,7 +189,7 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 /* Full-bleed on essay pages — Google Docs style */
 .main-content:has(.essay-page) { max-width: none; padding-left: 0; padding-right: 0; padding-bottom: 0; }
 .essay-page > .annotated-essay,
-.essay-page > .transition-view, .essay-page > .grammar-view,
+.essay-page > .transition-view, .essay-page > .grammar-view, .essay-page > .prompt-view,
 .essay-page > .loading-state, .essay-page > .error-state,
 .essay-page > .trait-feedback-panel,
 .essay-page > .revision-plan-inline,
@@ -805,6 +805,198 @@ mark {
   border-radius: 2px;
 }
 
+/* ═══ Prompt Adherence View ═══ */
+.prompt-view {
+  margin-bottom: 24px;
+}
+
+/* Bar segments */
+.prompt-bar-segment { transition: width 0.3s; }
+.prompt-bar-segment.filled { background: var(--color-green); }
+.prompt-bar-segment.partial { background: var(--color-yellow); }
+.prompt-bar-segment.empty { background: var(--color-red); }
+
+.legend-dot.filled { background: var(--color-green); }
+.legend-dot.partial { background: var(--color-yellow); }
+.legend-dot.empty { background: var(--color-red); }
+
+.prompt-matrix-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.prompt-section-heading {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 24px 0 12px;
+}
+
+/* Grid mode — matrix table */
+.prompt-matrix-grid {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.prompt-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.prompt-matrix-table th,
+.prompt-matrix-table td {
+  border: 1px solid var(--color-border);
+  padding: 10px 12px;
+  text-align: left;
+}
+.prompt-matrix-corner {
+  background: var(--color-surface);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.prompt-matrix-col-header {
+  background: var(--color-surface);
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 13px;
+}
+.prompt-matrix-row-label {
+  background: var(--color-surface);
+  font-weight: 500;
+  color: var(--color-text);
+  max-width: 200px;
+}
+.prompt-matrix-cell {
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.prompt-matrix-cell:hover {
+  background: rgba(0,0,0,0.03);
+}
+.prompt-matrix-cell.active {
+  background: rgba(0,0,0,0.05);
+}
+.prompt-matrix-cell.filled .prompt-cell-icon { color: var(--color-green); }
+.prompt-matrix-cell.partial .prompt-cell-icon { color: var(--color-yellow); }
+.prompt-matrix-cell.empty .prompt-cell-icon { color: var(--color-red); }
+.prompt-cell-icon {
+  font-size: 16px;
+  margin-right: 6px;
+}
+.prompt-cell-status-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+.prompt-matrix-detail-row td {
+  background: var(--color-surface-warm);
+  padding: 12px 16px;
+}
+
+/* List mode (flat / single-column) */
+.prompt-requirement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.prompt-requirement-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.prompt-requirement-row:hover {
+  background: var(--color-surface-warm);
+}
+.prompt-requirement-row.expanded {
+  border-color: var(--color-text-muted);
+}
+.prompt-requirement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.prompt-requirement-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  flex: 1;
+}
+
+/* Coverage pills */
+.prompt-coverage-pill {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.prompt-coverage-pill.filled { color: var(--color-green); background: rgba(5, 150, 105, 0.08); }
+.prompt-coverage-pill.partial { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
+.prompt-coverage-pill.empty { color: var(--color-red); background: rgba(220, 38, 38, 0.08); }
+
+/* Cell detail (expanded content) */
+.prompt-cell-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+.prompt-evidence-quote {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-left: 3px solid var(--color-border);
+  padding-left: 12px;
+  margin: 6px 0;
+  font-style: italic;
+  line-height: 1.6;
+}
+.prompt-cell-comment {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+/* Questions section */
+.prompt-questions-section {
+  margin-bottom: 16px;
+}
+.prompt-question-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 8px;
+}
+.prompt-question-row:hover {
+  background: var(--color-surface-warm);
+}
+.prompt-question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.prompt-question-text {
+  font-size: 14px;
+  color: var(--color-text);
+  flex: 1;
+}
+
 /* ═══ Skeleton pulse animation ═══ */
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.4; }
@@ -1068,7 +1260,7 @@ mark {
     padding-right: 12px !important;
   }
   .essay-page > .annotated-essay,
-  .essay-page > .transition-view, .essay-page > .grammar-view,
+  .essay-page > .transition-view, .essay-page > .grammar-view, .essay-page > .prompt-view,
   .essay-page > .loading-state, .essay-page > .error-state,
   .essay-page > .revision-layout {
     padding: 16px 12px;

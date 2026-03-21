@@ -1,54 +1,5 @@
 import { useState } from 'react';
-
-/** Duplicated from pasteHandler so we can call it standalone without a fake event */
-function htmlToPlainText(root: Node): string {
-  const doc = root.ownerDocument ?? (root as Document);
-
-  if (root instanceof (doc.defaultView ?? window).Element) {
-    for (const el of Array.from(root.querySelectorAll('sup, sub, style, script'))) {
-      const space = doc.createTextNode(' ');
-      el.parentNode?.replaceChild(space, el);
-    }
-  }
-
-  const blocks = root instanceof (doc.defaultView ?? window).Element
-    ? Array.from(root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, br'))
-    : [];
-
-  if (blocks.length > 0) {
-    const parts: string[] = [];
-    const seen = new WeakSet<Node>();
-
-    for (const block of blocks) {
-      if (seen.has(block)) continue;
-      const tag = block.tagName.toLowerCase();
-
-      if (tag === 'br') {
-        parts.push('\n');
-        continue;
-      }
-
-      for (const nested of Array.from(block.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li'))) {
-        seen.add(nested);
-      }
-
-      const text = block.textContent?.trim();
-      if (!text) continue;
-
-      if (tag === 'li') {
-        parts.push('\n' + text);
-      } else {
-        parts.push(text);
-      }
-    }
-
-    return parts.join('\n\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  return (root.textContent ?? '').trim();
-}
+import { htmlToPlainText } from '../utils/pasteHandler';
 
 export default function ClipboardDebugPage() {
   const [output, setOutput] = useState<string>('');
@@ -124,8 +75,7 @@ export default function ClipboardDebugPage() {
     // Run the same translation handleRichPaste uses
     const html = e.clipboardData.getData('text/html');
     if (html) {
-      const parsed = new DOMParser().parseFromString(html, 'text/html');
-      setTranslated(htmlToPlainText(parsed.body));
+      setTranslated(htmlToPlainText(html));
     } else {
       setTranslated(plain || '(no content)');
     }

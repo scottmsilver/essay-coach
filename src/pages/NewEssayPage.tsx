@@ -176,11 +176,11 @@ export default function NewEssayPage() {
             setAssignmentPrompt(e.currentTarget.value);
             if (promptSource) setPromptSource(null);
           }}
-          maxLength={2000}
+          maxLength={10000}
           required
           placeholder="Paste the assignment prompt here..."
           rows={3}
-          description={`${assignmentPrompt.length}/2,000 characters`}
+          description={`${assignmentPrompt.length}/10,000 characters`}
           mb="md"
           readOnly={!!promptSource}
         />

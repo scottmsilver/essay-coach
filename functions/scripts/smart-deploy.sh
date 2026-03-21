@@ -24,6 +24,10 @@ for arg in "$@"; do
   esac
 done
 
+# --- Auto-discover all exported functions from index.ts ---
+# Parses "export { foo } from './bar'" lines to build the canonical function list.
+ALL_FUNCTIONS=$(grep -oP "export\s*\{\s*\K[^}]+" src/index.ts | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort -u | tr '\n' ' ' | xargs)
+
 # --- Dependency map: which source files affect which functions ---
 # If a shared file changes, all functions that import it (transitively) get deployed.
 declare -A FILE_TO_FUNCTIONS=(
@@ -31,6 +35,7 @@ declare -A FILE_TO_FUNCTIONS=(
   ["src/resubmitDraft.ts"]="resubmitDraft"
   ["src/analyzeTransitions.ts"]="analyzeTransitions"
   ["src/analyzeGrammar.ts"]="analyzeGrammar"
+  ["src/analyzePromptAdherence.ts"]="analyzePromptAdherence"
   ["src/deleteAccount.ts"]="deleteAccount"
   ["src/devSignIn.ts"]="devSignIn"
   ["src/shareEssays.ts"]="shareEssays"
@@ -39,16 +44,18 @@ declare -A FILE_TO_FUNCTIONS=(
   ["src/evaluateEssay.ts"]="evaluateEssay"
   ["src/prompt.ts"]="submitEssay resubmitDraft onDraftCreated"
   ["src/gemini.ts"]="submitEssay resubmitDraft onDraftCreated"
-  ["src/streamGemini.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar evaluateEssay onDraftCreated"
+  ["src/streamGemini.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence evaluateEssay onDraftCreated"
   ["src/transitions.ts"]="analyzeTransitions onDraftCreated"
   ["src/sentenceSplitter.ts"]="analyzeTransitions onDraftCreated"
   ["src/grammar.ts"]="analyzeGrammar onDraftCreated"
-  ["src/resolveEssayOwner.ts"]="resubmitDraft analyzeTransitions analyzeGrammar"
-  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar shareEssays unshareEssays removeSharedWithMe suggestTitle"
+  ["src/promptAdherence.ts"]="analyzePromptAdherence onDraftCreated"
+  ["src/resolveEssayOwner.ts"]="resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence"
+  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence shareEssays unshareEssays removeSharedWithMe suggestTitle"
   ["src/validation.ts"]="submitEssay resubmitDraft"
   ["src/onDraftCreated.ts"]="onDraftCreated"
   ["src/suggestTitle.ts"]="suggestTitle"
-  ["src/index.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
+  # index.ts changes affect all functions (new exports, etc.)
+  ["src/index.ts"]="__ALL__"
 )
 
 # Files that trigger a full deploy if changed
@@ -64,7 +71,7 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
   if [[ -z "$LAST_SHA" ]] && ! $FORCE_ALL; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
-  DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
+  DEPLOY_TARGETS="$ALL_FUNCTIONS"
 else
   # Get changed files since last deploy
   CHANGED_FILES=$(git diff --name-only "$LAST_SHA" -- . 2>/dev/null || echo "")
@@ -89,15 +96,19 @@ else
   done
 
   if $NEED_FULL; then
-    DEPLOY_TARGETS="submitEssay resubmitDraft analyzeTransitions analyzeGrammar deleteAccount devSignIn shareEssays unshareEssays removeSharedWithMe evaluateEssay onDraftCreated suggestTitle"
+    DEPLOY_TARGETS="$ALL_FUNCTIONS"
   else
     # Map changed files to affected functions
     DEPLOY_SET=""
     while IFS= read -r file; do
       # Strip "functions/" prefix if present (from repo root)
       file="${file#functions/}"
-      if [[ -n "${FILE_TO_FUNCTIONS[$file]:-}" ]]; then
-        DEPLOY_SET="$DEPLOY_SET ${FILE_TO_FUNCTIONS[$file]}"
+      mapped="${FILE_TO_FUNCTIONS[$file]:-}"
+      if [[ "$mapped" == "__ALL__" ]]; then
+        DEPLOY_SET="$ALL_FUNCTIONS"
+        break
+      elif [[ -n "$mapped" ]]; then
+        DEPLOY_SET="$DEPLOY_SET $mapped"
       fi
     done <<< "$CHANGED_FILES"
 

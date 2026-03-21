@@ -21,8 +21,7 @@ export function handleRichPaste(
   const textarea = e.currentTarget;
 
   // Parse the HTML and extract text with paragraph structure
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const text = htmlToPlainText(doc.body);
+  const text = htmlToPlainText(html);
 
   // Insert at cursor position (or replace selection)
   const start = textarea.selectionStart;
@@ -44,63 +43,125 @@ function hasTextIndent(el: Element): boolean {
   return match !== null && parseFloat(match[1]) > 0;
 }
 
-export function htmlToPlainText(root: Node): string {
-  const doc = root.ownerDocument ?? (root as Document);
+const BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ul', 'ol', 'blockquote', 'pre', 'table', 'section', 'article']);
 
-  // Remove sup/sub elements (footnote markers) and replace with a space
-  // to avoid smooshing adjacent words
-  if (root instanceof (doc.defaultView ?? window).Element) {
-    for (const el of Array.from(root.querySelectorAll('sup, sub, style, script'))) {
-      // Insert a space where the element was to prevent word smooshing
-      const space = doc.createTextNode(' ');
-      el.parentNode?.replaceChild(space, el);
+/**
+ * Check if a node is a block-level element.
+ */
+function isBlock(node: Node): boolean {
+  return node.nodeType === 1 && BLOCK_TAGS.has((node as Element).tagName.toLowerCase());
+}
+
+/**
+ * Extract text from a block element, applying formatting (indent, list markers).
+ */
+function extractBlockText(block: Element): string | null {
+  const text = block.textContent?.trim();
+  if (!text) return null;
+
+  const tag = block.tagName.toLowerCase();
+  if (tag === 'li') {
+    const parent = block.parentElement;
+    if (parent && parent.tagName.toLowerCase() === 'ol') {
+      const idx = Array.from(parent.children).indexOf(block) + 1;
+      return idx + '. ' + text;
+    }
+    return '\u2022 ' + text;
+  }
+  if (hasTextIndent(block)) {
+    return '\t' + text;
+  }
+  return text;
+}
+
+/**
+ * Walk the children of a container and collect text parts.
+ * Handles both proper block elements (<p>, <div>, etc.) and orphaned inline
+ * content (bare <span> elements that Google Docs sometimes emits outside <p> tags).
+ */
+function collectParts(container: Element): string[] {
+  const parts: string[] = [];
+  let orphanedText = '';
+
+  for (const child of Array.from(container.childNodes)) {
+    if (child.nodeType === 1) {
+      const el = child as Element;
+      const tag = el.tagName.toLowerCase();
+
+      if (isBlock(el)) {
+        // Flush any accumulated orphaned inline text
+        if (orphanedText.trim()) {
+          parts.push(orphanedText.trim());
+          orphanedText = '';
+        }
+
+        if (tag === 'br') {
+          parts.push('\n');
+        } else if (tag === 'ul' || tag === 'ol') {
+          // Process list items inside the list
+          for (const li of Array.from(el.querySelectorAll('li'))) {
+            const t = extractBlockText(li);
+            if (t) parts.push(t);
+          }
+        } else {
+          const t = extractBlockText(el);
+          if (t) parts.push(t);
+        }
+      } else if (tag === 'br') {
+        // Bare <br> not inside a block — treat as paragraph break
+        if (orphanedText.trim()) {
+          parts.push(orphanedText.trim());
+          orphanedText = '';
+        }
+      } else {
+        // Inline element (span, b, i, a, etc.) not inside a block — orphaned content
+        orphanedText += el.textContent ?? '';
+      }
+    } else if (child.nodeType === 3) {
+      // Text node — could be orphaned content between blocks
+      const t = child.textContent ?? '';
+      if (t.trim()) {
+        orphanedText += t;
+      }
     }
   }
 
-  // Collect block elements (p, div, h1-h6) and extract their textContent
-  // Using textContent preserves spacing between adjacent inline elements (spans)
-  const blocks = root instanceof (doc.defaultView ?? window).Element
-    ? Array.from(root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li, br'))
-    : [];
+  // Flush any remaining orphaned text
+  if (orphanedText.trim()) {
+    parts.push(orphanedText.trim());
+  }
 
-  if (blocks.length > 0) {
-    const parts: string[] = [];
-    const seen = new WeakSet<Node>();
+  return parts;
+}
 
-    for (const block of blocks) {
-      // Skip blocks nested inside other blocks we've already processed
-      if (seen.has(block)) continue;
+/**
+ * Strip the Google Docs <b style="font-weight:normal;" id="docs-internal-guid-..."> wrapper.
+ * Google Docs wraps clipboard HTML in this <b> tag. Since <b> is phrasing content,
+ * <p> elements can't legally nest inside it, causing DOMParser to mangle the structure.
+ */
+function fixGoogleDocsHtml(html: string): string {
+  return html
+    .replace(/<b\b[^>]*id="docs-internal-guid-[^"]*"[^>]*>/gi, '')
+    .replace(/<\/b>\s*$/i, '');
+}
 
-      const tag = block.tagName.toLowerCase();
+export function htmlToPlainText(rawHtml: string): string {
+  const fixed = fixGoogleDocsHtml(rawHtml);
+  const doc = new DOMParser().parseFromString(fixed, 'text/html');
+  const root = doc.body;
 
-      if (tag === 'br') {
-        parts.push('\n');
-        continue;
-      }
+  // Remove sup/sub elements (footnote markers) and replace with a space
+  // to avoid smooshing adjacent words
+  for (const el of Array.from(root.querySelectorAll('sup, sub, style, script'))) {
+    const space = doc.createTextNode(' ');
+    el.parentNode?.replaceChild(space, el);
+  }
 
-      // Mark nested blocks as seen so we don't double-process
-      for (const nested of Array.from(block.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li'))) {
-        seen.add(nested);
-      }
+  // Walk the DOM tree, collecting both block elements and orphaned inline content.
+  // Google Docs sometimes emits bare <span> elements outside of <p> tags.
+  const parts = collectParts(root);
 
-      const text = block.textContent?.trim();
-      if (!text) continue;
-
-      if (tag === 'li') {
-        const parent = block.parentElement;
-        if (parent && parent.tagName.toLowerCase() === 'ol') {
-          const idx = Array.from(parent.children).indexOf(block as Element) + 1;
-          parts.push(idx + '. ' + text);
-        } else {
-          parts.push('\u2022 ' + text);
-        }
-      } else if (hasTextIndent(block)) {
-        parts.push('\t' + text);
-      } else {
-        parts.push(text);
-      }
-    }
-
+  if (parts.length > 0) {
     return parts.join('\n\n')
       .replace(/\n{3,}/g, '\n\n')
       .replace(/^\n+/, '')

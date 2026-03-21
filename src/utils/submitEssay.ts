@@ -11,9 +11,11 @@ export function fireAllAnalyses(essayId: string, draftId: string, ownerUid?: str
   const evaluate = httpsCallable(functions, 'evaluateEssay', { timeout: FUNCTION_TIMEOUT });
   const grammar = httpsCallable(functions, 'analyzeGrammar', { timeout: FUNCTION_TIMEOUT });
   const transitions = httpsCallable(functions, 'analyzeTransitions', { timeout: FUNCTION_TIMEOUT });
+  const promptAdherence = httpsCallable(functions, 'analyzePromptAdherence', { timeout: FUNCTION_TIMEOUT });
 
   const args = { essayId, draftId, ownerUid };
   evaluate(args).catch((err) => console.error('Evaluation failed:', err));
   grammar(args).catch((err) => console.error('Grammar failed:', err));
   transitions(args).catch((err) => console.error('Transitions failed:', err));
+  promptAdherence(args).catch((err) => console.error('Prompt adherence failed:', err));
 }

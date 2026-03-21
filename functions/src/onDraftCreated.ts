@@ -3,6 +3,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
+import { analyzePromptWithGemini } from './promptAdherence';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 
@@ -133,6 +134,35 @@ export const onDraftCreated = onDocumentCreated(
       );
     } else {
       logger.info('Evaluation already processing or complete, skipping', { essayId, draftId });
+    }
+
+    // Prompt adherence: fire if client didn't start and essay has an assignmentPrompt
+    if (!isActivelyProcessing(data.promptStatus) && !data.promptAnalysis) {
+      // Read the essay doc to check for assignmentPrompt
+      const essayRef = draftRef.parent.parent!;
+      const essaySnap = await essayRef.get();
+      const assignmentPrompt = essaySnap.data()?.assignmentPrompt;
+
+      if (assignmentPrompt?.trim()) {
+        logger.info('Prompt adherence not actively processing — trigger firing', { essayId, draftId, status: data.promptStatus?.stage });
+        tasks.push(
+          (async () => {
+            try {
+              const analysis = await analyzePromptWithGemini(apiKey, assignmentPrompt, content, draftRef);
+              await draftRef.update({ promptAnalysis: analysis, promptStatus: null });
+              logger.info('Trigger prompt adherence analysis complete', { essayId, draftId });
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : String(error);
+              logger.error('Trigger prompt adherence analysis failed', { error: msg, essayId, draftId });
+              await draftRef.update({ promptStatus: { stage: 'error', message: 'Analysis failed' } });
+            }
+          })()
+        );
+      } else {
+        logger.info('No assignment prompt, skipping prompt adherence', { essayId, draftId });
+      }
+    } else {
+      logger.info('Prompt adherence already processing or complete, skipping', { essayId, draftId });
     }
 
     if (tasks.length > 0) {

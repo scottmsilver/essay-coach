@@ -13,3 +13,4 @@ export { resolvePendingShares } from './resolvePendingShares';
 export { evaluateEssay } from './evaluateEssay';
 export { onDraftCreated } from './onDraftCreated';
 export { suggestTitle } from './suggestTitle';
+export { analyzePromptAdherence } from './analyzePromptAdherence';

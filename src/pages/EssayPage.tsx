@@ -10,24 +10,26 @@ import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { scoreColor, relativeTime, collectAnnotations, classifyAnnotation } from '../utils';
 import { TRAIT_LABELS, TRAIT_KEYS } from '../types';
-import type { TraitKey, TransitionAnalysis, GrammarAnalysis } from '../types';
+import type { TraitKey, TransitionAnalysis, GrammarAnalysis, PromptAnalysis } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
 import ScorePillBar from '../components/ScorePillBar';
 import AnalysisPanel from '../components/AnalysisPanel';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
+import PromptAnalysisView from '../components/PromptAnalysisView';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
 import { fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
 import { fireAllAnalyses, FUNCTION_TIMEOUT } from '../utils/submitEssay';
 
-type ViewMode = 'feedback' | 'transitions' | 'grammar';
+type ViewMode = 'feedback' | 'transitions' | 'grammar' | 'prompt';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
   if (pathname.endsWith('/grammar')) return 'grammar';
+  if (pathname.endsWith('/prompt')) return 'prompt';
   return 'feedback';
 }
 
@@ -55,6 +57,8 @@ export default function EssayPage() {
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarError, setGrammarError] = useState<string | null>(null);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
   const [notifBannerDismissed, setNotifBannerDismissed] = useState(
     () => sessionStorage.getItem('essaycoach_notif_dismissed') === '1'
   );
@@ -169,6 +173,38 @@ export default function EssayPage() {
     await runGrammarAnalysis(activeDraft.id);
   }, [activeDraft, runGrammarAnalysis, setActiveView]);
 
+  // Shared prompt adherence analysis caller
+  const runPromptAnalysis = useCallback(async (draftId: string) => {
+    setPromptLoading(true);
+    setPromptError(null);
+    try {
+      const analyzePromptAdherence = httpsCallable<
+        { essayId: string; draftId: string; ownerUid?: string },
+        PromptAnalysis
+      >(functions, 'analyzePromptAdherence', { timeout: FUNCTION_TIMEOUT });
+      await analyzePromptAdherence({ essayId: essayId!, draftId, ownerUid });
+    } catch {
+      setPromptError('Failed to analyze prompt adherence. Please try again.');
+    } finally {
+      setPromptLoading(false);
+    }
+  }, [essayId, ownerUid]);
+
+  const handlePromptTab = useCallback(async () => {
+    setActiveView('prompt');
+    if (!activeDraft || activeDraft.promptAnalysis) return;
+    if (activeDraft.promptStatus && activeDraft.promptStatus.stage !== 'error') return;
+    await runPromptAnalysis(activeDraft.id);
+  }, [activeDraft, runPromptAnalysis, setActiveView]);
+
+  const handlePromptReanalyze = useCallback(async () => {
+    if (!activeDraft || !user) return;
+    const uid = ownerUid ?? user.uid;
+    const draftRef = doc(db, `users/${uid}/essays/${essayId}/drafts/${activeDraft.id}`);
+    await updateDoc(draftRef, { promptAnalysis: null, promptStatus: null });
+    await runPromptAnalysis(activeDraft.id);
+  }, [activeDraft, essayId, ownerUid, user, runPromptAnalysis]);
+
   const handleGrammarReanalyze = useCallback(async () => {
     if (!activeDraft || !user) return;
     const uid = ownerUid ?? user.uid;
@@ -252,6 +288,7 @@ export default function EssayPage() {
           submittedAt: serverTimestamp(),
           grammarStatus: { stage: 'pending', message: 'Queued...' },
           transitionStatus: { stage: 'pending', message: 'Queued...' },
+          ...(essay?.assignmentPrompt?.trim() ? { promptStatus: { stage: 'pending', message: 'Queued...' } } : {}),
         }),
         updateDoc(essayRef, {
           currentDraftNumber: newDraftNumber,
@@ -342,15 +379,17 @@ export default function EssayPage() {
                 size="xs"
                 value={activeView}
                 onChange={(val) => {
-                  const view = val as 'feedback' | 'transitions' | 'grammar';
+                  const view = val as ViewMode;
                   if (view === 'transitions') handleTransitionsTab();
                   else if (view === 'grammar') handleGrammarTab();
+                  else if (view === 'prompt') handlePromptTab();
                   else setActiveView('feedback');
                 }}
                 data={[
                   { value: 'feedback', label: 'Overall' },
                   { value: 'transitions', label: 'Transitions' },
                   { value: 'grammar', label: 'Grammar' },
+                  ...(essay?.assignmentPrompt?.trim() ? [{ value: 'prompt', label: 'Prompt' }] : []),
                 ]}
                 styles={{ input: { minWidth: 110 } }}
               />
@@ -361,14 +400,16 @@ export default function EssayPage() {
                   onClick={
                     activeView === 'grammar' ? handleGrammarReanalyze
                     : activeView === 'transitions' ? handleTransitionReanalyze
+                    : activeView === 'prompt' ? handlePromptReanalyze
                     : handleFeedbackReanalyze
                   }
                   disabled={
                     activeView === 'grammar' ? grammarLoading
                     : activeView === 'transitions' ? transitionLoading
+                    : activeView === 'prompt' ? promptLoading
                     : retrying || retryCount >= 3
                   }
-                  loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : retrying}
+                  loading={activeView === 'grammar' ? grammarLoading : activeView === 'transitions' ? transitionLoading : activeView === 'prompt' ? promptLoading : retrying}
                 >
                   Analyze
                 </Button>
@@ -384,7 +425,7 @@ export default function EssayPage() {
       ),
     });
     return () => setEssayHeader(null);
-  }, [essay, activeDraft, drafts, revising, resubmitting, resubmitRetryCount, refetching, activeView, evaluation, isLatestDraft, ownerUid, grammarLoading, transitionLoading, retrying, retryCount]);
+  }, [essay, activeDraft, drafts, revising, resubmitting, resubmitRetryCount, refetching, activeView, evaluation, isLatestDraft, ownerUid, grammarLoading, transitionLoading, promptLoading, retrying, retryCount]);
 
   if (loading) return <div className="loading-state"><div className="spinner" /><p>Loading essay...</p></div>;
   if (!essay || !activeDraft) return <div>Essay not found.</div>;
@@ -602,6 +643,20 @@ export default function EssayPage() {
           placeholder="Grammar analysis is loading..."
         >
           <GrammarView content={activeDraft.content} analysis={activeDraft.grammarAnalysis!} />
+        </AnalysisPanel>
+      )}
+
+      {activeView === 'prompt' && !revising && (
+        <AnalysisPanel
+          data={activeDraft.promptAnalysis}
+          error={promptError}
+          loading={promptLoading}
+          status={activeDraft.promptStatus}
+          onRetry={handlePromptTab}
+          defaultMessage="Analyzing prompt adherence..."
+          placeholder="Prompt analysis is loading..."
+        >
+          <PromptAnalysisView analysis={activeDraft.promptAnalysis!} />
         </AnalysisPanel>
       )}
 
