@@ -1,12 +1,19 @@
 import type { ReportKey } from '../types';
 import { REPORT_LABELS } from '../types';
 import { relativeTime } from '../utils';
-import type { CoachDrawerProps } from '../hooks/useNavbarContext';
+import type { DraftEntity } from '../entities/draftEntity';
+import type { DraftPresentation, VerdictPhase } from '../entities/draftPresentation';
+import type { DraftEditorState } from '../hooks/useDraftEditor';
+import type { NavbarMeta } from '../hooks/useNavbarContext';
 
-type Props = CoachDrawerProps;
+interface Props {
+  entity: DraftEntity;
+  presentation: DraftPresentation;
+  editor: DraftEditorState;
+  meta: NavbarMeta;
+}
 
-// No icons — just clean text labels
-
+// Platform-specific text mapping (web)
 const READINESS_LABELS: Record<string, string> = {
   keep_going: 'Keep Going.',
   getting_close: 'Getting Close.',
@@ -14,85 +21,50 @@ const READINESS_LABELS: Record<string, string> = {
   ready: 'Ready.',
 };
 
-const FIVE_MINUTES = 5 * 60 * 1000;
+const PHASE_TEXT: Record<VerdictPhase, { status: string; note: string }> = {
+  waiting: { status: 'Evaluating...', note: 'Your essay is being analyzed. Results will appear shortly.' },
+  analyzing: { status: 'Analyzing...', note: 'Reading your essay and preparing feedback...' },
+  old_data: { status: 'Feedback Ready', note: 'Select a report below to review your essay.' },
+  error: { status: 'Feedback Ready', note: 'Reports are available below. Coach summary couldn\'t load.' },
+  has_verdict: { status: '', note: '' },
+};
 
-export default function CoachDrawer({
-  synthesis,
-  synthesisStatus,
-  activeReport,
-  onSelectReport,
-  hasPrompt,
-  isOwner,
-  isLatestDraft,
-  hasUnsavedEdits,
-  draftAge,
-  reportLoading,
-  rawIssueCounts,
-  onReanalyze,
-  reanalyzing,
-  draftOptions,
-  activeDraftId,
-  onPickDraft,
-  lastSaved,
-  gdocChanged,
-  gdocLastChecked,
-}: Props) {
-  const isReady = synthesis?.readiness === 'ready';
-  // Old data = draft predates the synthesis feature (submitted >5min ago with no synthesis fields)
-  const isOldData = !synthesis && !synthesisStatus && draftAge > FIVE_MINUTES;
-  // New draft still waiting for synthesis to start
-  const isWaiting = !synthesis && !synthesisStatus && draftAge <= FIVE_MINUTES;
-  const isLoading = isWaiting || (!synthesis && !!synthesisStatus && synthesisStatus.stage !== 'error');
-  const isError = synthesisStatus?.stage === 'error';
+export default function CoachDrawer({ entity, presentation, editor, meta }: Props) {
+  const { verdict, reports, canEdit } = presentation;
+  const { activeReport, onSelectReport, draftOptions, onPickDraft, onReanalyze, reanalyzing, gdocChanged, gdocLastChecked } = meta;
+  const isReady = verdict.coachReadiness === 'ready';
 
-  const canEdit = isOwner && isLatestDraft;
   const reportKeys: ReportKey[] = [
     'overall' as ReportKey,
     'grammar' as ReportKey,
     'transitions' as ReportKey,
-    ...(hasPrompt ? ['prompt'] as ReportKey[] : []),
+    ...(presentation.hasPrompt ? ['prompt'] as ReportKey[] : []),
   ];
 
   return (
     <div className="coach-drawer-inner">
       {/* Verdict */}
       <div className={`coach-verdict-compact ${isReady ? 'coach-verdict-ready' : ''}`}>
-        {isOldData ? (
-          <>
-            <div className="coach-verdict-status">Feedback Ready</div>
-            <div className="coach-verdict-note">
-              Select a report below to review your essay.
-            </div>
-          </>
-        ) : isWaiting ? (
-          <>
-            <div className="coach-verdict-status">Evaluating...</div>
-            <div className="coach-verdict-note">
-              Your essay is being analyzed. Results will appear shortly.
-            </div>
-          </>
-        ) : isLoading ? (
-          <>
-            <div className="coach-verdict-status">Analyzing...</div>
-            <div className="coach-verdict-note">
-              {synthesisStatus?.message || 'Reading your essay and preparing feedback...'}
-            </div>
-          </>
-        ) : isError ? (
-          <>
-            <div className="coach-verdict-status">Feedback Ready</div>
-            <div className="coach-verdict-note">
-              Reports are available below. Coach summary couldn't load.
-            </div>
-          </>
-        ) : synthesis ? (
+        {verdict.phase === 'has_verdict' && verdict.coachReadiness ? (
           <>
             <div className="coach-verdict-status">
-              {READINESS_LABELS[synthesis.readiness] || synthesis.readiness}
+              {READINESS_LABELS[verdict.coachReadiness] || verdict.coachReadiness}
             </div>
-            <div className="coach-verdict-note">{synthesis.coachNote}</div>
+            <div className="coach-verdict-note">{verdict.coachNote}</div>
           </>
-        ) : null}
+        ) : verdict.phase === 'analyzing' ? (
+          <>
+            <div className="coach-verdict-status">{PHASE_TEXT.analyzing.status}</div>
+            <div className="coach-verdict-note">
+              {entity.raw.coachSynthesisStatus?.message || PHASE_TEXT.analyzing.note}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="coach-verdict-status">{PHASE_TEXT[verdict.phase].status}</div>
+            <div className="coach-verdict-note">{PHASE_TEXT[verdict.phase].note}</div>
+          </>
+        )}
       </div>
 
       {/* Essay + version section — always visible */}
@@ -103,8 +75,8 @@ export default function CoachDrawer({
             onClick={() => onSelectReport('essay' as ReportKey)}
           >
             <div className="coach-sb-name">
-              {hasUnsavedEdits ? 'Essay (revised)' : 'Essay'}
-              {hasUnsavedEdits && <span className="coach-sb-unsaved-dot" title="Unsaved edits" />}
+              {editor.hasUnsavedEdits ? 'Essay (revised)' : 'Essay'}
+              {editor.hasUnsavedEdits && <span className="coach-sb-unsaved-dot" title="Unsaved edits" />}
               <span className="coach-sb-edit-link">edit</span>
             </div>
           </div>
@@ -113,7 +85,7 @@ export default function CoachDrawer({
           {draftOptions.length > 1 && (
             <select
               className="coach-draft-select"
-              value={activeDraftId}
+              value={entity.id}
               onChange={(e) => onPickDraft(e.target.value)}
             >
               {draftOptions.map((d) => (
@@ -131,9 +103,9 @@ export default function CoachDrawer({
             </button>
           )}
         </div>
-        {canEdit && lastSaved && (
+        {canEdit && editor.lastSaved && (
           <div className="coach-last-edited">
-            Edited {relativeTime(lastSaved)}
+            Edited {relativeTime(editor.lastSaved)}
           </div>
         )}
         {gdocChanged && gdocLastChecked && (
@@ -147,12 +119,12 @@ export default function CoachDrawer({
       <div className="coach-sidebar-label">Reports</div>
       <div className="coach-report-list">
         {reportKeys.map((key) => {
-          const isEssay = false;
-          const summary = isEssay ? null : synthesis?.reportSummaries?.find((r) => r.key === key);
+          const report = reports[key as keyof typeof reports];
           const isActive = activeReport === key;
-          const count = summary?.issueCount ?? rawIssueCounts[key] ?? undefined;
+          const count = report?.issueCount;
           const isCleared = count === 0;
-          const isRecommended = !isEssay && synthesis?.recommendedReport === key;
+          const isLoading = report?.status === 'loading';
+          const summary = entity.raw.coachSynthesis?.reportSummaries?.find((r) => r.key === key);
 
           return (
             <div
@@ -160,24 +132,21 @@ export default function CoachDrawer({
               className={[
                 'coach-sb-report',
                 isActive ? 'coach-sb-report-active' : '',
-                isCleared && !isEssay ? 'coach-sb-report-cleared' : '',
+                isCleared ? 'coach-sb-report-cleared' : '',
               ].join(' ')}
               onClick={() => onSelectReport(key)}
             >
               <div className="coach-sb-info">
                 <div className="coach-sb-name">
-                  {isEssay ? (hasUnsavedEdits ? 'Essay (revised)' : 'Essay') : REPORT_LABELS[key]}
-                  {isEssay && hasUnsavedEdits && (
-                    <span className="coach-sb-unsaved-dot" title="Unsaved edits" />
-                  )}
-                  {isRecommended && !isCleared && (
+                  {REPORT_LABELS[key]}
+                  {report?.isRecommended && !isCleared && (
                     <span className="coach-sb-badge coach-sb-badge-rec">Focus</span>
                   )}
-                  {isCleared && !isEssay && (
+                  {isCleared && (
                     <span className="coach-sb-badge coach-sb-badge-clear">✓</span>
                   )}
                 </div>
-                {!isEssay && summary && summary.detail && (
+                {summary && summary.detail && (
                   <div className="coach-sb-detail">{summary.detail}</div>
                 )}
                 {summary && summary.previousCount !== null && summary.previousCount > 0 && (
@@ -192,10 +161,8 @@ export default function CoachDrawer({
                   </div>
                 )}
               </div>
-              {!isEssay && (() => {
-                const loading = reportLoading[key as keyof typeof reportLoading];
-                const count = summary?.issueCount ?? rawIssueCounts[key] ?? undefined;
-                if (loading) return <div className="coach-sb-spinner" />;
+              {(() => {
+                if (isLoading) return <div className="coach-sb-spinner" />;
                 if (count === undefined) return <div className="coach-sb-count coach-sb-count-few">—</div>;
                 return (
                   <div className={`coach-sb-count ${
@@ -213,10 +180,10 @@ export default function CoachDrawer({
       </div>
 
       {/* Footer hint */}
-      {synthesis?.recommendedReport && !isReady && (
+      {verdict.recommendedReport && !isReady && (
         <div className="coach-sb-footer">
           <div className="coach-sb-footer-hint">
-            Coach suggests {(REPORT_LABELS[synthesis.recommendedReport] || synthesis.recommendedReport || '').toLowerCase()} next
+            Coach suggests {(REPORT_LABELS[verdict.recommendedReport as ReportKey] || verdict.recommendedReport || '').toLowerCase()} next
           </div>
         </div>
       )}

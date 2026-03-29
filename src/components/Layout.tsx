@@ -19,10 +19,12 @@ function LayoutInner() {
   const essayContext = useEssayHeaderContext();
   const { state: navbar, toggle } = useNavbarContext();
 
+  const hasDrawer = navbar && navbar.entity && navbar.presentation && navbar.editor && navbar.actions && navbar.meta;
+
   return (
     <AppShell
       header={{ height: 52 }}
-      navbar={navbar ? {
+      navbar={hasDrawer ? {
         width: 280,
         breakpoint: 'xs',
         collapsed: { desktop: !navbar.opened, mobile: true },
@@ -33,14 +35,19 @@ function LayoutInner() {
         <AppHeader essayContext={essayContext ?? undefined} />
       </AppShell.Header>
 
-      {navbar && (
+      {hasDrawer && (
         <AppShell.Navbar p="xs">
-          <CoachDrawer {...navbar.drawerProps} />
+          <CoachDrawer
+            entity={navbar.entity!}
+            presentation={navbar.presentation!}
+            editor={navbar.editor!}
+            meta={navbar.meta!}
+          />
         </AppShell.Navbar>
       )}
 
       {/* Pull tab to toggle drawer */}
-      {navbar && (
+      {hasDrawer && (
         <div
           className={`coach-pull-tab ${navbar.opened ? 'coach-pull-tab-open' : ''}`}
           onClick={toggle}
