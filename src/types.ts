@@ -170,6 +170,34 @@ export interface EvaluationStatus {
   message: string;
 }
 
+// Coach synthesis types
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt'] as const;
+export type ReportKey = typeof REPORT_KEYS[number];
+
+export const REPORT_LABELS: Record<ReportKey, string> = {
+  essay: 'Essay',
+  overall: 'Overall',
+  grammar: 'Grammar',
+  transitions: 'Transitions',
+  prompt: 'Prompt Fit',
+};
+
+export interface ReportSummary {
+  key: ReportKey;
+  issueCount: number;
+  label: string;
+  detail: string;
+  previousCount: number | null;
+}
+
+export interface CoachSynthesis {
+  readiness: 'keep_going' | 'getting_close' | 'almost_there' | 'ready';
+  coachNote: string;
+  recommendedReport: ReportKey;
+  reportSummaries: ReportSummary[];
+  improvements: string[] | null;
+}
+
 export interface Draft {
   id: string;
   draftNumber: number;
@@ -183,6 +211,10 @@ export interface Draft {
   grammarStatus?: EvaluationStatus | null;
   promptAnalysis?: PromptAnalysis | null;
   promptStatus?: EvaluationStatus | null;
+  coachSynthesis?: CoachSynthesis | null;
+  coachSynthesisStatus?: EvaluationStatus | null;
+  editedAt?: Date | null;
+  lastScannedAt?: Date | null;
   revisionStage: number | null;
 }
 

@@ -8,13 +8,33 @@ interface Props {
   loading: boolean;
   status?: EvaluationStatus | null;
   onRetry: () => void;
+  onRerun?: () => void;
+  rerunLoading?: boolean;
   defaultMessage: string;
   placeholder: string;
   children: ReactNode;
 }
 
-export default function AnalysisPanel({ data, error, loading, status, onRetry, defaultMessage, placeholder, children }: Props) {
-  if (data) return <>{children}</>;
+export default function AnalysisPanel({ data, error, loading, status, onRetry, onRerun, rerunLoading, defaultMessage, placeholder, children }: Props) {
+  if (data) {
+    return (
+      <>
+        {children}
+        {onRerun && (
+          <div className="analysis-rerun">
+            <button
+              className="analysis-rerun-btn"
+              onClick={onRerun}
+              disabled={rerunLoading}
+              title="Re-run this analysis on the current draft"
+            >
+              {rerunLoading ? '↻ Running...' : '↻ Re-run'}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }
 
   if (error) {
     return (

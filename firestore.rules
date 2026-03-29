@@ -20,12 +20,10 @@ service cloud.firestore {
             && (request.auth.uid == uid || isSharedWith(uid))
             && !("evaluation" in request.resource.data);
           allow update: if request.auth != null
-            && (request.auth.uid == uid || isSharedWith(uid))
-            && (!("evaluation" in request.resource.data)
-                || (request.resource.data.diff(resource.data).affectedKeys()
-                    .hasOnly(["revisionStage"])
-                    && (request.resource.data.revisionStage is number
-                        || request.resource.data.revisionStage == null)));
+            && request.auth.uid == uid
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(["evaluation", "grammarAnalysis", "transitionAnalysis",
+                         "promptAnalysis", "coachSynthesis"]);
         }
       }
     }

@@ -6,6 +6,7 @@ import { analyzeTransitionsWithGemini } from './transitions';
 import { analyzePromptWithGemini } from './promptAdherence';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
+import { synthesizeCoachForDraft } from './synthesizeCoach';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
@@ -167,6 +168,15 @@ export const onDraftCreated = onDocumentCreated(
 
     if (tasks.length > 0) {
       await Promise.allSettled(tasks);
+    }
+
+    // After analyses settle, run coach synthesis (polls for data internally)
+    try {
+      await synthesizeCoachForDraft(apiKey, draftRef);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('Coach synthesis failed', { error: msg, essayId, draftId });
+      await draftRef.update({ coachSynthesisStatus: { stage: 'error', message: 'Coach synthesis failed' } });
     }
   }
 );
