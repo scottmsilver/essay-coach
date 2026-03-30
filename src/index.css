@@ -82,7 +82,7 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 24px;
+  padding: 8px 16px;
   background: var(--color-surface-warm);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
@@ -184,17 +184,17 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 }
 
 /* Main content — preserve Mantine's padding-top (clears fixed header) */
-.main-content { max-width: 1120px; margin: 0 auto; padding-left: 24px; padding-right: 24px; padding-bottom: 32px; }
+.main-content { max-width: 1120px; margin: 0 auto; padding-bottom: 32px; }
 
-/* Full-bleed on essay pages — Google Docs style */
-.main-content:has(.essay-page) { max-width: none; padding-left: 0; padding-right: 0; padding-bottom: 0; }
+/* Full-bleed on essay pages — Google Docs style. Let AppShell handle left padding for navbar offset. */
+.main-content:has(.essay-page) { max-width: none; margin: 0; padding-bottom: 0; padding-right: 0 !important; }
 .essay-page > .annotated-essay,
 .essay-page > .transition-view, .essay-page > .grammar-view, .essay-page > .prompt-view,
 .essay-page > .loading-state, .essay-page > .error-state,
 .essay-page > .trait-feedback-panel,
 .essay-page > .revision-plan-inline,
 .essay-page > .revision-layout {
-  padding: 16px 24px;
+  padding: 12px 16px;
 }
 
 /* Login Page */
@@ -462,8 +462,8 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
   border-radius: 10px;
   font-size: 14px;
   line-height: 1.6;
-  margin: 16px 24px 0;
-  padding: 16px 20px;
+  margin: 12px 16px 0;
+  padding: 14px 16px;
 }
 .feedback-summary:empty { display: none; }
 .feedback-summary-text {
@@ -1112,6 +1112,12 @@ mark {
   display: flex;
   padding: 0;
 }
+.app-header-essay-single {
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 52px;
+}
 .app-header-essay-rows {
   flex: 1;
   min-width: 0;
@@ -1269,5 +1275,557 @@ mark {
   .score-bar {
     padding: 8px 12px;
   }
+}
+
+/* ====== Analysis Re-run ====== */
+
+.analysis-rerun {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px;
+  margin-top: auto;
+}
+
+.analysis-rerun-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.analysis-rerun-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.analysis-rerun-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ====== Pull Tab ====== */
+
+.coach-pull-tab {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 16;
+  width: 16px;
+  height: 48px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: left 0.25s ease, background 0.15s;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+}
+
+.coach-pull-tab:hover {
+  background: var(--color-surface-warm);
+}
+
+.coach-pull-tab-open {
+  left: 280px;
+}
+
+.coach-pull-tab-icon {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+/* ====== Coach Drawer (content styles — layout handled by Mantine AppShell.Navbar) ====== */
+
+.coach-drawer-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Verdict compact */
+.coach-verdict-compact {
+  padding: 14px;
+  margin: 0 12px 12px;
+  background: var(--color-surface-warm);
+  border-radius: 12px;
+}
+
+.coach-verdict-ready {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.06) 0%, rgba(245, 158, 11, 0.06) 60%);
+  border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.coach-verdict-status {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  color: var(--color-primary);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.coach-verdict-ready .coach-verdict-status {
+  color: var(--color-green);
+  font-size: 26px;
+}
+
+.coach-verdict-note {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+/* Report list */
+.coach-sidebar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-muted);
+  padding: 8px 16px 6px;
+}
+
+.coach-report-list {
+  flex: 1;
+}
+
+/* Essay tab — above verdict, its own section */
+.coach-sb-essay {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border-radius: 6px;
+  margin: 0 8px 8px;
+  transition: all 0.15s ease;
+}
+
+.coach-sb-essay:hover {
+  background: var(--color-surface-warm);
+  color: var(--color-text);
+}
+
+.coach-sb-essay-active {
+  background: var(--color-surface-warm);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.coach-essay-section {
+  margin: 0 8px 8px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.coach-essay-actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px 0;
+}
+
+.coach-draft-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.coach-draft-select:hover {
+  border-color: var(--color-text-muted);
+}
+
+.coach-reanalyze-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.coach-reanalyze-btn:hover {
+  background: var(--color-primary-light);
+}
+
+.coach-reanalyze-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.coach-last-edited {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  padding: 4px 8px 0;
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+.coach-gdoc-changed {
+  color: var(--color-accent);
+}
+
+.coach-sb-report {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.coach-sb-report:hover {
+  background: var(--color-surface-warm);
+}
+
+.coach-sb-report-active {
+  background: var(--color-surface-warm);
+  border-left-color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.coach-sb-report-cleared {
+  opacity: 0.55;
+}
+
+.coach-sb-report-cleared:hover {
+  opacity: 0.8;
+}
+
+.coach-sb-report-cleared.coach-sb-report-active {
+  opacity: 1;
+}
+
+/* Report icons */
+.coach-sb-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.coach-sb-icon-grammar { background: rgba(220, 38, 38, 0.08); }
+.coach-sb-icon-transitions { background: rgba(245, 158, 11, 0.1); }
+.coach-sb-icon-prompt { background: rgba(37, 99, 235, 0.08); }
+.coach-sb-icon-feedback { background: rgba(147, 51, 234, 0.08); }
+.coach-sb-icon-cleared { background: rgba(5, 150, 105, 0.1); }
+
+.coach-sb-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.coach-sb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coach-sb-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.coach-sb-badge-rec {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.coach-sb-badge-clear {
+  background: var(--color-green-light);
+  color: var(--color-green);
+}
+
+.coach-sb-detail {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+
+.coach-sb-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.coach-sb-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.coach-sb-count {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.coach-sb-count-issues { color: var(--color-accent); }
+.coach-sb-count-few { color: var(--color-text-secondary); }
+.coach-sb-count-clear { color: var(--color-green); }
+
+.coach-sb-spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  animation: coach-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes coach-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.85); }
+  50% { opacity: 0.6; transform: scale(1); }
+}
+
+.coach-sb-edit-link {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-primary);
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+.coach-sb-unsaved-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: inline-block;
+  margin-left: 2px;
+}
+
+.coach-sb-report-editor {
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.coach-sb-icon-editor { background: rgba(37, 99, 235, 0.08); }
+
+/* Essay editor panel — full height, no sidebar */
+.essay-editor-panel {
+  padding: 12px 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.essay-editor-panel .essay-editor {
+  flex: 1;
+  min-height: 400px;
+}
+
+.essay-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+
+.essay-editor-save-status {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+.essay-gdoc-panel {
+  padding: 12px 16px;
+}
+
+.essay-gdoc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+.essay-gdoc-edit-link {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.essay-gdoc-changed-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.essay-gdoc-preview {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--color-text);
+}
+
+.essay-gdoc-preview p {
+  margin-bottom: 16px;
+}
+
+/* Footer */
+.coach-sb-footer {
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+
+.coach-sb-footer-hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+.coach-btn-revise {
+  width: 100%;
+  padding: 9px;
+  border-radius: 10px;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+}
+
+.coach-btn-revise:hover {
+  background: var(--color-primary-hover);
+}
+
+/* ====== Revision Journey ====== */
+
+.revision-journey {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.revision-journey-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.revision-journey-step {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 16px;
+  position: relative;
+}
+
+.revision-journey-step:last-child {
+  padding-bottom: 0;
+}
+
+.revision-journey-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 26px;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.revision-journey-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.revision-journey-dot-past {
+  background: var(--color-text-muted);
+}
+
+.revision-journey-dot-current {
+  background: var(--color-primary);
+}
+
+.revision-journey-dot-done {
+  background: var(--color-green);
+}
+
+.revision-journey-content {
+  padding-top: 2px;
+}
+
+.revision-journey-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.revision-journey-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.revision-journey-count-clear {
+  color: var(--color-green);
+}
+
+.revision-journey-desc {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 

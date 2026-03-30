@@ -38,9 +38,15 @@ export function useEssay(essayId: string | undefined, ownerUid?: string) {
       orderBy('draftNumber', 'desc')
     );
     const unsubDrafts = onSnapshot(draftsQuery, (snapshot) => {
-      const result: Draft[] = snapshot.docs.map((d) => ({
-        id: d.id, ...d.data(), submittedAt: d.data().submittedAt?.toDate() ?? new Date(),
-      })) as Draft[];
+      const result: Draft[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id, ...data,
+          submittedAt: data.submittedAt?.toDate() ?? new Date(),
+          editedAt: data.editedAt?.toDate() ?? null,
+          lastScannedAt: data.lastScannedAt?.toDate() ?? null,
+        };
+      }) as Draft[];
       setDrafts(result);
       draftsResolved.current = true;
       if (essayResolved.current) setLoading(false);
