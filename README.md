@@ -1,18 +1,49 @@
 # EssayCoach
 
-An AI-powered essay grading tool that uses the **6+1 Traits of Writing** model to score student essays and provide Socratic-style feedback for guided revision.
+An AI writing coach that teaches students to revise, not just fix errors. Uses the **6+1 Traits of Writing** model with Socratic-style annotations that ask questions instead of giving answers.
 
-Built with React, Firebase, Google Gemini, and Mantine.
+Not a grammar checker. Not a score machine. A coach that reads your essay, tells you what to work on next, and tracks your improvement across revisions.
+
+![EssayCoach — Coach Drawer with Annotated Essay](docs/screenshots/hero-coach-drawer.png)
+
+## How It Works
+
+1. **Submit your essay** — paste text or import from Google Docs
+2. **Get multi-dimensional feedback** — scored on 7 writing traits, with inline Socratic annotations
+3. **Revise and resubmit** — the coach tracks what improved and what still needs work
+4. **Keep going until ready** — the coach tells you when your essay is genuinely ready, not just "good enough"
 
 ## Features
 
-- **6+1 Traits scoring** — Ideas, Organization, Voice, Word Choice, Sentence Fluency, Conventions, and Presentation scored 1–6
-- **Inline annotations** — Quoted passages with Socratic comments to guide student thinking
-- **Grammar analysis** — Comma splices, fragments, run-ons, subject-verb agreement, passive voice, wordiness, and more
-- **Transition analysis** — Sentence and paragraph transition quality (smooth/adequate/weak/missing)
-- **Revision workflow** — Submit revised drafts, track score changes, and see what improved
-- **Essay sharing** — Share essays with classmates or teachers via email
-- **Progress tracking** — Dashboard showing writing trends across essays
+### Coach Drawer — Your Writing Coach
+
+The left sidebar shows your coach's verdict ("Keep Going", "Getting Close", "Almost There", "Ready"), report cards with issue counts, and a recommendation for what to focus on next. This is the command center for revision.
+
+### Annotated Essay — Socratic Feedback
+
+Every trait gets inline annotations that quote your text and ask you questions. Not "fix this comma" but "What would happen to your argument if you moved this evidence earlier?" The goal is to help students think, not just comply.
+
+### Grammar Analysis
+
+![Grammar Analysis View](docs/screenshots/grammar-analysis.png)
+
+Deep grammar analysis across 9 categories: comma splices, run-on sentences, fragments, subject-verb agreement, pronoun reference, verb tense consistency, parallel structure, punctuation, and missing commas. Plus sentence variety stats and active/passive voice breakdown.
+
+### Transition Analysis
+
+![Transition Analysis View](docs/screenshots/transition-analysis.png)
+
+Sentence-level and paragraph-level transition quality assessment. Each transition is rated smooth, adequate, weak, or missing, with specific coaching on how to improve flow.
+
+### Prompt Fit
+
+![Prompt Adherence View](docs/screenshots/prompt-fit.png)
+
+When an assignment prompt is provided, EssayCoach checks how well the essay addresses each requirement using a rubric matrix and targeted questions.
+
+### Revision Tracking
+
+Submit revised drafts and see score changes across traits. The coach compares your current draft to previous versions and highlights what improved. Progress bars in the drawer show how many issues you've fixed.
 
 ## Tech Stack
 
@@ -24,7 +55,16 @@ Built with React, Firebase, Google Gemini, and Mantine.
 | Database | Cloud Firestore |
 | Auth | Firebase Auth (Google OAuth) |
 | Hosting | Firebase Hosting |
-| Testing | Vitest, Testing Library |
+| Testing | Vitest, Testing Library (169 tests) |
+
+## Architecture
+
+The frontend uses a layered architecture:
+
+- **Entity layer** (`src/entities/`) — Pure TypeScript. Resolves Firestore data into clean states. No React dependency, shareable with any client.
+- **Presentation layer** (`src/entities/`) — Pure TypeScript. Maps entity states + context into semantic view states. Platform-agnostic.
+- **Hooks** (`src/hooks/`) — React hooks for editing (`useDraftEditor`) and analysis actions (`useAnalysisActions`).
+- **Components** (`src/components/`) — React components that render from presentation output.
 
 ## Setup
 
@@ -79,16 +119,6 @@ npm test
 cd functions && npm test
 ```
 
-### Calibrate the rubric
-
-Test essays from Oregon DOE, ACT, and CCSS Appendix C are in `functions/test-essays/`:
-
-```bash
-cd functions
-GEMINI_API_KEY=$(firebase functions:secrets:access GEMINI_API_KEY --project essay-grader-83737x 2>/dev/null) \
-  npx tsx scripts/test-evaluate.ts test-essays/<file> --type argumentative --prompt "..."
-```
-
 ## Deploy
 
 ### Frontend
@@ -107,43 +137,6 @@ cd functions
 ./scripts/smart-deploy.sh          # deploy changed functions
 ./scripts/smart-deploy.sh --dry    # preview what would deploy
 ./scripts/smart-deploy.sh --all    # force deploy everything
-```
-
-## Project Structure
-
-```
-src/
-  pages/          # EssayPage, HomePage, ProgressPage, etc.
-  components/     # AnnotatedEssay, GrammarView, TransitionView, ScorePillBar, DocBar
-  hooks/          # useEssay, useAuth, useActiveMarker, useCommentLayout
-  utils/          # sentenceSplitter, pasteHandler
-  types.ts        # TypeScript type definitions
-  firebase.ts     # Firebase initialization
-
-functions/src/
-  prompt.ts       # The 6+1 Traits rubric (system prompt + evaluation prompts)
-  gemini.ts       # Gemini API integration
-  submitEssay.ts  # First submission handler
-  resubmitDraft.ts # Revision submission handler
-  evaluateEssay.ts # Essay evaluation (with force re-evaluate support)
-  analyzeTransitions.ts # Transition quality analysis
-  analyzeGrammar.ts     # Grammar error detection
-  grammar.ts      # Grammar analysis with Gemini
-  transitions.ts  # Transition analysis with Gemini
-```
-
-## Data Model
-
-Essays are stored per-user in Firestore:
-
-```
-users/{uid}/essays/{essayId}
-  ├── title, writingType, assignmentPrompt, currentDraftNumber
-  └── drafts/{draftId}
-        ├── content, draftNumber, submittedAt
-        ├── evaluation          # 6+1 Traits scores + annotations
-        ├── transitionAnalysis  # Sentence/paragraph transitions
-        └── grammarAnalysis     # Grammar issues by category
 ```
 
 ## License
