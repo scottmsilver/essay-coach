@@ -367,8 +367,8 @@ export default function EssayPage() {
               onPaste={(e) => handleRichPaste(e, editor.onChange)}
             />
             <div className="essay-editor-footer">
-              <span className="essay-editor-save-status">
-                {editor.saving ? 'Saving...' : editor.lastSaved ? `Saved ${relativeTime(editor.lastSaved)}` : ''}
+              <span className={`essay-editor-save-status${editor.saveError ? ' essay-editor-save-error' : ''}`}>
+                {editor.saveError ? `Save failed: ${editor.saveError}` : editor.saving ? 'Saving...' : editor.lastSaved ? `Saved ${relativeTime(editor.lastSaved)}` : ''}
               </span>
               <Button size="compact-xs" variant="default" onClick={editor.save} disabled={editor.saving} loading={editor.saving}>
                 Save

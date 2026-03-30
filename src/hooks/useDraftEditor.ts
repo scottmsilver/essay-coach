@@ -10,6 +10,7 @@ export interface DraftEditorState {
   saving: boolean;
   lastSaved: Date | null;
   hasUnsavedEdits: boolean;
+  saveError: string | null;
 }
 
 export function useDraftEditor(
@@ -22,6 +23,7 @@ export function useDraftEditor(
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftIdRef = useRef<string | undefined>(undefined);
@@ -62,10 +64,13 @@ export function useDraftEditor(
     if (!activeDraft || currentContent === activeDraft.content) return;
 
     setSaving(true);
+    setSaveError(null);
     try {
       const draftRef = doc(db, `users/${user.uid}/essays/${essayId}/drafts/${currentDraftId}`);
       await updateDoc(draftRef, { content: currentContent, editedAt: serverTimestamp() });
       setLastSaved(new Date());
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -101,5 +106,6 @@ export function useDraftEditor(
     saving,
     lastSaved,
     hasUnsavedEdits,
+    saveError,
   };
 }

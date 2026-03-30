@@ -285,4 +285,42 @@ describe('useDraftEditor', () => {
 
     expect(result.current.hasUnsavedEdits).toBe(false);
   });
+
+  // --- saveError ---
+
+  it('exposes saveError when Firestore write fails', async () => {
+    mockUpdateDoc.mockRejectedValueOnce(new Error('Network error'));
+    const draft = makeDraft({ content: 'Original' });
+    const { result } = renderHook(() =>
+      useDraftEditor(draft, 'e1', defaultUser, undefined, true),
+    );
+
+    act(() => {
+      result.current.onChange('Edited content');
+    });
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(result.current.saveError).toBe('Network error');
+    expect(result.current.saving).toBe(false);
+  });
+
+  it('clears saveError on next successful save', async () => {
+    mockUpdateDoc.mockRejectedValueOnce(new Error('Network error'));
+    const draft = makeDraft({ content: 'Original' });
+    const { result } = renderHook(() =>
+      useDraftEditor(draft, 'e1', defaultUser, undefined, true),
+    );
+
+    act(() => { result.current.onChange('Edited'); });
+    await act(async () => { await result.current.save(); });
+    expect(result.current.saveError).toBe('Network error');
+
+    // Next save succeeds
+    mockUpdateDoc.mockResolvedValueOnce(undefined);
+    await act(async () => { await result.current.save(); });
+    expect(result.current.saveError).toBeNull();
+  });
 });
