@@ -202,6 +202,13 @@ export async function synthesizeCoachForDraft(
     throw new Error(`Coach synthesis JSON parse failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 
+  // Validate readiness enum — default to 'keep_going' if Gemini returns unexpected value
+  const VALID_READINESS = ['keep_going', 'getting_close', 'almost_there', 'ready'];
+  if (!VALID_READINESS.includes(synthesis.readiness)) {
+    logger.warn('Unexpected readiness from Gemini, defaulting to keep_going', { readiness: synthesis.readiness });
+    synthesis.readiness = 'keep_going';
+  }
+
   // If no assignment prompt, filter out the prompt report summary
   if (!hasAssignmentPrompt) {
     synthesis.reportSummaries = synthesis.reportSummaries.filter(
