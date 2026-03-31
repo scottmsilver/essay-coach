@@ -188,6 +188,14 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 
 /* Full-bleed on essay pages — Google Docs style. Let AppShell handle left padding for navbar offset. */
 .main-content:has(.essay-page) { max-width: none; margin: 0; padding-bottom: 0; padding-right: 0 !important; }
+
+/* Fill viewport height when editing — makes the textarea expand to use available space */
+.essay-page:has(.essay-editor-panel) {
+  min-height: calc(100vh - 52px);
+  display: flex;
+  flex-direction: column;
+}
+
 .essay-page > .annotated-essay,
 .essay-page > .transition-view, .essay-page > .grammar-view, .essay-page > .prompt-view,
 .essay-page > .loading-state, .essay-page > .error-state,
