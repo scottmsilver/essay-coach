@@ -1,83 +1,34 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { getFirestore } from 'firebase-admin/firestore';
-import { defineSecret } from 'firebase-functions/params';
-import { logger } from 'firebase-functions/v2';
-import { isEmailAllowed } from './allowlist';
-import { analyzePromptWithGemini } from './promptAdherence';
-import { resolveEssayOwner } from './resolveEssayOwner';
+import { createAnalysisHandler, type AnalysisContext } from './createAnalysisHandler';
+import { analyzePromptWithGemini, type PromptAnalysis } from './promptAdherence';
 
-const geminiApiKey = defineSecret('GEMINI_API_KEY');
+/** Sentinel error to tell the factory "nothing to do, don't write a result." */
+class AnalysisSkipped extends Error {
+  constructor() { super('skipped'); }
+}
 
-export const analyzePromptAdherence = onCall(
-  { timeoutSeconds: 180, secrets: [geminiApiKey] },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Must be signed in');
-    }
+async function analyzePromptForDraft(ctx: AnalysisContext): Promise<PromptAnalysis> {
+  const essayRef = ctx.draftRef.parent.parent!;
+  const essaySnap = await essayRef.get();
+  const assignmentPrompt = essaySnap.data()?.assignmentPrompt;
 
-    const email = request.auth.token.email;
-    if (!email || !(await isEmailAllowed(email))) {
-      throw new HttpsError('permission-denied', 'Your account is not on the allowlist');
-    }
-
-    const { essayId, draftId } = request.data;
-    if (!essayId || !draftId) {
-      throw new HttpsError('invalid-argument', 'essayId and draftId are required');
-    }
-
-    const db = getFirestore();
-    const uid = await resolveEssayOwner(request.auth.uid, request.data.ownerUid);
-
-    const draftRef = db.doc(`users/${uid}/essays/${essayId}/drafts/${draftId}`);
-    const draftDoc = await draftRef.get();
-
-    if (!draftDoc.exists) {
-      throw new HttpsError('not-found', 'Draft not found');
-    }
-
-    const content = draftDoc.data()!.content;
-    if (!content) {
-      throw new HttpsError('invalid-argument', 'Draft has no content');
-    }
-
-    // Read the parent essay doc to get assignmentPrompt
-    const essayRef = draftRef.parent.parent!;
-    const essaySnap = await essayRef.get();
-    const assignmentPrompt = essaySnap.data()?.assignmentPrompt;
-
-    if (!assignmentPrompt?.trim()) {
-      // No prompt to analyze against — skip
-      await draftRef.update({ promptStatus: null });
-      return { skipped: true };
-    }
-
-    try {
-      logger.info('Starting prompt adherence analysis', { essayId, draftId, contentLength: content.length });
-      const analysis = await analyzePromptWithGemini(geminiApiKey.value(), assignmentPrompt, content, draftRef);
-      logger.info('Prompt adherence analysis complete', {
-        totalCells: analysis.summary.totalCells,
-        filledCells: analysis.summary.filledCells,
-      });
-      await draftRef.update({ promptAnalysis: analysis, promptStatus: null });
-      return analysis;
-    } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      const errStack = error instanceof Error ? error.stack : undefined;
-      logger.error('Prompt adherence analysis failed', { error: errMsg, stack: errStack });
-      if (error instanceof SyntaxError) {
-        try {
-          const analysis = await analyzePromptWithGemini(geminiApiKey.value(), assignmentPrompt, content, draftRef);
-          await draftRef.update({ promptAnalysis: analysis, promptStatus: null });
-          return analysis;
-        } catch (retryError: unknown) {
-          const retryMsg = retryError instanceof Error ? retryError.message : String(retryError);
-          logger.error('Prompt adherence analysis retry also failed', { error: retryMsg });
-          await draftRef.update({ promptStatus: { stage: 'error', message: 'Analysis failed' } });
-          throw new HttpsError('internal', 'Failed to analyze prompt adherence. Please try again.');
-        }
-      }
-      await draftRef.update({ promptStatus: { stage: 'error', message: 'Analysis failed' } });
-      throw new HttpsError('internal', `Failed to analyze prompt adherence: ${errMsg}`);
-    }
+  if (!assignmentPrompt?.trim()) {
+    // No prompt to analyze. Clear any stale status and bail out.
+    // Throwing AnalysisSkipped prevents the factory from writing a
+    // fake result to promptAnalysis (which would crash the frontend).
+    await ctx.draftRef.update({ promptStatus: null });
+    throw new AnalysisSkipped();
   }
-);
+
+  return analyzePromptWithGemini(ctx.apiKey, assignmentPrompt, ctx.content, ctx.draftRef);
+}
+
+export const analyzePromptAdherence = createAnalysisHandler<PromptAnalysis>({
+  name: 'prompt adherence',
+  dataField: 'promptAnalysis',
+  statusField: 'promptStatus',
+  analyze: analyzePromptForDraft,
+  logSummary: (result) => ({
+    totalCells: result.summary?.totalCells,
+    filledCells: result.summary?.filledCells,
+  }),
+});
