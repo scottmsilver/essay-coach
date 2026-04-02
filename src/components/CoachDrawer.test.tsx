@@ -11,6 +11,7 @@ const entity = {
   id: 'draft-1',
   raw: {
     id: 'draft-1',
+    draftNumber: 1,
     content: '',
     submittedAt: new Date('2026-01-01T00:00:00Z'),
     revisionStage: null,
@@ -89,7 +90,7 @@ describe('CoachDrawer', () => {
 
     const row = screen.getByText('Overall').closest('.coach-sb-report');
     expect(row).not.toBeNull();
-    expect(within(row!).getByText('0').className).toContain('coach-sb-count-clear');
+    expect(within(row as HTMLElement).getByText('0').className).toContain('coach-sb-count-clear');
   });
 
   it('maps a 1 issue report to the few count class', () => {
@@ -97,7 +98,7 @@ describe('CoachDrawer', () => {
 
     const row = screen.getByText('Grammar').closest('.coach-sb-report');
     expect(row).not.toBeNull();
-    expect(within(row!).getByText('1').className).toContain('coach-sb-count-few');
+    expect(within(row as HTMLElement).getByText('1').className).toContain('coach-sb-count-few');
   });
 
   it('maps a 3 issue report to the issues count class', () => {
@@ -105,7 +106,7 @@ describe('CoachDrawer', () => {
 
     const row = screen.getByText('Transitions').closest('.coach-sb-report');
     expect(row).not.toBeNull();
-    expect(within(row!).getByText('3').className).toContain('coach-sb-count-issues');
+    expect(within(row as HTMLElement).getByText('3').className).toContain('coach-sb-count-issues');
   });
 
   it('maps an unavailable report count to a dedicated unavailable class', () => {
@@ -113,6 +114,6 @@ describe('CoachDrawer', () => {
 
     const row = screen.getByText('Prompt Fit').closest('.coach-sb-report');
     expect(row).not.toBeNull();
-    expect(within(row!).getByText('—').className).toContain('coach-sb-count-unavailable');
+    expect(within(row as HTMLElement).getByText('—').className).toContain('coach-sb-count-unavailable');
   });
 });
