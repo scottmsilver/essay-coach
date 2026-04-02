@@ -6,7 +6,7 @@ import { functions } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, scoreTooltip } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -273,7 +273,10 @@ export default function EssayPage() {
                   <div className="trait-popover" ref={popoverRef}>
                     <div className="trait-popover-header">
                       <strong>{TRAIT_LABELS[activeTrait]}</strong>
-                      <span style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}>
+                      <span
+                        style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}
+                        title={scoreTooltip(evaluation.traits[activeTrait].score)}
+                      >
                         {evaluation.traits[activeTrait].score}/6
                       </span>
                     </div>

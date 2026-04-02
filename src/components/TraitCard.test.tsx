@@ -45,6 +45,15 @@ describe('TraitCard', () => {
     expect(container.querySelector('.score-high')).toBeInTheDocument();
   });
 
+  it('applies score-mid class and tooltip for score 4', () => {
+    const midEval = { ...mockEval, score: 4 };
+    const { container } = renderWithRouter(
+      <TraitCard traitKey="voice" evaluation={midEval} expanded={false} onClick={vi.fn()} />
+    );
+    expect(container.querySelector('.score-mid')).toBeInTheDocument();
+    expect(screen.getByText('4/6')).toHaveAttribute('title', '3-4: developing / capable');
+  });
+
   it('shows annotations when expanded', () => {
     renderWithRouter(
       <TraitCard traitKey="conventions" evaluation={mockEval} expanded={true} onClick={vi.fn()} />
