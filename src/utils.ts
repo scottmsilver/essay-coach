@@ -25,7 +25,7 @@ export function countWords(text: string): number {
 
 export function scoreLevel(score: number): string {
   if (score <= 2) return 'low';
-  if (score === 3) return 'mid';
+  if (score <= 4) return 'mid';
   return 'high';
 }
 
@@ -35,8 +35,14 @@ export function scoreClass(score: number): string {
 
 export function scoreColor(score: number): string {
   if (score <= 2) return 'var(--color-red)';
-  if (score === 3) return 'var(--color-yellow)';
+  if (score <= 4) return 'var(--color-yellow)';
   return 'var(--color-green)';
+}
+
+export function scoreTooltip(score: number): string {
+  if (score <= 2) return '1-2: major problems';
+  if (score <= 4) return '3-4: developing / capable';
+  return '5-6: strong / clear';
 }
 
 export function relativeTime(date: Date): string {

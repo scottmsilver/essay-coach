@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { relativeTime } from './utils';
+import { relativeTime, scoreColor, scoreLevel, scoreTooltip } from './utils';
 
 describe('relativeTime', () => {
   afterEach(() => { vi.useRealTimers(); });
@@ -41,5 +41,27 @@ describe('relativeTime', () => {
     vi.setSystemTime(new Date('2026-03-16T12:00:00Z'));
     const result = relativeTime(new Date('2025-06-05T14:00:00Z'));
     expect(result).toMatch(/2025/);
+  });
+});
+
+describe('score semantics', () => {
+  it('maps scoreLevel across the full bucket boundaries', () => {
+    expect(scoreLevel(1)).toBe('low');
+    expect(scoreLevel(2)).toBe('low');
+    expect(scoreLevel(3)).toBe('mid');
+    expect(scoreLevel(4)).toBe('mid');
+    expect(scoreLevel(5)).toBe('high');
+  });
+
+  it('maps scoreColor across the full bucket boundaries', () => {
+    expect(scoreColor(2)).toBe('var(--color-red)');
+    expect(scoreColor(4)).toBe('var(--color-yellow)');
+    expect(scoreColor(5)).toBe('var(--color-green)');
+  });
+
+  it('maps scoreTooltip across the full bucket boundaries', () => {
+    expect(scoreTooltip(2)).toBe('1-2: major problems');
+    expect(scoreTooltip(4)).toBe('3-4: developing / capable');
+    expect(scoreTooltip(5)).toBe('5-6: strong / clear');
   });
 });
