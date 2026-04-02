@@ -666,7 +666,7 @@ mark {
   transition: width 0.3s;
 }
 .transition-bar-segment.smooth { background: var(--color-green); }
-.transition-bar-segment.adequate { background: var(--color-text-secondary); }
+.transition-bar-segment.adequate { background: var(--color-yellow); }
 .transition-bar-segment.weak { background: var(--color-yellow); }
 .transition-bar-segment.missing { background: var(--color-red); }
 .legend-item {
@@ -683,7 +683,7 @@ mark {
   display: inline-block;
 }
 .legend-dot.smooth { background: var(--color-green); }
-.legend-dot.adequate { background: var(--color-text-secondary); }
+.legend-dot.adequate { background: var(--color-yellow); }
 .legend-dot.weak { background: var(--color-yellow); }
 .legend-dot.missing { background: var(--color-red); }
 
@@ -711,7 +711,7 @@ mark {
   box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
 }
 .transition-dot.smooth { background: var(--color-green); }
-.transition-dot.adequate { background: var(--color-text-secondary); }
+.transition-dot.adequate { background: var(--color-yellow); }
 .transition-dot.weak { background: var(--color-yellow); }
 .transition-dot.missing { background: var(--color-red); }
 
@@ -740,7 +740,7 @@ mark {
   border-radius: 1px;
 }
 .transition-marker.smooth .transition-marker-line { background: var(--color-green); }
-.transition-marker.adequate .transition-marker-line { background: var(--color-text-secondary); }
+.transition-marker.adequate .transition-marker-line { background: var(--color-yellow); }
 .transition-marker.weak .transition-marker-line { background: var(--color-yellow); }
 .transition-marker.missing .transition-marker-line { background: var(--color-red); }
 
@@ -758,7 +758,7 @@ mark {
   white-space: nowrap;
 }
 .transition-marker.smooth .transition-marker-quality { color: var(--color-green); background: rgba(5, 150, 105, 0.08); }
-.transition-marker.adequate .transition-marker-quality { color: var(--color-text-secondary); background: rgba(107, 114, 128, 0.08); }
+.transition-marker.adequate .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
 .transition-marker.weak .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
 .transition-marker.missing .transition-marker-quality { color: var(--color-red); background: rgba(220, 38, 38, 0.08); }
 
@@ -1604,9 +1604,10 @@ mark {
   flex-shrink: 0;
 }
 
-.coach-sb-count-issues { color: var(--color-accent); }
-.coach-sb-count-few { color: var(--color-text-secondary); }
+.coach-sb-count-issues { color: var(--color-red); }
+.coach-sb-count-few { color: var(--color-yellow); }
 .coach-sb-count-clear { color: var(--color-green); }
+.coach-sb-count-unavailable { color: var(--color-text-muted); }
 
 .coach-sb-spinner {
   width: 8px;
@@ -1836,4 +1837,3 @@ mark {
   color: var(--color-text-secondary);
   line-height: 1.4;
 }
-

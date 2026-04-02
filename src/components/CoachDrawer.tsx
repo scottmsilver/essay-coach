@@ -163,7 +163,7 @@ export default function CoachDrawer({ entity, presentation, editor, meta }: Prop
               </div>
               {(() => {
                 if (isLoading) return <div className="coach-sb-spinner" />;
-                if (count === undefined) return <div className="coach-sb-count coach-sb-count-few">—</div>;
+                if (count === undefined) return <div className="coach-sb-count coach-sb-count-unavailable">—</div>;
                 return (
                   <div className={`coach-sb-count ${
                     count === 0 ? 'coach-sb-count-clear' :
