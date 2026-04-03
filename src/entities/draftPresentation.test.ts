@@ -184,9 +184,9 @@ describe('presentDraft', () => {
       expect(p.canEdit).toBe(true);
     });
 
-    it('is false when not owner', () => {
+    it('is true for shared users on latest draft', () => {
       const p = present({}, 30_000, true, true, false);
-      expect(p.canEdit).toBe(false);
+      expect(p.canEdit).toBe(true);
     });
 
     it('is false when not latest', () => {

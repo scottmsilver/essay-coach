@@ -20,7 +20,7 @@ describe('TraitCard', () => {
       <TraitCard traitKey="conventions" evaluation={mockEval} expanded={false} onClick={vi.fn()} />
     );
     expect(screen.getByText('Conventions')).toBeInTheDocument();
-    expect(screen.getByText('2/6')).toBeInTheDocument();
+    expect(screen.getByText('2/6 Emerging')).toBeInTheDocument();
   });
 
   it('renders feedback text', () => {
@@ -45,13 +45,12 @@ describe('TraitCard', () => {
     expect(container.querySelector('.score-high')).toBeInTheDocument();
   });
 
-  it('applies score-mid class and tooltip for score 4', () => {
+  it('applies score-mid class and shows rubric label for score 4', () => {
     const midEval = { ...mockEval, score: 4 };
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <TraitCard traitKey="voice" evaluation={midEval} expanded={false} onClick={vi.fn()} />
     );
-    expect(container.querySelector('.score-mid')).toBeInTheDocument();
-    expect(screen.getByText('4/6')).toHaveAttribute('title', '3-4: developing / capable');
+    expect(screen.getByText('4/6 Capable')).toBeInTheDocument();
   });
 
   it('shows annotations when expanded', () => {

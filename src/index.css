@@ -17,6 +17,8 @@
   --color-yellow: #D97706;
   --color-red: #DC2626;
   --color-red-light: rgba(220, 38, 38, 0.06);
+  --color-neutral: #93C5FD;
+  --color-neutral-muted: rgba(147, 197, 253, 0.5);
 
   /* Surfaces — warm grays (stone palette) */
   --color-bg: #F8F7F4;
@@ -160,6 +162,15 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 }
 .score-pill-value {
   font-weight: 600;
+}
+.score-pill-rubric {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+@media (max-width: 600px) {
+  .score-pill-rubric { display: none; }
+  .score-pill { padding: 4px 8px; gap: 3px; font-size: 12px; }
 }
 .score-pill-delta {
   font-size: 9px;
@@ -360,14 +371,17 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+.sidebar-comment.suggestion {
+  border-left: 3px solid rgba(217, 119, 6, 0.3);
+}
 .sidebar-comment.suggestion:hover {
-  border-color: rgba(79, 70, 229, 0.4);
+  border-color: rgba(217, 119, 6, 0.5);
 }
 .sidebar-comment.suggestion.active {
-  border-color: var(--color-primary);
-  border-left: 3px solid var(--color-primary);
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
-  background: rgba(79, 70, 229, 0.04);
+  border-color: var(--color-yellow);
+  border-left: 3px solid var(--color-yellow);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+  background: rgba(217, 119, 6, 0.04);
 }
 .sidebar-comment.praise {
   border-left: 3px solid rgba(5, 150, 105, 0.3);
@@ -388,7 +402,7 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-primary);
+  color: var(--color-yellow);
   margin-bottom: 4px;
 }
 .sidebar-comment.praise .sidebar-comment-trait {
@@ -426,13 +440,13 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 }
 /* Suggestions (has a question — things to work on) */
 .annotation-mark.suggestion {
-  background: rgba(79, 70, 229, 0.10);
-  border-bottom: 2px solid rgba(79, 70, 229, 0.25);
+  background: rgba(217, 119, 6, 0.08);
+  border-bottom: 2px solid rgba(217, 119, 6, 0.25);
 }
-.annotation-mark.suggestion:hover { background: rgba(79, 70, 229, 0.20); }
+.annotation-mark.suggestion:hover { background: rgba(217, 119, 6, 0.16); }
 .annotation-mark.suggestion.selected {
-  background: rgba(79, 70, 229, 0.22);
-  border-bottom-color: var(--color-primary);
+  background: rgba(217, 119, 6, 0.18);
+  border-bottom-color: var(--color-yellow);
 }
 /* Praise (what's working well) */
 .annotation-mark.praise {
@@ -624,7 +638,7 @@ label, .mantine-InputWrapper-label, .mantine-Text-root {
 
 /* Highlight */
 mark {
-  background: rgba(79, 70, 229, 0.15);
+  background: rgba(217, 119, 6, 0.12);
   padding: 2px 0;
   border-radius: 2px;
 }
@@ -666,7 +680,7 @@ mark {
   transition: width 0.3s;
 }
 .transition-bar-segment.smooth { background: var(--color-green); }
-.transition-bar-segment.adequate { background: var(--color-yellow); }
+.transition-bar-segment.adequate { background: var(--color-neutral-muted); }
 .transition-bar-segment.weak { background: var(--color-yellow); }
 .transition-bar-segment.missing { background: var(--color-red); }
 .legend-item {
@@ -683,7 +697,7 @@ mark {
   display: inline-block;
 }
 .legend-dot.smooth { background: var(--color-green); }
-.legend-dot.adequate { background: var(--color-yellow); }
+.legend-dot.adequate { background: var(--color-neutral); }
 .legend-dot.weak { background: var(--color-yellow); }
 .legend-dot.missing { background: var(--color-red); }
 
@@ -711,7 +725,7 @@ mark {
   box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
 }
 .transition-dot.smooth { background: var(--color-green); }
-.transition-dot.adequate { background: var(--color-yellow); }
+.transition-dot.adequate { background: var(--color-neutral); }
 .transition-dot.weak { background: var(--color-yellow); }
 .transition-dot.missing { background: var(--color-red); }
 
@@ -740,7 +754,7 @@ mark {
   border-radius: 1px;
 }
 .transition-marker.smooth .transition-marker-line { background: var(--color-green); }
-.transition-marker.adequate .transition-marker-line { background: var(--color-yellow); }
+.transition-marker.adequate .transition-marker-line { background: var(--color-neutral); }
 .transition-marker.weak .transition-marker-line { background: var(--color-yellow); }
 .transition-marker.missing .transition-marker-line { background: var(--color-red); }
 
@@ -758,7 +772,7 @@ mark {
   white-space: nowrap;
 }
 .transition-marker.smooth .transition-marker-quality { color: var(--color-green); background: rgba(5, 150, 105, 0.08); }
-.transition-marker.adequate .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
+.transition-marker.adequate .transition-marker-quality { color: var(--color-neutral); background: rgba(147, 197, 253, 0.12); }
 .transition-marker.weak .transition-marker-quality { color: var(--color-yellow); background: rgba(217, 119, 6, 0.08); }
 .transition-marker.missing .transition-marker-quality { color: var(--color-red); background: rgba(220, 38, 38, 0.08); }
 
@@ -772,12 +786,12 @@ mark {
 .grammar-bar-segment { transition: width 0.3s; }
 .grammar-bar-segment.error { background: var(--color-red); }
 .grammar-bar-segment.warning { background: var(--color-yellow); }
-.grammar-bar-segment.pattern { background: var(--color-primary); }
+.grammar-bar-segment.pattern { background: var(--color-green); }
 .grammar-bar-segment.clean { background: var(--color-green); }
 
 .legend-dot.error { background: var(--color-red); }
 .legend-dot.warning { background: var(--color-yellow); }
-.legend-dot.pattern { background: var(--color-primary); }
+.legend-dot.pattern { background: var(--color-green); }
 .legend-dot.clean { background: var(--color-green); }
 
 .grammar-passive-ratio {
@@ -802,14 +816,14 @@ mark {
   text-underline-offset: 3px;
 }
 .grammar-underline.pattern {
-  text-decoration: underline dashed var(--color-primary);
+  text-decoration: underline dashed var(--color-green);
   text-underline-offset: 3px;
 }
 .grammar-underline:hover {
   background: rgba(0,0,0,0.04);
 }
 .grammar-underline.active {
-  background: rgba(79, 70, 229, 0.15);
+  background: rgba(217, 119, 6, 0.15);
   border-radius: 2px;
 }
 
@@ -1836,4 +1850,142 @@ mark {
   font-size: 13px;
   color: var(--color-text-secondary);
   line-height: 1.4;
+}
+
+/* ═══ Duplication View ═══ */
+.duplication-view { margin-bottom: 24px; }
+
+.dup-bar-segment { transition: width 0.3s; }
+.dup-bar-segment.duplicated { background: var(--color-yellow); }
+.dup-bar-segment.unique { background: var(--color-green); }
+
+.dup-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0;
+  position: relative;
+}
+.dup-essay { padding-right: 24px; }
+.dup-sidebar {
+  border-left: 1px solid var(--color-border);
+  padding-left: 16px;
+}
+
+/* Marks in essay text */
+.dup-mark { padding: 2px 0; cursor: pointer; border-radius: 2px; transition: background 0.15s; }
+.dup-mark.keep { background: rgba(5, 150, 105, 0.08); border-bottom: 2px solid rgba(5, 150, 105, 0.25); }
+.dup-mark.keep:hover, .dup-mark.keep.active { background: rgba(5, 150, 105, 0.18); border-bottom-color: var(--color-green); }
+.dup-mark.cut { background: rgba(180, 83, 9, 0.10); border-bottom: 2px solid rgba(180, 83, 9, 0.25); }
+.dup-mark.cut:hover, .dup-mark.cut.active { background: rgba(180, 83, 9, 0.20); border-bottom-color: var(--color-yellow); }
+
+/* Sidebar comments */
+.dup-severity-tag {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 1px 6px; border-radius: 4px; margin-bottom: 6px;
+}
+.dup-severity-tag.high { background: rgba(220, 38, 38, 0.08); color: var(--color-red); }
+.dup-severity-tag.medium { background: rgba(180, 83, 9, 0.08); color: var(--color-yellow); }
+.dup-finding-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.dup-instance { margin-bottom: 6px; }
+.dup-instance-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+.dup-instance-label.keep { color: var(--color-green); }
+.dup-instance-label.cut { color: var(--color-yellow); }
+.dup-instance-quote {
+  font-family: var(--font-body); font-size: 12px; line-height: 1.5;
+  color: var(--color-text-secondary); padding: 4px 8px; border-radius: 4px;
+}
+.dup-instance-quote.keep { background: rgba(5, 150, 105, 0.06); border-left: 2px solid var(--color-green); }
+.dup-instance-quote.cut { background: rgba(180, 83, 9, 0.06); border-left: 2px solid var(--color-yellow); }
+.dup-coach-comment {
+  font-size: 12px; line-height: 1.5; color: var(--color-text-secondary);
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 900px) {
+  .dup-layout { grid-template-columns: 1fr; }
+  .dup-sidebar { border-left: none; padding-left: 0; margin-top: 16px; }
+  .dup-essay { padding-right: 0; }
+}
+
+/* ═══ Mobile Bottom Sheet ═══ */
+@media (max-width: 576px) {
+  .score-bar { display: none; }
+}
+
+.mobile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 100;
+  pointer-events: none;
+}
+.mobile-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  background: var(--color-surface);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 101;
+  padding-bottom: env(safe-area-inset-bottom);
+  will-change: transform;
+  overflow: visible;  /* allow drag zone to extend above */
+}
+.mobile-sheet-drag-zone {
+  cursor: grab;
+  position: relative;
+}
+/* Invisible touch target extending 24px above the visible sheet for fat fingers */
+.mobile-sheet-drag-zone::before {
+  content: '';
+  position: absolute;
+  top: -24px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  z-index: 102;
+}
+.mobile-sheet-handle {
+  width: 32px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  margin: 8px auto;
+}
+.mobile-sheet-scroll {
+  overflow-y: auto;
+  max-height: calc(100vh - 170px);
+  overscroll-behavior: contain;
+}
+.mobile-peek {
+  padding: 0;
+}
+.mobile-peek-pills {
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0 12px 8px;
+  scrollbar-width: none;
+}
+.mobile-peek-pills::-webkit-scrollbar {
+  display: none;
+}
+.mobile-peek-pills .analysis-bar-scores {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+.mobile-peek-verdict {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 16px 8px;
+  line-height: 1.4;
+}
+.mobile-peek-loading {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }

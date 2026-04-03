@@ -1,6 +1,6 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from '../types';
 import type { TraitKey, Evaluation } from '../types';
-import { scoreLevel, scoreTooltip } from '../utils';
+import { scoreLevel, scoreLabel } from '../utils';
 
 interface ScoreChange {
   delta: number;
@@ -43,10 +43,11 @@ export default function ScorePillBar({ evaluation, activeKey, onSelect, scoreCha
             key={trait}
             className={`score-pill ${scoreLevel(score)} ${isActive ? 'active' : ''} ${improved ? 'improved' : ''}`}
             onClick={() => onSelect?.(isActive ? null : trait)}
-            title={scoreTooltip(score)}
+            title={traitData.feedback}
           >
             <span className="score-pill-label">{TRAIT_LABELS[trait]}</span>
             <span className="score-pill-value">{score}</span>
+            <span className="score-pill-rubric">{scoreLabel(score)}</span>
             {change && change.delta !== 0 && (
               <span className={`score-pill-delta ${change.delta > 0 ? 'up' : 'down'}`}>
                 {change.delta > 0 ? '+' : ''}{change.delta}

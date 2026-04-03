@@ -1,5 +1,5 @@
 import { TRAIT_LABELS, type TraitKey, type TraitEvaluation } from '../types';
-import { scoreClass, scoreColor, scoreTooltip } from '../utils';
+import { scoreClass, scoreColor, scoreLabel } from '../utils';
 
 interface Props {
   traitKey: TraitKey;
@@ -13,8 +13,8 @@ export default function TraitCard({ traitKey, evaluation, expanded, onClick }: P
     <div className={`trait-card ${scoreClass(evaluation.score)}`} onClick={onClick}>
       <div className="trait-card-header">
         <span className="trait-card-name">{TRAIT_LABELS[traitKey]}</span>
-        <span className="trait-card-score" style={{ color: scoreColor(evaluation.score) }} title={scoreTooltip(evaluation.score)}>
-          {evaluation.score}/6
+        <span className="trait-card-score" style={{ color: scoreColor(evaluation.score) }}>
+          {evaluation.score}/6 {scoreLabel(evaluation.score)}
         </span>
       </div>
       <p className="trait-card-feedback">{evaluation.feedback}</p>

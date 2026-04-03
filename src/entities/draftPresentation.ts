@@ -27,7 +27,7 @@ export interface DraftPresentation {
   isLatest: boolean;
 }
 
-const REPORT_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt'];
+const REPORT_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication'];
 const ONE_MINUTE = 60_000;
 const THREE_MINUTES = 180_000;
 const FIVE_MINUTES = 300_000;
@@ -83,7 +83,7 @@ export function presentDraft(
   draftAge: number,
   hasPrompt: boolean,
   isLatest: boolean,
-  isOwner: boolean,
+  _isOwner?: boolean,
 ): DraftPresentation {
   const reports = {} as Record<AnalysisKey, ReportPresentation>;
 
@@ -99,7 +99,7 @@ export function presentDraft(
   return {
     reports,
     verdict: resolveVerdict(entity, draftAge),
-    canEdit: isOwner && isLatest,
+    canEdit: isLatest,
     hasPrompt,
     isLatest,
   };

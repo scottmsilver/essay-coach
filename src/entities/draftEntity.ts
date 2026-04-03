@@ -1,6 +1,6 @@
 import type { Draft, CoachSynthesis } from '../types';
 
-export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt';
+export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication';
 export type AnalysisStatus = 'ready' | 'loading' | 'error' | 'pending';
 
 export interface DraftEntity {
@@ -20,6 +20,7 @@ const DATA_FIELDS: Record<AnalysisKey, keyof Draft> = {
   grammar: 'grammarAnalysis',
   transitions: 'transitionAnalysis',
   prompt: 'promptAnalysis',
+  duplication: 'duplicationAnalysis',
 };
 
 const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
@@ -27,6 +28,7 @@ const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
   grammar: 'grammarStatus',
   transitions: 'transitionStatus',
   prompt: 'promptStatus',
+  duplication: 'duplicationStatus',
 };
 
 export function createDraftEntity(raw: Draft): DraftEntity {
@@ -62,6 +64,10 @@ export function createDraftEntity(raw: Draft): DraftEntity {
       case 'prompt':
         return raw.promptAnalysis
           ? raw.promptAnalysis.summary.emptyCells + raw.promptAnalysis.summary.partialCells
+          : undefined;
+      case 'duplication':
+        return raw.duplicationAnalysis
+          ? raw.duplicationAnalysis.summary.totalDuplications
           : undefined;
     }
   };

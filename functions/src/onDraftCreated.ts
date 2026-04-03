@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2';
 import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
 import { analyzePromptWithGemini } from './promptAdherence';
+import { analyzeDuplicationWithGemini } from './duplication';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
@@ -81,7 +82,7 @@ export const onDraftCreated = onDocumentCreated(
       tasks.push(
         (async () => {
           try {
-            const analysis = await analyzeTransitionsWithGemini(apiKey, content, draftRef);
+            const analysis = await analyzeTransitionsWithGemini(apiKey, content, draftRef, data.transitionAnalysis || null);
             await draftRef.update({ transitionAnalysis: analysis, transitionStatus: null });
             logger.info('Trigger transition analysis complete', { essayId, draftId });
           } catch (error: unknown) {
@@ -164,6 +165,26 @@ export const onDraftCreated = onDocumentCreated(
       }
     } else {
       logger.info('Prompt adherence already processing or complete, skipping', { essayId, draftId });
+    }
+
+    // Duplication: fire if client didn't start
+    if (!isActivelyProcessing(data.duplicationStatus) && !data.duplicationAnalysis) {
+      logger.info('Duplication not actively processing — trigger firing', { essayId, draftId, status: data.duplicationStatus?.stage });
+      tasks.push(
+        (async () => {
+          try {
+            const analysis = await analyzeDuplicationWithGemini(apiKey, content, draftRef);
+            await draftRef.update({ duplicationAnalysis: analysis, duplicationStatus: null });
+            logger.info('Trigger duplication analysis complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger duplication analysis failed', { error: msg, essayId, draftId });
+            await draftRef.update({ duplicationStatus: { stage: 'error', message: 'Analysis failed' } });
+          }
+        })()
+      );
+    } else {
+      logger.info('Duplication already processing or complete, skipping', { essayId, draftId });
     }
 
     if (tasks.length > 0) {

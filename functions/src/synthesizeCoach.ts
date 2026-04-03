@@ -24,6 +24,7 @@ RULES:
 - Count grammar issues from the summary.totalErrors field.
 - Count transition issues by counting "Weak" or "Missing" quality transitions.
 - Count prompt gaps by counting questions where addressed=false or cells with status="empty" or "partial".
+- Count duplication issues from the summary.totalDuplications field.
 - Count overall/trait suggestions by counting traits with revisionPriority !== null. Use key "overall" for trait-level feedback.
 - Be honest. If the essay has problems, say so warmly but clearly.
 - The coach note should sound like a real teacher, not a bot. Reference specific things about the essay.`;
@@ -38,7 +39,7 @@ const COACH_SYNTHESIS_SCHEMA = {
     coachNote: { type: 'string' as const },
     recommendedReport: {
       type: 'string' as const,
-      enum: ['grammar', 'transitions', 'prompt', 'overall'],
+      enum: ['grammar', 'transitions', 'prompt', 'overall', 'duplication'],
     },
     reportSummaries: {
       type: 'array' as const,
@@ -69,6 +70,7 @@ interface SynthesisInput {
   grammarAnalysis: Record<string, unknown> | null;
   transitionAnalysis: Record<string, unknown> | null;
   promptAnalysis: Record<string, unknown> | null;
+  duplicationAnalysis: Record<string, unknown> | null;
   previousCoachSynthesis: Record<string, unknown> | null;
   hasAssignmentPrompt: boolean;
 }
@@ -105,6 +107,12 @@ function buildCoachSynthesisPrompt(input: SynthesisInput): string {
     sections.push('## Prompt Adherence Analysis\nNo assignment prompt provided — omit the "prompt" report from reportSummaries.');
   }
 
+  if (input.duplicationAnalysis) {
+    sections.push(`## Duplication Analysis\n${JSON.stringify(input.duplicationAnalysis, null, 2)}`);
+  } else {
+    sections.push('## Duplication Analysis\nNot yet available.');
+  }
+
   if (input.previousCoachSynthesis) {
     sections.push(`## Previous Draft Coach Synthesis (for progress comparison)\n${JSON.stringify(input.previousCoachSynthesis, null, 2)}`);
   } else if (input.draftNumber > 1) {
@@ -129,14 +137,15 @@ export async function synthesizeCoachForDraft(
     const hasEval = !!data.evaluation;
     const hasGrammar = !!data.grammarAnalysis;
     const hasTransitions = !!data.transitionAnalysis;
+    const hasDuplication = !!data.duplicationAnalysis;
     // Prompt analysis only expected if essay has a prompt
     const essayRef = draftRef.parent.parent!;
     const essaySnap = await essayRef.get();
     const needsPrompt = !!essaySnap.data()?.assignmentPrompt?.trim();
     const hasPrompt = !needsPrompt || !!data.promptAnalysis;
-    if (hasEval && hasGrammar && hasTransitions && hasPrompt) break;
+    if (hasEval && hasGrammar && hasTransitions && hasPrompt && hasDuplication) break;
     logger.info('Waiting for analyses before synthesis', {
-      attempt, hasEval, hasGrammar, hasTransitions, hasPrompt,
+      attempt, hasEval, hasGrammar, hasTransitions, hasPrompt, hasDuplication,
     });
     await new Promise((r) => setTimeout(r, 5000));
   }
@@ -165,6 +174,7 @@ export async function synthesizeCoachForDraft(
     grammarAnalysis: data.grammarAnalysis || null,
     transitionAnalysis: data.transitionAnalysis || null,
     promptAnalysis: data.promptAnalysis || null,
+    duplicationAnalysis: data.duplicationAnalysis || null,
     previousCoachSynthesis,
     hasAssignmentPrompt,
   };

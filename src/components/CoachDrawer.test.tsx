@@ -51,6 +51,7 @@ const presentation = {
     grammar: { status: 'ready', issueCount: 1, isRecommended: false, statusMessage: null },
     transitions: { status: 'ready', issueCount: 3, isRecommended: false, statusMessage: null },
     prompt: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    duplication: { status: 'ready', issueCount: 0, isRecommended: false, statusMessage: null },
   },
   verdict: {
     phase: 'has_verdict',

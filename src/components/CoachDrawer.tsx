@@ -39,6 +39,7 @@ export default function CoachDrawer({ entity, presentation, editor, meta }: Prop
     'grammar' as ReportKey,
     'transitions' as ReportKey,
     ...(presentation.hasPrompt ? ['prompt'] as ReportKey[] : []),
+    'duplication' as ReportKey,
   ];
 
   return (

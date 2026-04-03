@@ -6,7 +6,7 @@ import { functions } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations, scoreTooltip } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, scoreLabel } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -15,6 +15,7 @@ import AnalysisPanel from '../components/AnalysisPanel';
 import AnnotatedEssay from '../components/AnnotatedEssay';
 import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
+import DuplicationView from '../components/DuplicationView';
 import PromptAnalysisView from '../components/PromptAnalysisView';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
@@ -29,12 +30,13 @@ import { useDraftEditor } from '../hooks/useDraftEditor';
 import { useAnalysisActions } from '../hooks/useAnalysisActions';
 import type { ActionKey } from '../hooks/useAnalysisActions';
 
-type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt';
+type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
   if (pathname.endsWith('/grammar')) return 'grammar';
   if (pathname.endsWith('/prompt')) return 'prompt';
+  if (pathname.endsWith('/duplication')) return 'duplication';
   if (pathname.endsWith('/overall')) return 'overall';
   return 'essay';
 }
@@ -121,7 +123,7 @@ export default function EssayPage() {
   // Orchestration: report selection (composes actions.ensure + navigation)
   const handleDrawerSelectReport = useCallback((key: ReportKey) => {
     const view = key as ViewMode;
-    if (view === 'transitions' || view === 'grammar' || view === 'prompt') {
+    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication') {
       actions.ensure(view as ActionKey);
       setActiveView(view);
     } else if (view === 'essay') {
@@ -273,11 +275,8 @@ export default function EssayPage() {
                   <div className="trait-popover" ref={popoverRef}>
                     <div className="trait-popover-header">
                       <strong>{TRAIT_LABELS[activeTrait]}</strong>
-                      <span
-                        style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}
-                        title={scoreTooltip(evaluation.traits[activeTrait].score)}
-                      >
-                        {evaluation.traits[activeTrait].score}/6
+                      <span style={{ color: scoreColor(evaluation.traits[activeTrait].score), fontWeight: 700 }}>
+                        {evaluation.traits[activeTrait].score}/6 {scoreLabel(evaluation.traits[activeTrait].score)}
                       </span>
                     </div>
                     <p className="trait-popover-text">{evaluation.traits[activeTrait].feedback}</p>
@@ -454,6 +453,22 @@ export default function EssayPage() {
           placeholder="Prompt analysis is loading..."
         >
           <PromptAnalysisView analysis={activeDraft.promptAnalysis!} />
+        </AnalysisPanel>
+      )}
+
+      {activeView === 'duplication' && (
+        <AnalysisPanel
+          data={activeDraft.duplicationAnalysis}
+          error={actions.errors.duplication}
+          loading={actions.loading.duplication}
+          status={activeDraft.duplicationStatus}
+          onRetry={() => { actions.ensure('duplication'); }}
+          onRerun={() => { actions.rerun('duplication'); }}
+          rerunLoading={actions.loading.duplication}
+          defaultMessage="Finding repeated ideas..."
+          placeholder="Duplication analysis is loading..."
+        >
+          <DuplicationView content={activeDraft.content} analysis={activeDraft.duplicationAnalysis!} />
         </AnalysisPanel>
       )}
 

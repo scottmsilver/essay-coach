@@ -39,10 +39,17 @@ export function scoreColor(score: number): string {
   return 'var(--color-green)';
 }
 
-export function scoreTooltip(score: number): string {
-  if (score <= 2) return '1-2: major problems';
-  if (score <= 4) return '3-4: developing / capable';
-  return '5-6: strong / clear';
+const SCORE_LABELS: Record<number, string> = {
+  1: 'Beginning',
+  2: 'Emerging',
+  3: 'Developing',
+  4: 'Capable',
+  5: 'Strong',
+  6: 'Exceptional',
+};
+
+export function scoreLabel(score: number): string {
+  return SCORE_LABELS[score] ?? '';
 }
 
 export function relativeTime(date: Date): string {

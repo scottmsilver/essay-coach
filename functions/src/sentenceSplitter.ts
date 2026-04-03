@@ -30,7 +30,7 @@ async function splitOneParagraph(
   const result = await ai.models.generateContent({
     model: 'gemini-3.1-flash-lite-preview',
     contents: `Split this paragraph into its individual sentences. Return ONLY a JSON array of sentence strings. Preserve the exact original text of each sentence. Do not add, remove, or change any words.\n\n${paragraph}`,
-    config: { httpOptions: { timeout: 30_000 } },
+    config: { temperature: 0, httpOptions: { timeout: 30_000 } },
   });
 
   const text = (result.text ?? '').trim();

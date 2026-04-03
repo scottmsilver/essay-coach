@@ -165,13 +165,36 @@ export interface PromptAnalysis {
   };
 }
 
+// Duplication analysis types
+export interface DuplicationInstance {
+  quotedText: string;
+  paragraph: number;
+  recommendation: 'keep' | 'cut';
+}
+
+export interface DuplicationFinding {
+  idea: string;
+  severity: 'high' | 'medium';
+  instances: DuplicationInstance[];
+  comment: string;
+}
+
+export interface DuplicationAnalysis {
+  findings: DuplicationFinding[];
+  summary: {
+    totalDuplications: number;
+    uniqueIdeas: number;
+    overallComment: string;
+  };
+}
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -180,6 +203,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   grammar: 'Grammar',
   transitions: 'Transitions',
   prompt: 'Prompt Fit',
+  duplication: 'Duplication',
 };
 
 export interface ReportSummary {
@@ -211,6 +235,8 @@ export interface Draft {
   grammarStatus?: EvaluationStatus | null;
   promptAnalysis?: PromptAnalysis | null;
   promptStatus?: EvaluationStatus | null;
+  duplicationAnalysis?: DuplicationAnalysis | null;
+  duplicationStatus?: EvaluationStatus | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;

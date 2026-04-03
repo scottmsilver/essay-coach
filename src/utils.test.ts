@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { relativeTime, scoreColor, scoreLevel, scoreTooltip } from './utils';
+import { relativeTime, scoreColor, scoreLevel, scoreLabel } from './utils';
 
 describe('relativeTime', () => {
   afterEach(() => { vi.useRealTimers(); });
@@ -59,9 +59,12 @@ describe('score semantics', () => {
     expect(scoreColor(5)).toBe('var(--color-green)');
   });
 
-  it('maps scoreTooltip across the full bucket boundaries', () => {
-    expect(scoreTooltip(2)).toBe('1-2: major problems');
-    expect(scoreTooltip(4)).toBe('3-4: developing / capable');
-    expect(scoreTooltip(5)).toBe('5-6: strong / clear');
+  it('maps scoreLabel to per-score rubric names', () => {
+    expect(scoreLabel(1)).toBe('Beginning');
+    expect(scoreLabel(2)).toBe('Emerging');
+    expect(scoreLabel(3)).toBe('Developing');
+    expect(scoreLabel(4)).toBe('Capable');
+    expect(scoreLabel(5)).toBe('Strong');
+    expect(scoreLabel(6)).toBe('Exceptional');
   });
 });
