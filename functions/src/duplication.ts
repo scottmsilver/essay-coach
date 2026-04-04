@@ -7,7 +7,7 @@ import type { DuplicationAnalysis } from '../../shared/duplicationTypes';
 
 // ── System Prompt ────────────────────────────────────────────────────────
 
-const DUPLICATION_SYSTEM_PROMPT = `You are a writing coach helping high school students eliminate repetition in their essays. Your job is to find places where the same idea, argument, or claim appears more than once and help the student decide which version to keep.
+export const DUPLICATION_SYSTEM_PROMPT = `You are a writing coach helping high school students eliminate repetition in their essays. Your job is to find places where the same idea, argument, or claim appears more than once and help the student decide which version to keep.
 
 ## What counts as duplication
 - The same IDEA restated in different words (not the same exact phrase, but the same point)
@@ -66,7 +66,7 @@ const FINDING_SCHEMA = {
   required: ['idea', 'severity', 'instances', 'comment'],
 };
 
-const DUPLICATION_ANALYSIS_SCHEMA = {
+export const DUPLICATION_ANALYSIS_SCHEMA = {
   type: 'object' as const,
   properties: {
     findings: { type: 'array' as const, items: FINDING_SCHEMA },

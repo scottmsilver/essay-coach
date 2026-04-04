@@ -41,3 +41,8 @@ firebase-debug.log
 functions/lib/
 functions/.last-deploy-sha
 .gstack/
+
+# Eval framework datasets (generated, contain production data)
+eval/datasets/
+eval/node_modules/
+eval/dist/

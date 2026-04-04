@@ -9,6 +9,8 @@ import { analyzeDuplicationWithGemini } from './duplication';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
+import { megaAnalyze } from './megaAnalyze';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
@@ -38,7 +40,7 @@ function runIfNeeded(
 ) {
   const { data, draftRef, essayId, draftId, statusField, dataField, label, analyze } = opts;
 
-  if (!isActivelyProcessing(data[statusField]) && !data[dataField]) {
+  if (!data.megaInProgress && !isActivelyProcessing(data[statusField]) && !data[dataField]) {
     logger.info(`${label} not actively processing — trigger firing`, { essayId, draftId, status: data[statusField]?.stage });
     tasks.push(
       (async () => {
@@ -76,6 +78,129 @@ export const onDraftCreated = onDocumentCreated(
 
     const { uid, essayId, draftId } = event.params;
     const draftRef = snap.ref;
+
+    // ── Mega mode: single combined Gemini call ──────────────────────────
+    const db = getFirestore();
+    const megaConfig = await db.doc('config/megaPrompt').get();
+    if (megaConfig.exists && megaConfig.data()?.enabled) {
+      const megaModel = megaConfig.data()?.model || 'gemini-3.1-flash-lite-preview';
+
+      try {
+        // Mark mega in progress so fallback path doesn't also start
+        await draftRef.update({ megaInProgress: true });
+
+        // Set all status fields to thinking
+        await draftRef.update({
+          evaluationStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+          grammarStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+          transitionStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+          promptStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+          duplicationStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+          coachSynthesisStatus: { stage: 'thinking', message: 'Analyzing essay...' },
+        });
+
+        // Load essay metadata
+        const essayRef = draftRef.parent.parent!;
+        const essaySnap = await essayRef.get();
+        const essayData = essaySnap.data();
+        const assignmentPrompt = essayData?.assignmentPrompt || '';
+        const writingType = essayData?.writingType || 'argumentative';
+        const content = snap.data()!.content;
+        const draftNumber = snap.data()!.draftNumber || 1;
+
+        // Load previous evaluation for resubmissions
+        let previousEvaluation: Record<string, unknown> | null = null;
+        if (draftNumber > 1) {
+          const prevDrafts = await draftRef.parent
+            .where('draftNumber', '==', draftNumber - 1)
+            .limit(1)
+            .get();
+          previousEvaluation = prevDrafts.empty
+            ? null
+            : prevDrafts.docs[0].data().evaluation || null;
+        }
+
+        const result = await megaAnalyze({
+          apiKey: geminiApiKey.value(),
+          content,
+          assignmentPrompt,
+          writingType,
+          draftNumber,
+          previousEvaluation,
+          model: megaModel,
+          draftRef,
+        });
+
+        // Write all 6 analysis fields + clear all status fields
+        await draftRef.update({
+          evaluation: result.evaluation,
+          grammarAnalysis: result.grammarAnalysis,
+          transitionAnalysis: result.transitionAnalysis,
+          promptAnalysis: result.promptAnalysis,
+          duplicationAnalysis: result.duplicationAnalysis,
+          coachSynthesis: result.coachSynthesis,
+          evaluationStatus: null,
+          grammarStatus: null,
+          transitionStatus: null,
+          promptStatus: null,
+          duplicationStatus: null,
+          coachSynthesisStatus: null,
+          megaInProgress: null,
+        });
+
+        logger.info('Mega analysis complete', { uid, essayId, draftId, model: megaModel });
+        return; // Done — skip the entire existing parallel path
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error('Mega analysis failed, falling back to separate calls', { error: msg, uid, essayId, draftId });
+
+        // Retry once on SyntaxError
+        if (error instanceof SyntaxError) {
+          try {
+            const essayRef = draftRef.parent.parent!;
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data();
+
+            const result = await megaAnalyze({
+              apiKey: geminiApiKey.value(),
+              content: snap.data()!.content,
+              assignmentPrompt: essayData?.assignmentPrompt || '',
+              writingType: essayData?.writingType || 'argumentative',
+              draftNumber: snap.data()!.draftNumber || 1,
+              previousEvaluation: null,
+              model: megaConfig.data()?.model || 'gemini-3.1-flash-lite-preview',
+              draftRef,
+            });
+
+            await draftRef.update({
+              evaluation: result.evaluation,
+              grammarAnalysis: result.grammarAnalysis,
+              transitionAnalysis: result.transitionAnalysis,
+              promptAnalysis: result.promptAnalysis,
+              duplicationAnalysis: result.duplicationAnalysis,
+              coachSynthesis: result.coachSynthesis,
+              evaluationStatus: null, grammarStatus: null, transitionStatus: null,
+              promptStatus: null, duplicationStatus: null, coachSynthesisStatus: null,
+              megaInProgress: null,
+            });
+
+            logger.info('Mega analysis retry succeeded', { uid, essayId, draftId });
+            return;
+          } catch (retryError: unknown) {
+            logger.error('Mega analysis retry also failed', { error: retryError instanceof Error ? retryError.message : String(retryError) });
+          }
+        }
+
+        // Clear mega lock so fallback path can proceed
+        await draftRef.update({
+          megaInProgress: null,
+          evaluationStatus: null, grammarStatus: null, transitionStatus: null,
+          promptStatus: null, duplicationStatus: null, coachSynthesisStatus: null,
+        });
+        // Fall through to existing parallel dispatch below
+      }
+    }
+    // ── End mega mode guard ─────────────────────────────────────────────
 
     // Wait 5 seconds to give the client time to start analyses
     await new Promise((r) => setTimeout(r, 5000));

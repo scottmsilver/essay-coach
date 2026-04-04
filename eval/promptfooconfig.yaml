@@ -1,0 +1,29 @@
+description: Essay Grader Model Evaluation
+providers:
+- id: file://providers/gemini-essay-grader.ts
+  label: gemini-3.1-pro-preview (incumbent)
+  config:
+    model: gemini-3.1-pro-preview
+- id: file://providers/gemini-essay-grader.ts
+  label: gemini-3.1-flash-lite-preview (challenger)
+  config:
+    model: gemini-3.1-flash-lite-preview
+prompts:
+- 'Evaluate this essay: {{content}}'
+tests: file://tests.ts
+defaultTest:
+  options:
+    provider:
+      anthropic:
+        modelName: claude-sonnet-4-6
+  assert:
+  - type: is-json
+  - type: javascript
+    value: "const evaluation = JSON.parse(output);\nconst traits = ['ideas', 'organization', 'voice', 'wordChoice', 'sentenceFluency',\
+      \ 'conventions', 'presentation'];\nconst errors = [];\n\nfor (const t of traits) {\n  if (!evaluation.traits?.[t]) {\n\
+      \    errors.push(`Missing trait: ${t}`);\n    continue;\n  }\n  const trait = evaluation.traits[t];\n\n  if (!Number.isInteger(trait.score)\
+      \ || trait.score < 1 || trait.score > 6) {\n    errors.push(`${t}: score ${trait.score} not integer 1-6`);\n  }\n\n\
+      \  if (!Array.isArray(trait.annotations)) {\n    errors.push(`${t}: annotations not an array`);\n  }\n}\n\nif (typeof\
+      \ evaluation.overallFeedback !== 'string') errors.push('Missing overallFeedback');\nif (!Array.isArray(evaluation.revisionPlan))\
+      \ errors.push('Missing revisionPlan');\n\nreturn {\n  pass: errors.length === 0,\n  score: 1 - (errors.length / 20),\n\
+      \  reason: errors.length === 0 ? 'Schema valid' : errors.join('; '),\n};\n"

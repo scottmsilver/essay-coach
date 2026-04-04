@@ -2,7 +2,7 @@ import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { splitSentences, splitParagraphs, splitSentencesAI } from './sentenceSplitter';
 
-const TRANSITION_SYSTEM_PROMPT = `You are an expert writing coach specializing in essay structure and flow. Your job is to analyze EVERY transition in a student's essay — between consecutive sentences and between paragraphs.
+export const TRANSITION_SYSTEM_PROMPT = `You are an expert writing coach specializing in essay structure and flow. Your job is to analyze EVERY transition in a student's essay — between consecutive sentences and between paragraphs.
 
 A "transition" is the seam between two adjacent units of text. Good transitions create flow; weak or missing transitions make writing feel choppy or disconnected.
 
@@ -39,7 +39,7 @@ Be specific about WHAT is weak and WHY, then ask a guiding question.
 
 For smooth transitions, briefly explain WHY it works so the student can replicate the technique elsewhere.`;
 
-const TRANSITION_SCHEMA = {
+export const TRANSITION_SCHEMA = {
   type: 'object' as const,
   properties: {
     sentenceTransitions: {

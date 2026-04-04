@@ -4,7 +4,7 @@ import type { DocumentReference } from 'firebase-admin/firestore';
 
 const MODEL = 'gemini-2.0-flash-lite';
 
-const COACH_SYNTHESIS_SYSTEM = `You are a writing coach summarizing the state of a student's essay revision. You receive analysis data from multiple reports (grammar, transitions, prompt adherence, trait evaluation) and produce a concise coaching synthesis.
+export const COACH_SYNTHESIS_SYSTEM = `You are a writing coach summarizing the state of a student's essay revision. You receive analysis data from multiple reports (grammar, transitions, prompt adherence, trait evaluation) and produce a concise coaching synthesis.
 
 Your job:
 1. Count issues in each report area
@@ -29,7 +29,7 @@ RULES:
 - Be honest. If the essay has problems, say so warmly but clearly.
 - The coach note should sound like a real teacher, not a bot. Reference specific things about the essay.`;
 
-const COACH_SYNTHESIS_SCHEMA = {
+export const COACH_SYNTHESIS_SCHEMA = {
   type: 'object' as const,
   properties: {
     readiness: {

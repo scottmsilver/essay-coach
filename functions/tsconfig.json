@@ -10,7 +10,8 @@
     "target": "es2022",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "declaration": true
   },
   "compileOnSave": true,
   "include": [

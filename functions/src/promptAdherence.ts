@@ -7,7 +7,7 @@ import type { PromptAnalysis } from '../../shared/promptTypes';
 
 // ── System Prompt ────────────────────────────────────────────────────────
 
-const PROMPT_ADHERENCE_SYSTEM_PROMPT = `You are an expert writing coach who analyzes whether a student's essay addresses all parts of an assignment prompt. Your job is to build a structured map of the prompt's requirements and show which ones the essay fulfills.
+export const PROMPT_ADHERENCE_SYSTEM_PROMPT = `You are an expert writing coach who analyzes whether a student's essay addresses all parts of an assignment prompt. Your job is to build a structured map of the prompt's requirements and show which ones the essay fulfills.
 
 ## Matrix Construction
 
@@ -76,7 +76,7 @@ const MATRIX_CELL_SCHEMA = {
   required: ['status', 'evidence', 'comment'],
 };
 
-const PROMPT_ANALYSIS_SCHEMA = {
+export const PROMPT_ANALYSIS_SCHEMA = {
   type: 'object' as const,
   properties: {
     matrix: {

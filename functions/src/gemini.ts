@@ -2,7 +2,7 @@ import { SYSTEM_PROMPT } from './prompt';
 import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
-const EVALUATION_SCHEMA = {
+export const EVALUATION_SCHEMA = {
   type: 'object' as const,
   properties: {
     traits: {
@@ -55,6 +55,7 @@ export async function evaluateWithGemini(
   apiKey: string,
   userPrompt: string,
   progressRef?: DocumentReference,
+  model?: string,
 ): Promise<Record<string, unknown>> {
   const outputText = await streamGeminiJson({
     apiKey,
@@ -64,6 +65,7 @@ export async function evaluateWithGemini(
     progressRef,
     statusField: 'evaluationStatus',
     generatingMessage: 'Writing feedback...',
+    model,
   });
 
   return JSON.parse(outputText);

@@ -1,0 +1,49 @@
+{
+  "description": "Best known config: Flash Lite for eval+dup+coach, Pro for grammar/transitions/prompt",
+  "analyses": {
+    "evaluation": {
+      "model": "gemini-3.1-flash-lite-preview",
+      "v3Boost": true
+    },
+    "grammar": {
+      "model": "gemini-3.1-pro-preview",
+      "v3Boost": false
+    },
+    "transitions": {
+      "model": "gemini-3.1-pro-preview",
+      "v3Boost": false
+    },
+    "promptAdherence": {
+      "model": "gemini-3.1-pro-preview",
+      "v3Boost": false
+    },
+    "duplication": {
+      "model": "gemini-3.1-flash-lite-preview",
+      "v3Boost": false
+    },
+    "coachSynthesis": {
+      "model": "gemini-3.1-flash-lite-preview",
+      "v3Boost": false
+    }
+  },
+  "groups": [
+    [
+      "evaluation"
+    ],
+    [
+      "grammar"
+    ],
+    [
+      "transitions"
+    ],
+    [
+      "promptAdherence"
+    ],
+    [
+      "duplication"
+    ],
+    [
+      "coachSynthesis"
+    ]
+  ]
+}

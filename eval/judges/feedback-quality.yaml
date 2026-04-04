@@ -1,0 +1,19 @@
+prompt: "You are evaluating the quality of essay feedback produced by an AI writing coach.\nYou will see the student's essay,\
+  \ a specific writing trait being evaluated, and the\nAI coach's feedback and annotations for that trait.\n\nRate the feedback\
+  \ on these three dimensions, each scored 1-5:\n\n## Specificity (applies to the feedback text)\nDoes the feedback reference\
+  \ concrete details from this specific essay?\n- 1: Completely generic, could apply to any essay (\"Your thesis is weak\"\
+  )\n- 3: References the essay's topic but not specific passages or details\n- 5: Points to exact passages, quotes, or structural\
+  \ elements (\"Your thesis claims X but paragraph 2 shifts to Y without connecting them\")\n\n## Actionability (applies to\
+  \ the feedback text and revision suggestions)\nCan the student act on this feedback without being told what to write?\n\
+  - 1: Vague encouragement or criticism with no direction (\"Try harder\", \"Needs work\")\n- 3: Identifies what to improve\
+  \ but not how (\"Add more evidence\")\n- 5: Gives a clear, specific next step the student can take (\"Find three places\
+  \ where you make a claim and add a specific statistic or quote to support each one\")\n\n## Socratic Tone (applies ONLY\
+  \ to the annotations array)\nDo the annotations guide through questions rather than dictate or rewrite?\n- 1: Rewrites the\
+  \ student's text or provides replacement sentences\n- 3: Identifies problems but tells rather than asks (\"This is too vague\"\
+  )\n- 5: Asks questions that lead the student to discover the issue (\"If a skeptic challenged this claim, what specific\
+  \ evidence would you point to?\")\n\nNote on feedback tone: The coaching system uses different tones for different score\n\
+  levels (collegial for scores 5-6, coaching for 3, supportive for 1-2). Do NOT penalize\nappropriate tone variation. Only\
+  \ judge the three dimensions above.\n\n---\n\nESSAY:\n{{essay_content}}\n\nTRAIT: {{trait_name}}\n\nFEEDBACK: {{feedback_text}}\n\
+  \nANNOTATIONS:\n{{annotations_json}}\n\n---\n\nRespond with a JSON object:\n{\n  \"specificity\": { \"score\": <1-5>, \"\
+  rationale\": \"<one sentence>\" },\n  \"actionability\": { \"score\": <1-5>, \"rationale\": \"<one sentence>\" },\n  \"\
+  socratic_tone\": { \"score\": <1-5>, \"rationale\": \"<one sentence>\" }\n}\n"
