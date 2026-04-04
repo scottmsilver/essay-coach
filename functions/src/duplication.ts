@@ -1,29 +1,9 @@
 import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
-// ── Types ────────────────────────────────────────────────────────────────
-
-export interface DuplicationInstance {
-  quotedText: string;
-  paragraph: number;
-  recommendation: 'keep' | 'cut';
-}
-
-export interface DuplicationFinding {
-  idea: string;
-  severity: 'high' | 'medium';
-  instances: DuplicationInstance[];
-  comment: string;
-}
-
-export interface DuplicationAnalysis {
-  findings: DuplicationFinding[];
-  summary: {
-    totalDuplications: number;
-    uniqueIdeas: number;
-    overallComment: string;
-  };
-}
+// ── Types (canonical definitions in shared/duplicationTypes.ts) ──────────
+export type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis } from '../../shared/duplicationTypes';
+import type { DuplicationAnalysis } from '../../shared/duplicationTypes';
 
 // ── System Prompt ────────────────────────────────────────────────────────
 
@@ -105,6 +85,10 @@ const DUPLICATION_ANALYSIS_SCHEMA = {
 
 // ── Analysis Function ────────────────────────────────────────────────────
 
+export function buildDuplicationPrompt(content: string): string {
+  return `Analyze this student essay for repeated ideas. Find places where the same argument, claim, or insight appears more than once.\n\n${content}`;
+}
+
 export async function analyzeDuplicationWithGemini(
   apiKey: string,
   content: string,
@@ -112,7 +96,7 @@ export async function analyzeDuplicationWithGemini(
 ): Promise<DuplicationAnalysis> {
   const json = await streamGeminiJson({
     apiKey,
-    contents: content,
+    contents: buildDuplicationPrompt(content),
     systemInstruction: DUPLICATION_SYSTEM_PROMPT,
     responseSchema: DUPLICATION_ANALYSIS_SCHEMA,
     progressRef,

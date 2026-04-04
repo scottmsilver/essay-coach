@@ -1,5 +1,5 @@
 import type { ReportKey } from '../types';
-import { REPORT_LABELS } from '../types';
+import { REPORT_KEYS, REPORT_LABELS } from '../types';
 import { relativeTime } from '../utils';
 import type { DraftEntity } from '../entities/draftEntity';
 import type { DraftPresentation, VerdictPhase } from '../entities/draftPresentation';
@@ -34,13 +34,9 @@ export default function CoachDrawer({ entity, presentation, editor, meta }: Prop
   const { activeReport, onSelectReport, draftOptions, onPickDraft, onReanalyze, reanalyzing, gdocChanged, gdocLastChecked } = meta;
   const isReady = verdict.coachReadiness === 'ready';
 
-  const reportKeys: ReportKey[] = [
-    'overall' as ReportKey,
-    'grammar' as ReportKey,
-    'transitions' as ReportKey,
-    ...(presentation.hasPrompt ? ['prompt'] as ReportKey[] : []),
-    'duplication' as ReportKey,
-  ];
+  const reportKeys = REPORT_KEYS.filter((k): k is Exclude<ReportKey, 'essay'> =>
+    k !== 'essay' && (k !== 'prompt' || presentation.hasPrompt)
+  );
 
   return (
     <div className="coach-drawer-inner">

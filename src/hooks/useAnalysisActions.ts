@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc } from 'firebase/firestore';
-import { functions, db } from '../firebase';
+import { functions } from '../firebase';
 import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
+import { clearAnalysis } from '../utils/draftFirestore';
 import type { DraftEntity } from '../entities/draftEntity';
 
 export type ActionKey = 'grammar' | 'transitions' | 'prompt' | 'duplication';
@@ -67,8 +67,7 @@ export function useAnalysisActions(
     if (!entity || !user || !essayId) return;
     const config = ANALYSIS_CONFIG[key];
     const uid = ownerUid ?? user.uid;
-    const draftRef = doc(db, `users/${uid}/essays/${essayId}/drafts/${entity.raw.id}`);
-    await updateDoc(draftRef, { [config.dataField]: null, [config.statusField]: null });
+    await clearAnalysis(uid, essayId, entity.raw.id, config.dataField, config.statusField);
     await run(key);
   }, [entity, user, essayId, ownerUid, run]);
 

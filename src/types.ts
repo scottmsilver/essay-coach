@@ -64,129 +64,17 @@ export type { SentenceTransition, ParagraphTransition, TransitionAnalysis };
 import type { DocSource } from '../shared/gdocTypes';
 export type { DocSource };
 
-// Grammar analysis types
-export interface GrammarIssue {
-  sentence: string;
-  quotedText: string;
-  comment: string;
-  severity: 'error' | 'warning' | 'pattern';
-}
+// Grammar analysis types — canonical definitions in shared/grammarTypes.ts
+import type { GrammarIssue, GrammarIssueCategory, GrammarAnalysis } from '../shared/grammarTypes';
+export type { GrammarIssue, GrammarIssueCategory, GrammarAnalysis };
 
-export interface GrammarIssueCategory {
-  locations: GrammarIssue[];
-}
+// Prompt adherence analysis types — canonical definitions in shared/promptTypes.ts
+import type { MatrixCell, MatrixRow, PromptMatrix, PromptQuestion, PromptAnalysis } from '../shared/promptTypes';
+export type { MatrixCell, MatrixRow, PromptMatrix, PromptQuestion, PromptAnalysis };
 
-export interface GrammarAnalysis {
-  commaSplices: GrammarIssueCategory;
-  runOnSentences: GrammarIssueCategory;
-  fragments: GrammarIssueCategory;
-  subjectVerbAgreement: GrammarIssueCategory;
-  pronounReference: GrammarIssueCategory;
-  verbTenseConsistency: GrammarIssueCategory;
-  parallelStructure: GrammarIssueCategory;
-  punctuationErrors: GrammarIssueCategory;
-  missingCommas: GrammarIssueCategory;
-  sentenceVariety: {
-    avgLength: number;
-    distribution: {
-      simple: number;
-      compound: number;
-      complex: number;
-      compoundComplex: number;
-    };
-    comment: string;
-  };
-  activePassiveVoice: {
-    activeCount: number;
-    passiveCount: number;
-    passiveInstances: { quotedText: string; comment: string }[];
-  };
-  modifierPlacement: {
-    issues: { quotedText: string; comment: string }[];
-  };
-  wordiness: {
-    instances: { quotedText: string; comment: string }[];
-  };
-  summary: {
-    totalErrors: number;
-    errorsByCategory: {
-      commaSplices: number;
-      runOnSentences: number;
-      fragments: number;
-      subjectVerbAgreement: number;
-      pronounReference: number;
-      verbTenseConsistency: number;
-      parallelStructure: number;
-      punctuationErrors: number;
-      missingCommas: number;
-    };
-    overallComment: string;
-    strengthAreas: string[];
-    priorityFixes: string[];
-  };
-}
-
-// Prompt adherence analysis types
-export interface MatrixCell {
-  status: 'filled' | 'partial' | 'empty';
-  evidence: string[];
-  comment: string;
-}
-
-export interface MatrixRow {
-  label: string;
-  cells: MatrixCell[];
-}
-
-export interface PromptMatrix {
-  description: string;
-  rowLabel: string;
-  columnLabel: string;
-  rows: MatrixRow[];
-  columns: string[];
-}
-
-export interface PromptQuestion {
-  questionText: string;
-  addressed: boolean;
-  evidence: string;
-  comment: string;
-}
-
-export interface PromptAnalysis {
-  matrix: PromptMatrix;
-  questions: PromptQuestion[];
-  summary: {
-    totalCells: number;
-    filledCells: number;
-    partialCells: number;
-    emptyCells: number;
-    overallComment: string;
-  };
-}
-
-// Duplication analysis types
-export interface DuplicationInstance {
-  quotedText: string;
-  paragraph: number;
-  recommendation: 'keep' | 'cut';
-}
-
-export interface DuplicationFinding {
-  idea: string;
-  severity: 'high' | 'medium';
-  instances: DuplicationInstance[];
-  comment: string;
-}
-
-export interface DuplicationAnalysis {
-  findings: DuplicationFinding[];
-  summary: {
-    totalDuplications: number;
-    uniqueIdeas: number;
-    overallComment: string;
-  };
-}
+// Duplication analysis types — canonical definitions in shared/duplicationTypes.ts
+import type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis } from '../shared/duplicationTypes';
+export type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis };
 
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';

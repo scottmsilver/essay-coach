@@ -1,6 +1,7 @@
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
+import type { DocumentReference } from 'firebase-admin/firestore';
 import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
 import { analyzePromptWithGemini } from './promptAdherence';
@@ -15,6 +16,46 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 function isActivelyProcessing(status: { stage: string } | null | undefined): boolean {
   if (!status) return false;
   return status.stage === 'thinking' || status.stage === 'generating';
+}
+
+/**
+ * DRY helper: run an analysis if the client hasn't started it.
+ * Handles the check → log → try/catch → Firestore update pattern
+ * that all simple analyses share.
+ */
+function runIfNeeded(
+  tasks: Promise<void>[],
+  opts: {
+    data: FirebaseFirestore.DocumentData;
+    draftRef: DocumentReference;
+    essayId: string;
+    draftId: string;
+    statusField: string;
+    dataField: string;
+    label: string;
+    analyze: () => Promise<unknown>;
+  },
+) {
+  const { data, draftRef, essayId, draftId, statusField, dataField, label, analyze } = opts;
+
+  if (!isActivelyProcessing(data[statusField]) && !data[dataField]) {
+    logger.info(`${label} not actively processing — trigger firing`, { essayId, draftId, status: data[statusField]?.stage });
+    tasks.push(
+      (async () => {
+        try {
+          const analysis = await analyze();
+          await draftRef.update({ [dataField]: analysis, [statusField]: null });
+          logger.info(`Trigger ${label} analysis complete`, { essayId, draftId });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger.error(`Trigger ${label} analysis failed`, { error: msg, essayId, draftId });
+          await draftRef.update({ [statusField]: { stage: 'error', message: 'Analysis failed' } });
+        }
+      })()
+    );
+  } else {
+    logger.info(`${label} already processing or complete, skipping`, { essayId, draftId });
+  }
 }
 
 /**
@@ -55,71 +96,46 @@ export const onDraftCreated = onDocumentCreated(
 
     const apiKey = geminiApiKey.value();
     const tasks: Promise<void>[] = [];
+    const shared = { data, draftRef, essayId, draftId };
 
-    // Grammar: fire if client didn't start (absent or still 'pending')
-    if (!isActivelyProcessing(data.grammarStatus) && !data.grammarAnalysis) {
-      logger.info('Grammar not actively processing — trigger firing', { essayId, draftId, status: data.grammarStatus?.stage });
-      tasks.push(
-        (async () => {
-          try {
-            const analysis = await analyzeGrammarWithGemini(apiKey, content, draftRef);
-            await draftRef.update({ grammarAnalysis: analysis, grammarStatus: null });
-            logger.info('Trigger grammar analysis complete', { essayId, draftId });
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error);
-            logger.error('Trigger grammar analysis failed', { error: msg, essayId, draftId });
-            await draftRef.update({ grammarStatus: { stage: 'error', message: 'Analysis failed' } });
-          }
-        })()
-      );
-    } else {
-      logger.info('Grammar already processing or complete, skipping', { essayId, draftId });
-    }
+    // Simple analyses: all follow the same pattern
+    runIfNeeded(tasks, {
+      ...shared, label: 'Grammar',
+      statusField: 'grammarStatus', dataField: 'grammarAnalysis',
+      analyze: () => analyzeGrammarWithGemini(apiKey, content, draftRef),
+    });
 
-    // Transitions: fire if client didn't start (absent or still 'pending')
-    if (!isActivelyProcessing(data.transitionStatus) && !data.transitionAnalysis) {
-      logger.info('Transitions not actively processing — trigger firing', { essayId, draftId, status: data.transitionStatus?.stage });
-      tasks.push(
-        (async () => {
-          try {
-            const analysis = await analyzeTransitionsWithGemini(apiKey, content, draftRef, data.transitionAnalysis || null);
-            await draftRef.update({ transitionAnalysis: analysis, transitionStatus: null });
-            logger.info('Trigger transition analysis complete', { essayId, draftId });
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error);
-            logger.error('Trigger transition analysis failed', { error: msg, essayId, draftId });
-            await draftRef.update({ transitionStatus: { stage: 'error', message: 'Analysis failed' } });
-          }
-        })()
-      );
-    } else {
-      logger.info('Transitions already processing or complete, skipping', { essayId, draftId });
-    }
+    runIfNeeded(tasks, {
+      ...shared, label: 'Transitions',
+      statusField: 'transitionStatus', dataField: 'transitionAnalysis',
+      analyze: () => analyzeTransitionsWithGemini(apiKey, content, draftRef, data.transitionAnalysis || null),
+    });
 
-    // Evaluation: fire if client didn't start (absent or still 'pending')
+    runIfNeeded(tasks, {
+      ...shared, label: 'Duplication',
+      statusField: 'duplicationStatus', dataField: 'duplicationAnalysis',
+      analyze: () => analyzeDuplicationWithGemini(apiKey, content, draftRef),
+    });
+
+    // Evaluation: special case (needs essay data for prompt building)
     if (!isActivelyProcessing(data.evaluationStatus) && !data.evaluation) {
       logger.info('Evaluation not actively processing — trigger firing', { essayId, draftId, status: data.evaluationStatus?.stage });
       tasks.push(
         (async () => {
           try {
-            // Get essay data for prompt building
             const essayRef = draftRef.parent.parent!;
             const essaySnap = await essayRef.get();
             const essayData = essaySnap.data();
             const assignmentPrompt = essayData?.assignmentPrompt || '';
             const writingType = essayData?.writingType || 'argumentative';
 
-            // Check if this is a resubmission (draftNumber > 1)
             let prompt: string;
             if (data.draftNumber > 1) {
-              // Try to get previous draft's evaluation for resubmission prompt
               const draftsSnap = await draftRef.parent.where('draftNumber', '==', data.draftNumber - 1).limit(1).get();
               const prevEval = draftsSnap.docs[0]?.data()?.evaluation;
-              if (prevEval) {
-                prompt = buildResubmissionPrompt({ assignmentPrompt, writingType, content, previousEvaluation: prevEval });
-              } else {
-                prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
-              }
+              prompt = prevEval
+                ? buildResubmissionPrompt({ assignmentPrompt, writingType, content, previousEvaluation: prevEval })
+                : buildEvaluationPrompt({ assignmentPrompt, writingType, content });
             } else {
               prompt = buildEvaluationPrompt({ assignmentPrompt, writingType, content });
             }
@@ -138,9 +154,8 @@ export const onDraftCreated = onDocumentCreated(
       logger.info('Evaluation already processing or complete, skipping', { essayId, draftId });
     }
 
-    // Prompt adherence: fire if client didn't start and essay has an assignmentPrompt
+    // Prompt adherence: special case (conditional on assignment prompt existing)
     if (!isActivelyProcessing(data.promptStatus) && !data.promptAnalysis) {
-      // Read the essay doc to check for assignmentPrompt
       const essayRef = draftRef.parent.parent!;
       const essaySnap = await essayRef.get();
       const assignmentPrompt = essaySnap.data()?.assignmentPrompt;
@@ -165,26 +180,6 @@ export const onDraftCreated = onDocumentCreated(
       }
     } else {
       logger.info('Prompt adherence already processing or complete, skipping', { essayId, draftId });
-    }
-
-    // Duplication: fire if client didn't start
-    if (!isActivelyProcessing(data.duplicationStatus) && !data.duplicationAnalysis) {
-      logger.info('Duplication not actively processing — trigger firing', { essayId, draftId, status: data.duplicationStatus?.stage });
-      tasks.push(
-        (async () => {
-          try {
-            const analysis = await analyzeDuplicationWithGemini(apiKey, content, draftRef);
-            await draftRef.update({ duplicationAnalysis: analysis, duplicationStatus: null });
-            logger.info('Trigger duplication analysis complete', { essayId, draftId });
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error);
-            logger.error('Trigger duplication analysis failed', { error: msg, essayId, draftId });
-            await draftRef.update({ duplicationStatus: { stage: 'error', message: 'Analysis failed' } });
-          }
-        })()
-      );
-    } else {
-      logger.info('Duplication already processing or complete, skipping', { essayId, draftId });
     }
 
     if (tasks.length > 0) {

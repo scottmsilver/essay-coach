@@ -1,5 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useRef } from 'react';
 import type { DuplicationAnalysis, DuplicationFinding } from '../types';
+import { useActiveMarker } from '../hooks/useActiveMarker';
+import { useCommentLayout } from '../hooks/useCommentLayout';
 
 interface Props {
   content: string;
@@ -9,6 +11,7 @@ interface Props {
 interface MarkRange {
   start: number;
   end: number;
+  id: string;
   findingIndex: number;
   recommendation: 'keep' | 'cut';
 }
@@ -16,33 +19,38 @@ interface MarkRange {
 function buildMarks(content: string, findings: DuplicationFinding[]): MarkRange[] {
   const marks: MarkRange[] = [];
   for (let fi = 0; fi < findings.length; fi++) {
-    for (const inst of findings[fi].instances) {
+    for (let ii = 0; ii < findings[fi].instances.length; ii++) {
+      const inst = findings[fi].instances[ii];
       const idx = content.indexOf(inst.quotedText);
       if (idx >= 0) {
         marks.push({
           start: idx,
           end: idx + inst.quotedText.length,
+          id: `dup-${fi}-${ii}`,
           findingIndex: fi,
           recommendation: inst.recommendation,
         });
       }
     }
   }
-  // Sort by start position, no overlaps expected
   marks.sort((a, b) => a.start - b.start);
   return marks;
 }
 
 export default function DuplicationView({ content, analysis }: Props) {
-  const [activeGroup, setActiveGroup] = useState<number | null>(null);
+  const essayRef = useRef<HTMLDivElement>(null);
+  const [activeId, handleMarkClick] = useActiveMarker(essayRef);
 
   const marks = useMemo(() => buildMarks(content, analysis.findings), [content, analysis.findings]);
 
-  const handleMarkClick = useCallback((findingIndex: number) => {
-    setActiveGroup((prev) => (prev === findingIndex ? null : findingIndex));
-  }, []);
+  // Which finding is active (derived from activeId)
+  const activeFinding = useMemo(() => {
+    if (!activeId) return null;
+    const mark = marks.find(m => m.id === activeId);
+    return mark ? mark.findingIndex : null;
+  }, [activeId, marks]);
 
-  // Build essay text with highlighted spans
+  // Build highlighted essay elements using the same cursor-walk pattern as GrammarView
   const essayElements = useMemo(() => {
     const elements: React.ReactNode[] = [];
     let cursor = 0;
@@ -50,17 +58,23 @@ export default function DuplicationView({ content, analysis }: Props) {
     for (const mark of marks) {
       if (mark.start < cursor) continue;
 
-      // Text before this mark
       if (mark.start > cursor) {
-        elements.push(<span key={`t-${cursor}`}>{content.slice(cursor, mark.start)}</span>);
+        const text = content.slice(cursor, mark.start);
+        // Convert double newlines to <br/> pairs (same approach as GrammarView)
+        const parts = text.split('\n\n');
+        for (let i = 0; i < parts.length; i++) {
+          if (i > 0) elements.push(<br key={`br1-${cursor}-${i}`} />, <br key={`br2-${cursor}-${i}`} />);
+          if (parts[i]) elements.push(<span key={`t-${cursor}-${i}`}>{parts[i]}</span>);
+        }
       }
 
-      const isActive = activeGroup === mark.findingIndex;
+      const isActive = activeFinding === mark.findingIndex;
       elements.push(
         <span
-          key={`m-${mark.start}`}
+          key={mark.id}
+          data-dup-id={mark.id}
           className={`dup-mark ${mark.recommendation} ${isActive ? 'active' : ''}`}
-          onClick={() => handleMarkClick(mark.findingIndex)}
+          onClick={() => handleMarkClick(mark.id)}
         >
           {content.slice(mark.start, mark.end)}
         </span>,
@@ -70,38 +84,18 @@ export default function DuplicationView({ content, analysis }: Props) {
     }
 
     if (cursor < content.length) {
-      elements.push(<span key={`t-${cursor}`}>{content.slice(cursor)}</span>);
+      const text = content.slice(cursor);
+      const parts = text.split('\n\n');
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) elements.push(<br key={`bre1-${cursor}-${i}`} />, <br key={`bre2-${cursor}-${i}`} />);
+        if (parts[i]) elements.push(<span key={`te-${cursor}-${i}`}>{parts[i]}</span>);
+      }
     }
 
     return elements;
-  }, [content, marks, activeGroup, handleMarkClick]);
+  }, [content, marks, activeFinding, handleMarkClick]);
 
-  // Split essay into paragraphs for rendering
-  const paragraphs = useMemo(() => {
-    const result: React.ReactNode[][] = [[]];
-    for (const el of essayElements) {
-      if (typeof el === 'string') {
-        // Shouldn't happen since we wrap in spans, but handle it
-        result[result.length - 1].push(el);
-      } else if (el && typeof el === 'object' && 'props' in el) {
-        const text = (el as React.ReactElement<{ children: string }>).props.children;
-        if (typeof text === 'string' && text.includes('\n\n')) {
-          const parts = text.split('\n\n');
-          for (let i = 0; i < parts.length; i++) {
-            if (i > 0) result.push([]);
-            if (parts[i]) {
-              result[result.length - 1].push(
-                <span key={`p-${result.length}-${i}`}>{parts[i]}</span>,
-              );
-            }
-          }
-        } else {
-          result[result.length - 1].push(el);
-        }
-      }
-    }
-    return result;
-  }, [essayElements]);
+  const commentPositions = useCommentLayout(essayRef, marks, 'data-dup-id', activeId);
 
   return (
     <div className="duplication-view">
@@ -110,14 +104,10 @@ export default function DuplicationView({ content, analysis }: Props) {
         <div className="analysis-summary-bar">
           {analysis.summary.totalDuplications > 0 ? (
             <>
-              <div
-                className="dup-bar-segment duplicated"
-                style={{ width: `${(analysis.summary.totalDuplications / (analysis.summary.totalDuplications + analysis.summary.uniqueIdeas)) * 100}%` }}
-              />
-              <div
-                className="dup-bar-segment unique"
-                style={{ width: `${(analysis.summary.uniqueIdeas / (analysis.summary.totalDuplications + analysis.summary.uniqueIdeas)) * 100}%` }}
-              />
+              <div className="dup-bar-segment duplicated"
+                style={{ width: `${(analysis.summary.totalDuplications / (analysis.summary.totalDuplications + analysis.summary.uniqueIdeas)) * 100}%` }} />
+              <div className="dup-bar-segment unique"
+                style={{ width: `${(analysis.summary.uniqueIdeas / (analysis.summary.totalDuplications + analysis.summary.uniqueIdeas)) * 100}%` }} />
             </>
           ) : (
             <div className="dup-bar-segment unique" style={{ width: '100%' }} />
@@ -138,48 +128,52 @@ export default function DuplicationView({ content, analysis }: Props) {
         <div className="analysis-summary-text">{analysis.summary.overallComment}</div>
       </div>
 
-      {/* Essay + sidebar layout */}
+      {/* Essay + sidebar */}
       <div className="dup-layout">
-        {/* Essay text with highlights */}
-        <div className="dup-essay">
-          <div className="essay-text">
-            {paragraphs.map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
-          </div>
+        <div className="dup-essay" ref={essayRef}>
+          <div className="essay-text">{essayElements}</div>
         </div>
 
-        {/* Sidebar comments */}
         <div className="dup-sidebar">
-          {analysis.findings.map((finding, fi) => (
-            <div
-              key={fi}
-              className={`sidebar-comment ${activeGroup === fi ? 'active' : ''}`}
-              style={{
-                borderLeft: activeGroup === fi ? '3px solid var(--color-yellow)' : undefined,
-                background: activeGroup === fi ? 'rgba(180, 83, 9, 0.04)' : undefined,
-              }}
-              onClick={() => handleMarkClick(fi)}
-            >
-              <span className={`dup-severity-tag ${finding.severity}`}>
-                {finding.severity}
-              </span>
-              <div className="dup-finding-title">{finding.idea}</div>
+          {analysis.findings.map((finding, fi) => {
+            const isActive = activeFinding === fi;
+            // Position from useCommentLayout (first mark for this finding)
+            const firstMark = marks.find(m => m.findingIndex === fi);
+            const pos = firstMark ? commentPositions[firstMark.id] : undefined;
 
-              {finding.instances.map((inst, ii) => (
-                <div key={ii} className="dup-instance">
-                  <div className={`dup-instance-label ${inst.recommendation}`}>
-                    {inst.recommendation === 'keep' ? '✓ Keep' : '✂ Cut'} (¶{inst.paragraph})
-                  </div>
-                  <div className={`dup-instance-quote ${inst.recommendation}`}>
-                    "{inst.quotedText.length > 80 ? inst.quotedText.slice(0, 80) + '...' : inst.quotedText}"
-                  </div>
-                </div>
-              ))}
+            return (
+              <div
+                key={fi}
+                className={`sidebar-comment ${isActive ? 'active' : ''}`}
+                style={{
+                  ...(pos != null ? { position: 'absolute' as const, top: pos } : {}),
+                  borderLeft: isActive ? '3px solid var(--color-yellow)' : '3px solid rgba(180, 83, 9, 0.3)',
+                  background: isActive ? 'rgba(180, 83, 9, 0.04)' : undefined,
+                }}
+                onClick={() => {
+                  if (firstMark) handleMarkClick(firstMark.id);
+                }}
+              >
+                <span className={`dup-severity-tag ${finding.severity}`}>
+                  {finding.severity}
+                </span>
+                <div className="dup-finding-title">{finding.idea}</div>
 
-              <div className="dup-coach-comment">{finding.comment}</div>
-            </div>
-          ))}
+                {finding.instances.map((inst, ii) => (
+                  <div key={ii} className="dup-instance">
+                    <div className={`dup-instance-label ${inst.recommendation}`}>
+                      {inst.recommendation === 'keep' ? '✓ Keep' : '✂ Cut'} (¶{inst.paragraph})
+                    </div>
+                    <div className={`dup-instance-quote ${inst.recommendation}`}>
+                      "{inst.quotedText.length > 80 ? inst.quotedText.slice(0, 80) + '...' : inst.quotedText}"
+                    </div>
+                  </div>
+                ))}
+
+                <div className="dup-coach-comment">{finding.comment}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
