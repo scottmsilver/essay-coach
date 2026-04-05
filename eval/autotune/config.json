@@ -1,5 +1,5 @@
 {
-  "description": "gemini-2.5-flash for grammar + gemini-2.5-pro for transitions",
+  "description": "2.5-flash for grammar+prompt, 2.5-pro for transitions, Flash Lite for eval+dup+coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -14,7 +14,7 @@
       "v3Boost": false
     },
     "promptAdherence": {
-      "model": "gemini-3.1-pro-preview",
+      "model": "gemini-2.5-flash",
       "v3Boost": false
     },
     "duplication": {
