@@ -1,5 +1,5 @@
 {
-  "description": "5 calls: eval+dup combined in Flash Lite, 2.5-flash gram+trans+prompt",
+  "description": "4 calls: eval+dup (Flash Lite), grammar+prompt (2.5-flash), transitions (2.5-flash), coach (Flash Lite)",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -32,13 +32,11 @@
       "duplication"
     ],
     [
-      "grammar"
+      "grammar",
+      "promptAdherence"
     ],
     [
       "transitions"
-    ],
-    [
-      "promptAdherence"
     ],
     [
       "coachSynthesis"
