@@ -2,42 +2,23 @@ import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { splitSentences, splitParagraphs, splitSentencesAI } from './sentenceSplitter';
 
-export const TRANSITION_SYSTEM_PROMPT = `You are an expert writing coach specializing in essay structure and flow. Your job is to analyze EVERY transition in a student's essay — between consecutive sentences and between paragraphs.
+export const TRANSITION_SYSTEM_PROMPT = `You analyze transitions between consecutive sentences and between paragraphs in student essays.
 
-A "transition" is the seam between two adjacent units of text. Good transitions create flow; weak or missing transitions make writing feel choppy or disconnected.
+Rate each transition:
+- smooth: natural, invisible flow
+- adequate: connected but could be stronger
+- weak: unclear, abrupt, or generic connector without real linking
+- missing: no discernible connection
 
-## What to look for
+Comments: use Socratic questions referencing specific text. Do NOT rewrite. 1-2 sentences max.
+For smooth transitions, briefly note WHY it works.`;
 
-**Sentence-to-sentence transitions (within a paragraph):**
-- Logical connectors (however, furthermore, therefore, similarly, in contrast)
-- Pronoun references that link back ("This approach...", "These findings...")
-- Repeated key terms or synonyms that create cohesion
-- Causal or temporal chains (because of this, after, as a result)
-- Whether the new sentence logically follows from the previous one
-- Abrupt topic shifts within a paragraph
-
-**Paragraph-to-paragraph transitions:**
-- Whether the opening sentence of the new paragraph connects to the closing idea of the previous one
-- Topic sentences that bridge concepts
-- Logical progression (from general to specific, from problem to solution, chronological)
-- Whether the reader can follow WHY you moved to this new paragraph
-
-## Rating scale
-
-- **smooth**: The transition feels natural and invisible. The reader flows from one idea to the next without friction.
-- **adequate**: There is a logical connection, but it could be stronger or more elegant.
-- **weak**: The connection exists but is unclear, abrupt, or relies on a generic transition word without real logical linking.
-- **missing**: There is no discernible connection. The reader has to work to understand why these two ideas are next to each other.
-
-## Feedback style
-
-Use Socratic questions to guide the student. Do NOT rewrite their text for them.
-- BAD: "Add 'Furthermore' at the beginning of this sentence."
-- GOOD: "What logical relationship connects this idea to the previous one? Once you know that, you can signal it to your reader."
-
-Be specific about WHAT is weak and WHY, then ask a guiding question.
-
-For smooth transitions, briefly explain WHY it works so the student can replicate the technique elsewhere.`;
+export const TRANS_COVERAGE_BOOST = `\n\n## EXHAUSTIVE COVERAGE REQUIREMENT
+You MUST produce one sentenceTransition entry for EVERY consecutive sentence pair in EVERY paragraph.
+If a paragraph has N sentences, you must produce exactly N-1 sentenceTransition entries for it.
+Do NOT skip any sentence pairs. Do NOT summarize multiple transitions into one entry.
+Count: ¶1 has sentences S1..Sn → produce n-1 entries (S1→S2, S2→S3, ..., S(n-1)→Sn).
+Repeat for every paragraph. Missing entries = FAILURE.`;
 
 export const TRANSITION_SCHEMA = {
   type: 'object' as const,
@@ -106,14 +87,14 @@ export function formatSentencesForPrompt(sentences: Record<string, string[]>): s
   const lines: string[] = [];
 
   for (let ki = 0; ki < keys.length; ki++) {
-    const pi = ki; // paragraph index (0-based)
+    const pi = ki + 1; // 1-based paragraph index
     const sents = sentences[keys[ki]];
     for (let si = 0; si < sents.length; si++) {
-      lines.push(`¶${pi + 1} S${si + 1}: "${sents[si]}"`);
+      lines.push(`${pi}.${si + 1} ${sents[si]}`);
     }
 
     if (ki < keys.length - 1) {
-      lines.push(`--- PARAGRAPH BREAK (¶${pi + 1} → ¶${pi + 2}) ---`);
+      lines.push('---');
     }
   }
 
@@ -121,15 +102,13 @@ export function formatSentencesForPrompt(sentences: Record<string, string[]>): s
 }
 
 export function buildTransitionPrompt(formatted: string): string {
-  return `Analyze every transition in this student essay. The essay has been split into numbered paragraphs (¶) and sentences (S) for your reference.
+  return `Analyze every transition in this essay. Format: P.S = paragraph.sentence number.
 
-Rate each sentence-to-sentence transition within each paragraph, and each paragraph-to-paragraph transition. Use the rating scale: smooth, adequate, weak, missing.
-
-Here is the essay:
+Rate each consecutive sentence pair and each paragraph break: smooth, adequate, weak, missing.
 
 ${formatted}
 
-Analyze EVERY transition point. Do not skip any.`;
+Analyze EVERY transition. Do not skip any.`;
 }
 
 /**
