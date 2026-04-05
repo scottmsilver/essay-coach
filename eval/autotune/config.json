@@ -1,5 +1,5 @@
 {
-  "description": "2.5-flash+v3Boost for transitions, gemma4 dup ($0), 2.5-flash gram+prompt, FL eval+coach",
+  "description": "2.5-flash+transBoost for transitions, gemma4 dup ($0), 2.5-flash gram+prompt, FL eval+coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -11,7 +11,8 @@
     },
     "transitions": {
       "model": "gemini-2.5-flash",
-      "v3Boost": true
+      "v3Boost": false,
+      "transBoost": true
     },
     "promptAdherence": {
       "model": "gemini-2.5-flash",

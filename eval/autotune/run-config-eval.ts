@@ -181,6 +181,14 @@ Name the specific craft move or error type. Check for factual errors and anachro
 Each annotation must end with a Socratic question referencing the student's actual words.
 Before finalizing: verify every feedback cites specific text and every annotation has a Socratic question.`;
 
+// Transition-specific coverage boost: ensures models produce a transition entry for EVERY pair
+const TRANS_COVERAGE_BOOST = `\n\n## EXHAUSTIVE COVERAGE REQUIREMENT
+You MUST produce one sentenceTransition entry for EVERY consecutive sentence pair in EVERY paragraph.
+If a paragraph has N sentences, you must produce exactly N-1 sentenceTransition entries for it.
+Do NOT skip any sentence pairs. Do NOT summarize multiple transitions into one entry.
+Count: ¶1 has sentences S1..Sn → produce n-1 entries (S1→S2, S2→S3, ..., S(n-1)→Sn).
+Repeat for every paragraph. Missing entries = FAILURE.`;
+
 const ANALYSIS_CONFIG: Record<string, { systemPrompt: string; schema: any; buildPrompt: (content: string, assignmentPrompt: string, writingType: string) => string }> = {
   evaluation: {
     systemPrompt: SYSTEM_PROMPT,
@@ -228,6 +236,7 @@ const FIELD_MAP: Record<string, string> = {
 interface AnalysisConfig {
   model: string;
   v3Boost: boolean;
+  transBoost?: boolean;  // Add transition coverage boost
 }
 
 interface Config {
@@ -244,6 +253,7 @@ async function runGroup(
   assignmentPrompt: string,
   writingType: string,
   priorResults: Record<string, any>,
+  transBoost?: boolean,
 ): Promise<Record<string, any>> {
   if (group.length === 1) {
     // Single analysis — use its own prompt and schema
@@ -251,6 +261,7 @@ async function runGroup(
     const cfg = ANALYSIS_CONFIG[name];
     let systemPrompt = cfg.systemPrompt;
     if (v3Boost) systemPrompt += V3_BOOST;
+    if (transBoost && name === 'transitions') systemPrompt += TRANS_COVERAGE_BOOST;
 
     let userPrompt: string;
     if (name === 'coachSynthesis') {
@@ -366,8 +377,8 @@ async function main() {
 
       const groupResults = await Promise.all(nonCoachGroups.map(group => {
         const analysisName = group[0]; // Model comes from first analysis in group
-        const { model, v3Boost } = config.analyses[analysisName];
-        return runGroup(ai, group, model, v3Boost, record.content, record.assignmentPrompt, record.writingType, allResults);
+        const { model, v3Boost, transBoost } = config.analyses[analysisName];
+        return runGroup(ai, group, model, v3Boost, record.content, record.assignmentPrompt, record.writingType, allResults, transBoost);
       }));
 
       for (const r of groupResults) Object.assign(allResults, r);
