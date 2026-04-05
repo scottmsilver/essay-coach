@@ -1,5 +1,5 @@
 {
-  "description": "3 calls ULTRA: FL mega(eval+dup+gram+prompt), 2.5-flash trans(transBoost), FL coach",
+  "description": "ALL Flash Lite: FL mega(eval+dup+gram+prompt), FL trans(transBoost+sentFmt), FL coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -10,7 +10,7 @@
       "v3Boost": false
     },
     "transitions": {
-      "model": "gemini-2.5-flash",
+      "model": "gemini-3.1-flash-lite-preview",
       "v3Boost": false,
       "transBoost": true
     },
