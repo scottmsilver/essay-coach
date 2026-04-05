@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
-const MODEL = 'gemini-3.1-pro-preview';
+const DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 const PROGRESS_THROTTLE_MS = 2000;
 
 interface StreamOptions {
@@ -14,6 +14,8 @@ interface StreamOptions {
   statusField: string;
   /** Message shown when Gemini starts writing output */
   generatingMessage: string;
+  /** Gemini model to use (defaults to gemini-3.1-pro-preview) */
+  model?: string;
 }
 
 /**
@@ -24,7 +26,7 @@ export async function streamGeminiJson(opts: StreamOptions): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: opts.apiKey });
 
   const stream = await ai.models.generateContentStream({
-    model: MODEL,
+    model: opts.model ?? DEFAULT_MODEL,
     contents: opts.contents,
     config: {
       systemInstruction: opts.systemInstruction,

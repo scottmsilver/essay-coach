@@ -1,0 +1,23 @@
+{
+  "name": "essay-grader-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export": "tsx export-firestore.ts",
+    "calibration": "tsx build-calibration.ts",
+    "eval": "promptfoo eval",
+    "view": "promptfoo view",
+    "judge": "tsx run-judge.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@azure/identity": "^4.13.1",
+    "@google/genai": "^1.0.0",
+    "firebase-admin": "^13.0.0",
+    "promptfoo": "^0.121.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}

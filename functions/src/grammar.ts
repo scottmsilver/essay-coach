@@ -7,7 +7,7 @@ import type { GrammarAnalysis } from '../../shared/grammarTypes';
 
 // ── System Prompt ────────────────────────────────────────────────────────
 
-const GRAMMAR_SYSTEM_PROMPT = `You are an expert English grammar and writing mechanics analyst for high school and college students. Your job is to perform a comprehensive grammar analysis of a student essay in a single pass, covering both sentence-level mechanics and higher-order writing patterns.
+export const GRAMMAR_SYSTEM_PROMPT = `You are an expert English grammar and writing mechanics analyst for high school and college students. Your job is to perform a comprehensive grammar analysis of a student essay in a single pass, covering both sentence-level mechanics and higher-order writing patterns.
 
 ## Your analysis must cover:
 
@@ -85,7 +85,7 @@ const ISSUE_CATEGORY_SCHEMA = {
   required: ['locations'],
 };
 
-const GRAMMAR_ANALYSIS_SCHEMA = {
+export const GRAMMAR_ANALYSIS_SCHEMA = {
   type: 'object' as const,
   properties: {
     commaSplices: ISSUE_CATEGORY_SCHEMA,
