@@ -21,7 +21,7 @@ import { validateFullOutput } from '../validate-full-output.js';
 import { SYSTEM_PROMPT, buildEvaluationPrompt } from '../../functions/lib/functions/src/prompt.js';
 import { EVALUATION_SCHEMA } from '../../functions/lib/functions/src/gemini.js';
 import { GRAMMAR_SYSTEM_PROMPT, GRAMMAR_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/grammar.js';
-import { TRANSITION_SYSTEM_PROMPT, TRANSITION_SCHEMA, formatSentencesForPrompt, buildTransitionPrompt } from '../../functions/lib/functions/src/transitions.js';
+import { TRANSITION_SYSTEM_PROMPT, TRANSITION_SCHEMA, formatSentencesForPrompt, buildTransitionPrompt, splitEssayIntoSentences } from '../../functions/lib/functions/src/transitions.js';
 import { splitSentences, splitParagraphs } from '../../functions/lib/functions/src/sentenceSplitter.js';
 import { PROMPT_ADHERENCE_SYSTEM_PROMPT, PROMPT_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/promptAdherence.js';
 import { DUPLICATION_SYSTEM_PROMPT, DUPLICATION_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/duplication.js';
@@ -325,6 +325,7 @@ async function runGroup(
 
     let systemPrompt = systemParts.join('\n\n');
     if (v3Boost) systemPrompt += V3_BOOST;
+    if (transBoost && group.includes('transitions')) systemPrompt += TRANS_COVERAGE_BOOST;
 
     const mergedSchema = {
       type: 'object' as const,

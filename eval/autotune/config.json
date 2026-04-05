@@ -1,5 +1,5 @@
 {
-  "description": "2.5-flash+transBoost+sentFmt for trans, FL eval+dup+coach, 2.5-flash gram+prompt",
+  "description": "3-call mega: FL eval+dup, 2.5-flash gram+prompt+trans(transBoost+sentFmt), FL coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -7,7 +7,8 @@
     },
     "grammar": {
       "model": "gemini-2.5-flash",
-      "v3Boost": false
+      "v3Boost": false,
+      "transBoost": true
     },
     "transitions": {
       "model": "gemini-2.5-flash",
@@ -34,9 +35,7 @@
     ],
     [
       "grammar",
-      "promptAdherence"
-    ],
-    [
+      "promptAdherence",
       "transitions"
     ],
     [
