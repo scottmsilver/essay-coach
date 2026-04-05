@@ -42,8 +42,15 @@ functions/lib/
 functions/.last-deploy-sha
 .gstack/
 
-# Eval framework datasets (generated, contain production data)
+# Eval framework (generated data, large outputs, session artifacts)
 eval/datasets/
 eval/node_modules/
 eval/dist/
 eval/autotune/results.tsv
+eval/autotune/run*.log
+eval/autotune/baseline-pro.json
+eval/judge-results*.json
+eval/promptfoo-output.json
+eval/.context/
+eval/.cchost-events.jsonl
+eval/package-lock.json
