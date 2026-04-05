@@ -1,3 +1,0 @@
-iteration	commit	pass_rate	cost_estimate	description	status	date
-0	baseline	3/3	-	6x Pro separate calls (current production)	kept	2026-04-04
-1	config-v1	3/3	~40-50% savings	Flash Lite eval+dup+coach, Pro grammar/trans/prompt (6 calls)	kept	2026-04-04
