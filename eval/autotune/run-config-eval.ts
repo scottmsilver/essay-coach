@@ -21,7 +21,8 @@ import { validateFullOutput } from '../validate-full-output.js';
 import { SYSTEM_PROMPT, buildEvaluationPrompt } from '../../functions/lib/functions/src/prompt.js';
 import { EVALUATION_SCHEMA } from '../../functions/lib/functions/src/gemini.js';
 import { GRAMMAR_SYSTEM_PROMPT, GRAMMAR_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/grammar.js';
-import { TRANSITION_SYSTEM_PROMPT, TRANSITION_SCHEMA } from '../../functions/lib/functions/src/transitions.js';
+import { TRANSITION_SYSTEM_PROMPT, TRANSITION_SCHEMA, formatSentencesForPrompt, buildTransitionPrompt } from '../../functions/lib/functions/src/transitions.js';
+import { splitSentences, splitParagraphs } from '../../functions/lib/functions/src/sentenceSplitter.js';
 import { PROMPT_ADHERENCE_SYSTEM_PROMPT, PROMPT_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/promptAdherence.js';
 import { DUPLICATION_SYSTEM_PROMPT, DUPLICATION_ANALYSIS_SCHEMA } from '../../functions/lib/functions/src/duplication.js';
 import { COACH_SYNTHESIS_SYSTEM, COACH_SYNTHESIS_SCHEMA } from '../../functions/lib/functions/src/synthesizeCoach.js';
@@ -204,7 +205,20 @@ const ANALYSIS_CONFIG: Record<string, { systemPrompt: string; schema: any; build
   transitions: {
     systemPrompt: TRANSITION_SYSTEM_PROMPT,
     schema: TRANSITION_SCHEMA,
-    buildPrompt: (content) => `Analyze transitions in this student essay:\n\n${content}`,
+    buildPrompt: (content) => {
+      // Use production-style sentence formatting for better transition coverage
+      const paragraphs = splitParagraphs(content);
+      const sentences: Record<string, string[]> = {};
+      let ki = 0;
+      for (const para of paragraphs) {
+        const sents = splitSentences(para).map(s => s.trim()).filter(s => s.length > 0);
+        if (sents.length > 0) {
+          sentences[String(ki++)] = sents;
+        }
+      }
+      const formatted = formatSentencesForPrompt(sentences);
+      return buildTransitionPrompt(formatted);
+    },
   },
   promptAdherence: {
     systemPrompt: PROMPT_ADHERENCE_SYSTEM_PROMPT,
