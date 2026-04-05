@@ -1,12 +1,12 @@
 {
-  "description": "gemini-2.5-pro for transitions (cheaper than 3.1 Pro), rest unchanged",
+  "description": "gemini-2.5-flash for grammar + gemini-2.5-pro for transitions",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
       "v3Boost": true
     },
     "grammar": {
-      "model": "gemini-3.1-pro-preview",
+      "model": "gemini-2.5-flash",
       "v3Boost": false
     },
     "transitions": {
