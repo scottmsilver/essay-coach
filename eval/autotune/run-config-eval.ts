@@ -29,6 +29,51 @@ import { COACH_SYNTHESIS_SYSTEM, COACH_SYNTHESIS_SCHEMA } from '../../functions/
 const __dirname = dirname(new URL(import.meta.url).pathname);
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// ── Ollama support ──────────────────────────────────────────────────────
+// Models prefixed with "ollama:" are routed to a local Ollama instance.
+// e.g. "ollama:gemma3:4b" → calls localhost:11434/api/generate with model "gemma3:4b"
+// Note: Ollama doesn't support responseSchema — we include schema in the prompt.
+
+function isOllamaModel(model: string): boolean {
+  return model.startsWith('ollama:');
+}
+
+function ollamaModelName(model: string): string {
+  return model.replace('ollama:', '');
+}
+
+async function callOllama(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  schema: any,
+): Promise<any> {
+  const ollamaModel = ollamaModelName(model);
+
+  // Embed schema instructions in the prompt since Ollama doesn't support responseSchema
+  const schemaInstruction = `\n\nYou MUST respond with valid JSON that matches this exact schema:\n${JSON.stringify(schema, null, 2)}\n\nRespond ONLY with the JSON object, no other text.`;
+
+  const resp = await fetch('http://localhost:11434/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: ollamaModel,
+      system: systemPrompt + schemaInstruction,
+      prompt: userPrompt,
+      format: 'json',
+      stream: false,
+      options: { temperature: 0.2, num_ctx: 8192 },
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Ollama error ${resp.status}: ${await resp.text()}`);
+  }
+
+  const data = await resp.json() as { response: string };
+  return JSON.parse(data.response);
+}
+
 const V3_BOOST = `\n\n## CRITICAL: FEEDBACK QUALITY STANDARDS
 Every feedback statement must reference EXACT text from the essay. No generic praise or criticism.
 Name the specific craft move or error type. Check for factual errors and anachronisms.
@@ -120,13 +165,17 @@ async function runGroup(
       userPrompt = cfg.buildPrompt(content, assignmentPrompt, writingType);
     }
 
-    const resp = await ai.models.generateContent({
-      model,
-      contents: userPrompt,
-      config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', responseSchema: cfg.schema },
-    });
-
-    const result = JSON.parse(resp.text || '{}');
+    let result: any;
+    if (isOllamaModel(model)) {
+      result = await callOllama(model, systemPrompt, userPrompt, cfg.schema);
+    } else {
+      const resp = await ai.models.generateContent({
+        model,
+        contents: userPrompt,
+        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', responseSchema: cfg.schema },
+      });
+      result = JSON.parse(resp.text || '{}');
+    }
     return { [FIELD_MAP[name]]: result };
   } else {
     // Combined group — build merged prompt and schema
@@ -153,13 +202,18 @@ async function runGroup(
       required: Object.keys(schemas) as any,
     };
 
-    const resp = await ai.models.generateContent({
-      model,
-      contents: promptParts.join('\n\n') || content,
-      config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', responseSchema: mergedSchema },
-    });
-
-    return JSON.parse(resp.text || '{}');
+    let result: any;
+    if (isOllamaModel(model)) {
+      result = await callOllama(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
+    } else {
+      const resp = await ai.models.generateContent({
+        model,
+        contents: promptParts.join('\n\n') || content,
+        config: { systemInstruction: systemPrompt, responseMimeType: 'application/json', responseSchema: mergedSchema },
+      });
+      result = JSON.parse(resp.text || '{}');
+    }
+    return result;
   }
 }
 
