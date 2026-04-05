@@ -129,8 +129,8 @@ export default function DuplicationView({ content, analysis }: Props) {
       </div>
 
       {/* Essay + sidebar */}
-      <div className="dup-layout">
-        <div className="dup-essay" ref={essayRef}>
+      <div className="dup-layout" ref={essayRef}>
+        <div className="dup-essay">
           <div className="essay-text">{essayElements}</div>
         </div>
 

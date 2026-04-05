@@ -1869,6 +1869,7 @@ mark {
 .dup-sidebar {
   border-left: 1px solid var(--color-border);
   padding-left: 16px;
+  position: relative;
 }
 
 /* Marks in essay text */
