@@ -1,5 +1,5 @@
 {
-  "description": "2.5-flash+transBoost for transitions, gemma4 dup ($0), 2.5-flash gram+prompt, FL eval+coach",
+  "description": "2.5-flash+transBoost+sentFmt for trans, FL eval+dup+coach, 2.5-flash gram+prompt",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -19,7 +19,7 @@
       "v3Boost": false
     },
     "duplication": {
-      "model": "ollama:gemma4",
+      "model": "gemini-3.1-flash-lite-preview",
       "v3Boost": false
     },
     "coachSynthesis": {
@@ -29,7 +29,8 @@
   },
   "groups": [
     [
-      "evaluation"
+      "evaluation",
+      "duplication"
     ],
     [
       "grammar",
@@ -37,9 +38,6 @@
     ],
     [
       "transitions"
-    ],
-    [
-      "duplication"
     ],
     [
       "coachSynthesis"
