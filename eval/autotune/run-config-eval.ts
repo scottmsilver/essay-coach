@@ -125,6 +125,56 @@ async function callAnthropic(
   return JSON.parse(cleaned);
 }
 
+// ── OpenAI support ──────────────────────────────────────────────────────
+// Models prefixed with "openai:" are routed to the OpenAI Chat Completions API.
+// e.g. "openai:gpt-4o-mini", "openai:gpt-4.1-nano"
+// Uses OPENAI_API_KEY from environment.
+
+function isOpenAIModel(model: string): boolean {
+  return model.startsWith('openai:');
+}
+
+function openaiModelName(model: string): string {
+  return model.replace('openai:', '');
+}
+
+async function callOpenAI(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  schema: any,
+): Promise<any> {
+  const openaiModel = openaiModelName(model);
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY required for OpenAI models');
+
+  const schemaInstruction = `\n\nYou MUST respond with valid JSON matching this exact schema:\n${JSON.stringify(schema, null, 2)}`;
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: openaiModel,
+      messages: [
+        { role: 'system', content: systemPrompt + schemaInstruction },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`OpenAI error ${resp.status}: ${await resp.text()}`);
+  }
+
+  const data = await resp.json() as { choices: { message: { content: string } }[] };
+  return JSON.parse(data.choices[0].message.content || '{}');
+}
+
 const V3_BOOST = `\n\n## CRITICAL: FEEDBACK QUALITY STANDARDS
 Every feedback statement must reference EXACT text from the essay. No generic praise or criticism.
 Name the specific craft move or error type. Check for factual errors and anachronisms.
@@ -221,6 +271,8 @@ async function runGroup(
       result = await callOllama(model, systemPrompt, userPrompt, cfg.schema);
     } else if (isAnthropicModel(model)) {
       result = await callAnthropic(model, systemPrompt, userPrompt, cfg.schema);
+    } else if (isOpenAIModel(model)) {
+      result = await callOpenAI(model, systemPrompt, userPrompt, cfg.schema);
     } else {
       const resp = await ai.models.generateContent({
         model,
@@ -260,6 +312,8 @@ async function runGroup(
       result = await callOllama(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
     } else if (isAnthropicModel(model)) {
       result = await callAnthropic(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
+    } else if (isOpenAIModel(model)) {
+      result = await callOpenAI(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
     } else {
       const resp = await ai.models.generateContent({
         model,
