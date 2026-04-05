@@ -74,6 +74,57 @@ async function callOllama(
   return JSON.parse(data.response);
 }
 
+// ── Anthropic support ───────────────────────────────────────────────────
+// Models prefixed with "anthropic:" are routed to the Anthropic Messages API.
+// e.g. "anthropic:claude-haiku-4-5-20251001"
+// Uses ANTHROPIC_API_KEY from environment.
+
+function isAnthropicModel(model: string): boolean {
+  return model.startsWith('anthropic:');
+}
+
+function anthropicModelName(model: string): string {
+  return model.replace('anthropic:', '');
+}
+
+async function callAnthropic(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+  schema: any,
+): Promise<any> {
+  const anthropicModel = anthropicModelName(model);
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY required for Anthropic models');
+
+  const schemaInstruction = `\n\nYou MUST respond with ONLY valid JSON matching this schema:\n${JSON.stringify(schema, null, 2)}\n\nNo markdown, no explanation — just the JSON object.`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: anthropicModel,
+      max_tokens: 8192,
+      system: systemPrompt + schemaInstruction,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Anthropic error ${resp.status}: ${await resp.text()}`);
+  }
+
+  const data = await resp.json() as { content: { type: string; text: string }[] };
+  const text = data.content.find(c => c.type === 'text')?.text || '{}';
+  // Strip markdown code fence if present
+  const cleaned = text.replace(/^```json?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  return JSON.parse(cleaned);
+}
+
 const V3_BOOST = `\n\n## CRITICAL: FEEDBACK QUALITY STANDARDS
 Every feedback statement must reference EXACT text from the essay. No generic praise or criticism.
 Name the specific craft move or error type. Check for factual errors and anachronisms.
@@ -168,6 +219,8 @@ async function runGroup(
     let result: any;
     if (isOllamaModel(model)) {
       result = await callOllama(model, systemPrompt, userPrompt, cfg.schema);
+    } else if (isAnthropicModel(model)) {
+      result = await callAnthropic(model, systemPrompt, userPrompt, cfg.schema);
     } else {
       const resp = await ai.models.generateContent({
         model,
@@ -205,6 +258,8 @@ async function runGroup(
     let result: any;
     if (isOllamaModel(model)) {
       result = await callOllama(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
+    } else if (isAnthropicModel(model)) {
+      result = await callAnthropic(model, systemPrompt, promptParts.join('\n\n') || content, mergedSchema);
     } else {
       const resp = await ai.models.generateContent({
         model,
