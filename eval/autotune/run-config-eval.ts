@@ -227,10 +227,13 @@ async function main() {
   const config: Config = JSON.parse(readFileSync(configPath, 'utf-8'));
   const ai = new GoogleGenAI({ apiKey });
 
-  // Load 3 diverse production essays with full analyses
+  // Load production essays with full analyses
+  const fullMode = process.argv.includes('--full');
   const prod = JSON.parse(readFileSync(resolve(__dirname, '../datasets/production.json'), 'utf-8'));
   const complete = prod.filter((r: any) => r.draftNumber === 1 && r.transitionAnalysis && r.grammarAnalysis);
-  const sample = [complete[0], complete[Math.floor(complete.length / 2)], complete[complete.length - 1]];
+  const sample = fullMode
+    ? complete
+    : [complete[0], complete[Math.floor(complete.length / 2)], complete[complete.length - 1]];
 
   console.log(`Config: ${config.description || 'unnamed'}`);
   console.log(`Groups: ${config.groups.map(g => g.join('+')).join(' | ')}`);
