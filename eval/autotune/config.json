@@ -1,5 +1,5 @@
 {
-  "description": "Best known config: Flash Lite for eval+dup+coach, Pro for grammar/transitions/prompt",
+  "description": "gemini-2.5-pro for transitions (cheaper than 3.1 Pro), rest unchanged",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -10,7 +10,7 @@
       "v3Boost": false
     },
     "transitions": {
-      "model": "gemini-3.1-pro-preview",
+      "model": "gemini-2.5-pro",
       "v3Boost": false
     },
     "promptAdherence": {
