@@ -1,5 +1,5 @@
 {
-  "description": "ALL Flash Lite except trans: FL eval+dup+gram+prompt+coach, 2.5-flash trans only",
+  "description": "3 calls ULTRA: FL mega(eval+dup+gram+prompt), 2.5-flash trans(transBoost), FL coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -30,9 +30,7 @@
   "groups": [
     [
       "evaluation",
-      "duplication"
-    ],
-    [
+      "duplication",
       "grammar",
       "promptAdherence"
     ],
