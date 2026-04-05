@@ -1,5 +1,5 @@
 {
-  "description": "BEST: 4 calls - eval+dup (FL), grammar+prompt (2.5-flash), transitions (2.5-flash), coach (FL)",
+  "description": "Ollama gemma4 for duplication ($0), rest at best API config",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -18,7 +18,7 @@
       "v3Boost": false
     },
     "duplication": {
-      "model": "gemini-3.1-flash-lite-preview",
+      "model": "ollama:gemma4",
       "v3Boost": false
     },
     "coachSynthesis": {
@@ -28,8 +28,7 @@
   },
   "groups": [
     [
-      "evaluation",
-      "duplication"
+      "evaluation"
     ],
     [
       "grammar",
@@ -37,6 +36,9 @@
     ],
     [
       "transitions"
+    ],
+    [
+      "duplication"
     ],
     [
       "coachSynthesis"
