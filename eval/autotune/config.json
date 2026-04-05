@@ -1,5 +1,5 @@
 {
-  "description": "ALL Flash Lite: FL mega(eval+dup+gram+prompt), FL trans(transBoost+sentFmt), FL coach",
+  "description": "2 API calls + local coach: FL mega(eval+dup+gram+prompt), FL trans(transBoost+sentFmt), gemma4 coach",
   "analyses": {
     "evaluation": {
       "model": "gemini-3.1-flash-lite-preview",
@@ -23,7 +23,7 @@
       "v3Boost": false
     },
     "coachSynthesis": {
-      "model": "gemini-3.1-flash-lite-preview",
+      "model": "ollama:gemma4",
       "v3Boost": false
     }
   },
