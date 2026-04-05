@@ -54,3 +54,4 @@ eval/promptfoo-output.json
 eval/.context/
 eval/.cchost-events.jsonl
 eval/package-lock.json
+.cchost-events.jsonl
