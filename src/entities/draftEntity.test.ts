@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createDraftEntity } from './draftEntity';
-import type { Draft, Evaluation, TraitEvaluation, GrammarAnalysis, TransitionAnalysis, PromptAnalysis, CoachSynthesis } from '../types';
+import type { Draft, Evaluation, TraitEvaluation, GrammarAnalysis, TransitionAnalysis, PromptAnalysis, CoachSynthesis, CriteriaAnalysis, CriterionResult } from '../types';
 
 // --- Helpers ---
 
@@ -126,6 +126,25 @@ function makeCoachSynthesis(overrides: Partial<CoachSynthesis> = {}): CoachSynth
   };
 }
 
+function makeCriterionResult(overrides: Partial<CriterionResult> = {}): CriterionResult {
+  return {
+    criterion: 'Uses evidence from the text',
+    status: 'met',
+    evidence: 'The essay cites three sources.',
+    comment: 'Well supported.',
+    annotations: [],
+    ...overrides,
+  };
+}
+
+function makeCriteriaAnalysis(criteria: CriterionResult[]): CriteriaAnalysis {
+  return {
+    criteria,
+    overallNarrative: 'Overall narrative.',
+    comparisonToPrevious: null,
+  };
+}
+
 
 // --- Tests ---
 
@@ -195,6 +214,22 @@ describe('createDraftEntity', () => {
         promptAnalysis: makePromptAnalysis(2, 3),
       }));
       expect(entity.issueCount('prompt')).toBe(5);
+    });
+
+    it('counts not-met and partially-met criteria as issues', () => {
+      const entity = createDraftEntity(makeDraft({
+        criteriaAnalysis: makeCriteriaAnalysis([
+          makeCriterionResult({ criterion: 'Uses evidence', status: 'met' }),
+          makeCriterionResult({ criterion: 'Clear thesis', status: 'partially_met' }),
+          makeCriterionResult({ criterion: 'Addresses counterarguments', status: 'not_met' }),
+        ]),
+      }));
+      expect(entity.issueCount('criteria')).toBe(2);
+    });
+
+    it('returns undefined issueCount when no criteria analysis', () => {
+      const entity = createDraftEntity(makeDraft());
+      expect(entity.issueCount('criteria')).toBeUndefined();
     });
 
     it('returns undefined when analysis data is missing', () => {
