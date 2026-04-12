@@ -15,3 +15,4 @@ export { onDraftCreated } from './onDraftCreated';
 export { suggestTitle } from './suggestTitle';
 export { analyzePromptAdherence } from './analyzePromptAdherence';
 export { analyzeDuplication } from './analyzeDuplication';
+export { analyzeCriteria } from './analyzeCriteria';
