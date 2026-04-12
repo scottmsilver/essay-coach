@@ -25,6 +25,7 @@ export default function App() {
             <Route path="/essay/:essayId/grammar" element={<EssayPage />} />
             <Route path="/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/essay/:essayId/duplication" element={<EssayPage />} />
+            <Route path="/essay/:essayId/criteria" element={<EssayPage />} />
             <Route path="/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/user/:ownerUid/essay/:essayId" element={<EssayPage />} />
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/user/:ownerUid/essay/:essayId/grammar" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/duplication" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/criteria" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/sharing" element={<SharingPage />} />
             <Route path="/debug/clipboard" element={<ClipboardDebugPage />} />
