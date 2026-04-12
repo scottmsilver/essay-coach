@@ -23,7 +23,9 @@ export default function NewEssayPage() {
   const [error, setError] = useState<string | null>(null);
   const [promptSource, setPromptSource] = useState<DocSource | null>(null);
   const [contentSource, setContentSource] = useState<DocSource | null>(null);
-  const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | null>(null);
+  const [teacherCriteria, setTeacherCriteria] = useState('');
+  const [criteriaSource, setCriteriaSource] = useState<DocSource | null>(null);
+  const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | 'criteria' | null>(null);
   const [lastImportedUrl, setLastImportedUrl] = useState('');
   const [lastImportedDocName, setLastImportedDocName] = useState('');
   const [titleIsGenerated, setTitleIsGenerated] = useState(false);
@@ -40,6 +42,9 @@ export default function NewEssayPage() {
     } else if (importTarget === 'essay') {
       setContent(text);
       setContentSource(source);
+    } else if (importTarget === 'criteria') {
+      setTeacherCriteria(text);
+      setCriteriaSource(source);
     }
     setImportTarget(null);
   };
@@ -54,7 +59,12 @@ export default function NewEssayPage() {
     setContent('');
   };
 
-  const handlePickerImport = async (target: 'prompt' | 'essay') => {
+  const clearCriteriaSource = () => {
+    setCriteriaSource(null);
+    setTeacherCriteria('');
+  };
+
+  const handlePickerImport = async (target: 'prompt' | 'essay' | 'criteria') => {
     try {
       const result = await openGooglePicker(user?.email ?? undefined);
       if (!result) return; // user cancelled
@@ -121,6 +131,8 @@ export default function NewEssayPage() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           currentDraftNumber: 1,
+          teacherCriteria: teacherCriteria.trim() || null,
+          criteriaSource: criteriaSource,
           ...(promptSource && { promptSource }),
           ...(contentSource && { contentSource }),
         }),
@@ -137,7 +149,7 @@ export default function NewEssayPage() {
       navigate(`/essay/${essayRef.id}`);
 
       // Fire all 3 analyses in parallel (fire-and-forget)
-      fireAllAnalyses(essayRef.id, draftRef.id);
+      fireAllAnalyses(essayRef.id, draftRef.id, undefined, teacherCriteria);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to submit essay. Please try again.');
       setSubmitting(false);
@@ -183,6 +195,35 @@ export default function NewEssayPage() {
           description={`${assignmentPrompt.length}/10,000 characters`}
           mb="md"
           readOnly={!!promptSource}
+        />
+        {/* Teacher Criteria */}
+        <Group justify="space-between" mb={4}>
+          <Text fw={500} size="sm">Teacher Criteria <span style={{ color: 'var(--mantine-color-dimmed)' }}>(optional)</span></Text>
+          {criteriaSource ? (
+            <Group gap="xs">
+              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
+              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('criteria')}>Change</Button>
+              <Button variant="subtle" size="compact-xs" color="red" onClick={clearCriteriaSource}>Clear</Button>
+            </Group>
+          ) : (
+            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('criteria')}>
+              Import from Google Docs
+            </Button>
+          )}
+        </Group>
+        <Textarea
+          value={teacherCriteria}
+          onChange={(e) => {
+            setTeacherCriteria(e.currentTarget.value);
+            if (criteriaSource) setCriteriaSource(null);
+          }}
+          onPaste={(e) => handleRichPaste(e, setTeacherCriteria)}
+          placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
+          autosize
+          minRows={3}
+          maxRows={8}
+          mb="md"
+          readOnly={!!criteriaSource}
         />
         <div style={{ position: 'relative' }}>
           <TextInput
@@ -241,7 +282,7 @@ export default function NewEssayPage() {
         opened={importTarget !== null}
         onClose={() => setImportTarget(null)}
         onImport={handleImport}
-        label={importTarget === 'prompt' ? 'prompt' : 'essay'}
+        label={importTarget === 'prompt' ? 'prompt' : importTarget === 'criteria' ? 'criteria' : 'essay'}
         initialUrl={lastImportedUrl}
         initialDocName={lastImportedDocName}
       />
