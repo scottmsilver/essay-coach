@@ -157,7 +157,7 @@ export default function NewEssayPage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
       <h2>New Essay</h2>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
         <Select
