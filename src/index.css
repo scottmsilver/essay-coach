@@ -2053,3 +2053,36 @@ mark {
   font-size: 14px;
   line-height: 1;
 }
+
+/* ── CriteriaPanel — checklist below summary card ────────────────────── */
+.criteria-view {
+  margin-bottom: 24px;
+}
+
+.criteria-checklist-header {
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+}
+
+.criteria-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.criteria-checklist-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.criteria-checklist-item:last-child {
+  border-bottom: none;
+}
+
+.criteria-bar-segment {
+  height: 100%;
+}

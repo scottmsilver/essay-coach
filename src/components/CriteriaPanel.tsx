@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { CriteriaAnalysis, DocSource } from '../types';
 import GDocImportDialog from './GDocImportDialog';
 import { handleRichPaste } from '../utils/pasteHandler';
+import AnalysisSummaryCard from './AnalysisSummaryCard';
 
 interface CriteriaPanelProps {
   analysis: CriteriaAnalysis;
@@ -15,6 +16,12 @@ interface CriteriaPanelProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
+  met: 'var(--color-green)',
+  partially_met: 'var(--color-yellow)',
+  not_met: 'var(--color-red)',
+};
+
+const STATUS_BADGE_COLORS: Record<string, string> = {
   met: 'green',
   partially_met: 'yellow',
   not_met: 'red',
@@ -41,6 +48,8 @@ export function CriteriaPanel({
   const [collapsed, setCollapsed] = useState(false);
 
   const metCount = analysis.criteria.filter(c => c.status === 'met').length;
+  const partialCount = analysis.criteria.filter(c => c.status === 'partially_met').length;
+  const notMetCount = analysis.criteria.filter(c => c.status === 'not_met').length;
   const totalCount = analysis.criteria.length;
 
   const openEditModal = () => {
@@ -64,68 +73,83 @@ export function CriteriaPanel({
     setEditSource(null);
   };
 
+  const segments = [
+    { color: STATUS_COLORS.met, proportion: totalCount > 0 ? metCount / totalCount : 0, label: 'met', count: metCount },
+    { color: STATUS_COLORS.partially_met, proportion: totalCount > 0 ? partialCount / totalCount : 0, label: 'partial', count: partialCount },
+    { color: STATUS_COLORS.not_met, proportion: totalCount > 0 ? notMetCount / totalCount : 0, label: 'not met', count: notMetCount },
+  ];
+
   return (
-    <Stack gap="sm" mb="md">
-      {/* Header — clickable to collapse */}
-      <Group
-        justify="space-between"
-        onClick={collapsible ? () => setCollapsed(c => !c) : undefined}
-        style={collapsible ? { cursor: 'pointer', userSelect: 'none' } : undefined}
-      >
-        <Group gap="xs">
-          {collapsible && (
-            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', transition: 'transform 150ms', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', display: 'inline-block' }}>
-              ▼
-            </span>
-          )}
-          <Text fw={600} size="sm">
-            {metCount} of {totalCount} criteria met
-          </Text>
-        </Group>
-        {isOwner && (
-          <ActionIcon variant="subtle" size="sm" onClick={(e) => { e.stopPropagation(); openEditModal(); }} aria-label="Edit criteria">
-            <IconPencil size={16} />
-          </ActionIcon>
-        )}
-      </Group>
-
-      {!collapsed && (
-        <>
-          {/* Overall narrative */}
-          <Text size="sm" c="dimmed">{analysis.overallNarrative}</Text>
-
-          {/* Comparison section */}
+    <div className="criteria-view">
+      {/* Summary card — matches grammar/transition/prompt/duplication pattern */}
+      <div style={{ position: 'relative' }}>
+        <AnalysisSummaryCard segments={segments} summaryText={analysis.overallNarrative}>
+          {/* Comparison badges */}
           {analysis.comparisonToPrevious && (
-            <div>
-              <Text size="sm" mb={4}>{analysis.comparisonToPrevious.summary}</Text>
+            <div style={{ marginBottom: 8 }}>
+              <Text size="xs" fw={500} mb={4}>{analysis.comparisonToPrevious.summary}</Text>
               <Group gap="xs" wrap="wrap">
                 {analysis.comparisonToPrevious.improvements.map((imp, i) => (
-                  <Badge key={`imp-${i}`} color="green" variant="light" size="sm">
-                    {imp.criterion}
-                  </Badge>
+                  <Badge key={`imp-${i}`} color="green" variant="light" size="xs">{imp.criterion}</Badge>
                 ))}
                 {analysis.comparisonToPrevious.regressions.map((reg, i) => (
-                  <Badge key={`reg-${i}`} color="red" variant="light" size="sm">
-                    {reg.criterion}
-                  </Badge>
+                  <Badge key={`reg-${i}`} color="red" variant="light" size="xs">{reg.criterion}</Badge>
                 ))}
               </Group>
             </div>
           )}
+        </AnalysisSummaryCard>
+        {/* Edit button floated top-right of card */}
+        {isOwner && (
+          <ActionIcon
+            variant="subtle"
+            size="sm"
+            onClick={openEditModal}
+            aria-label="Edit criteria"
+            style={{ position: 'absolute', top: 16, right: 16 }}
+          >
+            <IconPencil size={16} />
+          </ActionIcon>
+        )}
+      </div>
 
-          {/* Criteria checklist — compact */}
+      {/* Collapsible criteria checklist */}
+      <div
+        className="criteria-checklist-header"
+        onClick={collapsible ? () => setCollapsed(c => !c) : undefined}
+        style={collapsible ? { cursor: 'pointer', userSelect: 'none' } : undefined}
+      >
+        {collapsible && (
+          <span style={{
+            fontSize: 11,
+            color: 'var(--color-text-muted)',
+            transition: 'transform 150ms',
+            transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+            display: 'inline-block',
+            marginRight: 6,
+          }}>
+            ▼
+          </span>
+        )}
+        <Text size="xs" fw={600} c="dimmed" component="span" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          {totalCount} criteria
+        </Text>
+      </div>
+
+      {!collapsed && (
+        <div className="criteria-checklist">
           {analysis.criteria.map((cr, i) => (
-            <Group key={i} gap="sm" wrap="nowrap" align="flex-start">
-              <Badge color={STATUS_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0, marginTop: 2 }}>
+            <div key={i} className="criteria-checklist-item">
+              <Badge color={STATUS_BADGE_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0 }}>
                 {STATUS_LABELS[cr.status]}
               </Badge>
               <div>
                 <Text size="sm" fw={500}>{cr.criterion}</Text>
                 <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
               </div>
-            </Group>
+            </div>
           ))}
-        </>
+        </div>
       )}
 
       {/* Edit modal */}
@@ -137,31 +161,18 @@ export function CriteriaPanel({
                 <Badge variant="light" size="sm" leftSection={<IconFileImport size={12} />}>
                   Imported from Google Docs
                 </Badge>
-                <Button variant="subtle" size="compact-xs" onClick={() => setGdocOpen(true)}>
-                  Change
-                </Button>
-                <Button variant="subtle" size="compact-xs" color="red" onClick={clearSource}>
-                  Clear
-                </Button>
+                <Button variant="subtle" size="compact-xs" onClick={() => setGdocOpen(true)}>Change</Button>
+                <Button variant="subtle" size="compact-xs" color="red" onClick={clearSource}>Clear</Button>
               </Group>
             ) : (
-              <Button
-                variant="light"
-                size="compact-sm"
-                leftSection={<IconFileImport size={14} />}
-                onClick={() => setGdocOpen(true)}
-              >
+              <Button variant="light" size="compact-sm" leftSection={<IconFileImport size={14} />} onClick={() => setGdocOpen(true)}>
                 Import from Google Docs
               </Button>
             )}
           </Group>
-
           <Textarea
             value={editText}
-            onChange={(e) => {
-              setEditText(e.currentTarget.value);
-              if (editSource) setEditSource(null);
-            }}
+            onChange={(e) => { setEditText(e.currentTarget.value); if (editSource) setEditSource(null); }}
             onPaste={(e) => handleRichPaste(e, setEditText)}
             placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
             autosize
@@ -169,25 +180,14 @@ export function CriteriaPanel({
             maxRows={16}
             readOnly={!!editSource}
           />
-
           <Group justify="flex-end">
-            <Button variant="subtle" onClick={() => setEditOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              Save &amp; Re-analyze
-            </Button>
+            <Button variant="subtle" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save &amp; Re-analyze</Button>
           </Group>
         </Stack>
-
-        <GDocImportDialog
-          opened={gdocOpen}
-          onClose={() => setGdocOpen(false)}
-          onImport={handleGDocImport}
-          label="criteria"
-        />
+        <GDocImportDialog opened={gdocOpen} onClose={() => setGdocOpen(false)} onImport={handleGDocImport} label="criteria" />
       </Modal>
-    </Stack>
+    </div>
   );
 }
 
@@ -215,9 +215,7 @@ export function CriteriaEmptyState({ isOwner, onSaveCriteria }: { isOwner: boole
       </Text>
       {isOwner && (
         <>
-          <Button variant="light" onClick={() => setEditOpen(true)}>
-            Add Criteria
-          </Button>
+          <Button variant="light" onClick={() => setEditOpen(true)}>Add Criteria</Button>
           <Modal opened={editOpen} onClose={() => setEditOpen(false)} title="Add Teacher Criteria" size="lg">
             <Stack gap="md">
               <Group justify="flex-end">
@@ -249,12 +247,7 @@ export function CriteriaEmptyState({ isOwner, onSaveCriteria }: { isOwner: boole
                 <Button onClick={handleSave} disabled={!editText.trim()}>Save & Analyze</Button>
               </Group>
             </Stack>
-            <GDocImportDialog
-              opened={importOpen}
-              onClose={() => setImportOpen(false)}
-              onImport={handleImport}
-              label="criteria"
-            />
+            <GDocImportDialog opened={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} label="criteria" />
           </Modal>
         </>
       )}
