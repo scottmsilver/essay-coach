@@ -515,6 +515,11 @@ export default function EssayPage() {
             defaultMessage="Analyzing criteria..."
             placeholder="Criteria analysis is loading..."
           >
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
             <CriteriaPanel
               analysis={activeDraft.criteriaAnalysis!}
               teacherCriteria={essay.teacherCriteria}
