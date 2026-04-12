@@ -19,6 +19,11 @@ function getApiKey(): string {
   return import.meta.env.VITE_FIREBASE_API_KEY || '';
 }
 
+function getAppId(): string {
+  // GCP project number — same as Firebase messaging sender ID
+  return import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '';
+}
+
 // ---- Script loading ----
 
 let pickerLoaded = false;
@@ -149,9 +154,13 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
       (builder as unknown as { setAuthUser(email: string): void }).setAuthUser(userEmail);
     }
 
-    // setDeveloperKey is required by Google Picker but missing from the type defs
+    // setDeveloperKey + setAppId are required by Google Picker but missing from type defs
     if (apiKey) {
       (builder as unknown as { setDeveloperKey(key: string): void }).setDeveloperKey(apiKey);
+    }
+    const appId = getAppId();
+    if (appId) {
+      (builder as unknown as { setAppId(id: string): void }).setAppId(appId);
     }
 
     const picker = builder.build();
