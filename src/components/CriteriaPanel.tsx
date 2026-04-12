@@ -11,6 +11,7 @@ interface CriteriaPanelProps {
   criteriaSource: DocSource | null;
   isOwner: boolean;
   onSaveCriteria: (text: string, source: DocSource | null) => void;
+  collapsible?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,11 +32,13 @@ export function CriteriaPanel({
   criteriaSource,
   isOwner,
   onSaveCriteria,
+  collapsible,
 }: CriteriaPanelProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState('');
   const [editSource, setEditSource] = useState<DocSource | null>(null);
   const [gdocOpen, setGdocOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   const metCount = analysis.criteria.filter(c => c.status === 'met').length;
   const totalCount = analysis.criteria.length;
@@ -62,56 +65,68 @@ export function CriteriaPanel({
   };
 
   return (
-    <Stack gap="md">
-      {/* Header */}
-      <Group justify="space-between">
-        <Text fw={600} size="sm">
-          {metCount} of {totalCount} criteria met
-        </Text>
+    <Stack gap="sm" mb="md">
+      {/* Header — clickable to collapse */}
+      <Group
+        justify="space-between"
+        onClick={collapsible ? () => setCollapsed(c => !c) : undefined}
+        style={collapsible ? { cursor: 'pointer', userSelect: 'none' } : undefined}
+      >
+        <Group gap="xs">
+          {collapsible && (
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', transition: 'transform 150ms', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)', display: 'inline-block' }}>
+              ▼
+            </span>
+          )}
+          <Text fw={600} size="sm">
+            {metCount} of {totalCount} criteria met
+          </Text>
+        </Group>
         {isOwner && (
-          <ActionIcon variant="subtle" size="sm" onClick={openEditModal} aria-label="Edit criteria">
+          <ActionIcon variant="subtle" size="sm" onClick={(e) => { e.stopPropagation(); openEditModal(); }} aria-label="Edit criteria">
             <IconPencil size={16} />
           </ActionIcon>
         )}
       </Group>
 
-      {/* Overall narrative */}
-      <Card padding="sm" radius="sm" withBorder>
-        <Text size="sm">{analysis.overallNarrative}</Text>
-      </Card>
+      {!collapsed && (
+        <>
+          {/* Overall narrative */}
+          <Text size="sm" c="dimmed">{analysis.overallNarrative}</Text>
 
-      {/* Comparison section */}
-      {analysis.comparisonToPrevious && (
-        <Card padding="sm" radius="sm" withBorder>
-          <Text size="sm" fw={500} mb="xs">Comparison to Previous Draft</Text>
-          <Text size="sm" mb="xs">{analysis.comparisonToPrevious.summary}</Text>
-          <Group gap="xs" wrap="wrap">
-            {analysis.comparisonToPrevious.improvements.map((imp, i) => (
-              <Badge key={`imp-${i}`} color="green" variant="light" size="sm">
-                {imp.criterion}
+          {/* Comparison section */}
+          {analysis.comparisonToPrevious && (
+            <div>
+              <Text size="sm" mb={4}>{analysis.comparisonToPrevious.summary}</Text>
+              <Group gap="xs" wrap="wrap">
+                {analysis.comparisonToPrevious.improvements.map((imp, i) => (
+                  <Badge key={`imp-${i}`} color="green" variant="light" size="sm">
+                    {imp.criterion}
+                  </Badge>
+                ))}
+                {analysis.comparisonToPrevious.regressions.map((reg, i) => (
+                  <Badge key={`reg-${i}`} color="red" variant="light" size="sm">
+                    {reg.criterion}
+                  </Badge>
+                ))}
+              </Group>
+            </div>
+          )}
+
+          {/* Criteria checklist — compact */}
+          {analysis.criteria.map((cr, i) => (
+            <Group key={i} gap="sm" wrap="nowrap" align="flex-start">
+              <Badge color={STATUS_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0, marginTop: 2 }}>
+                {STATUS_LABELS[cr.status]}
               </Badge>
-            ))}
-            {analysis.comparisonToPrevious.regressions.map((reg, i) => (
-              <Badge key={`reg-${i}`} color="red" variant="light" size="sm">
-                {reg.criterion}
-              </Badge>
-            ))}
-          </Group>
-        </Card>
+              <div>
+                <Text size="sm" fw={500}>{cr.criterion}</Text>
+                <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
+              </div>
+            </Group>
+          ))}
+        </>
       )}
-
-      {/* Criteria checklist — compact summary */}
-      {analysis.criteria.map((cr, i) => (
-        <Group key={i} gap="sm" wrap="nowrap" align="flex-start">
-          <Badge color={STATUS_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0, marginTop: 2 }}>
-            {STATUS_LABELS[cr.status]}
-          </Badge>
-          <div>
-            <Text size="sm" fw={500}>{cr.criterion}</Text>
-            <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
-          </div>
-        </Group>
-      ))}
 
       {/* Edit modal */}
       <Modal opened={editOpen} onClose={() => setEditOpen(false)} title="Edit Teacher Criteria" size="lg">
