@@ -15,6 +15,7 @@ interface Props {
   onChange?: (content: string) => void;
   readOnly?: boolean;
   activeTrait?: TraitKey | null;
+  hideSidebar?: boolean;
 }
 
 interface AnnotationMarker {
@@ -25,7 +26,7 @@ interface AnnotationMarker {
   kind: 'praise' | 'suggestion';
 }
 
-export default function AnnotatedEssay({ content, annotations, onChange, readOnly = true, activeTrait }: Props) {
+export default function AnnotatedEssay({ content, annotations, onChange, readOnly = true, activeTrait, hideSidebar }: Props) {
   const essayRef = useRef<HTMLDivElement>(null);
   const [activeId, handleMarkClick] = useActiveMarker(essayRef);
 
@@ -109,7 +110,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
       <div className="essay-text">
         {segments}
       </div>
-      {markers.length > 0 && (
+      {markers.length > 0 && !hideSidebar && (
         <div className="comment-sidebar">
           {markers.map((m) => (
             <div
