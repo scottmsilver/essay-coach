@@ -1,5 +1,5 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from './types';
-import type { Evaluation, TraitAnnotation } from './types';
+import type { Evaluation, TraitAnnotation, CriteriaAnalysis } from './types';
 
 export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
   const result: TraitAnnotation[] = [];
@@ -8,6 +8,28 @@ export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
     if (!trait?.annotations) continue;
     for (const ann of trait.annotations) {
       result.push({ ...ann, traitKey, traitLabel: TRAIT_LABELS[traitKey] });
+    }
+  }
+  return result;
+}
+
+export interface CriteriaAnnotation {
+  quotedText: string;
+  comment: string;
+  criterionIndex: number;
+  criterionText: string;
+}
+
+export function collectCriteriaAnnotations(analysis: CriteriaAnalysis): CriteriaAnnotation[] {
+  const result: CriteriaAnnotation[] = [];
+  for (let i = 0; i < analysis.criteria.length; i++) {
+    const criterion = analysis.criteria[i];
+    for (const ann of criterion.annotations) {
+      result.push({
+        ...ann,
+        criterionIndex: i,
+        criterionText: criterion.criterion,
+      });
     }
   }
   return result;

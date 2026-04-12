@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@mantine/core';
-import { functions } from '../firebase';
+import { functions, db } from '../firebase';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations, scoreLabel } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, scoreLabel } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -17,26 +18,28 @@ import TransitionView from '../components/TransitionView';
 import GrammarView from '../components/GrammarView';
 import DuplicationView from '../components/DuplicationView';
 import PromptAnalysisView from '../components/PromptAnalysisView';
+import { CriteriaPanel, CriteriaEmptyState } from '../components/CriteriaPanel';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
 import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
 import RevisionJourney from '../components/RevisionJourney';
 import { useNavbarContext } from '../hooks/useNavbarContext';
 import { useGDocChangeDetection } from '../hooks/useGDocChangeDetection';
-import type { ReportKey } from '../types';
+import type { ReportKey, DocSource } from '../types';
 import { createDraftEntity } from '../entities/draftEntity';
 import { presentDraft } from '../entities/draftPresentation';
 import { useDraftEditor } from '../hooks/useDraftEditor';
 import { useAnalysisActions } from '../hooks/useAnalysisActions';
 import type { ActionKey } from '../hooks/useAnalysisActions';
 
-type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication';
+type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
   if (pathname.endsWith('/grammar')) return 'grammar';
   if (pathname.endsWith('/prompt')) return 'prompt';
   if (pathname.endsWith('/duplication')) return 'duplication';
+  if (pathname.endsWith('/criteria')) return 'criteria';
   if (pathname.endsWith('/overall')) return 'overall';
   return 'essay';
 }
@@ -60,6 +63,7 @@ export default function EssayPage() {
     () => sessionStorage.getItem('essaycoach_notif_dismissed') === '1'
   );
   const [resubmitError] = useState<string | null>(null);
+  const [showCriteriaEdit, setShowCriteriaEdit] = useState(false);
   const popoverRef = useClickOutside<HTMLDivElement>((e) => {
     const badge = (e.target as Element)?.closest?.('.score-pill');
     if (!badge) setActiveTrait(null);
@@ -83,7 +87,7 @@ export default function EssayPage() {
   // For rendering, we also compute it here for local use.
   const draftAge = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
   const presentation = entity ? presentDraft(
-    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid,
+    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria,
   ) : null;
 
   // Hooks
@@ -116,14 +120,19 @@ export default function EssayPage() {
   }, [loading, entity?.coachReadiness, essay]);
 
   const allAnnotations = useMemo(() => {
-    if (!activeDraft?.evaluation) return [];
-    return collectAnnotations(activeDraft.evaluation);
-  }, [activeDraft]);
+    if (activeView === 'criteria' && activeDraft?.criteriaAnalysis) {
+      return collectCriteriaAnnotations(activeDraft.criteriaAnalysis);
+    }
+    if (activeView === 'overall' && activeDraft?.evaluation) {
+      return collectAnnotations(activeDraft.evaluation);
+    }
+    return [];
+  }, [activeView, activeDraft]);
 
   // Orchestration: report selection (composes actions.ensure + navigation)
   const handleDrawerSelectReport = useCallback((key: ReportKey) => {
     const view = key as ViewMode;
-    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication') {
+    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria') {
       actions.ensure(view as ActionKey);
       setActiveView(view);
     } else if (view === 'essay') {
@@ -151,6 +160,27 @@ export default function EssayPage() {
       setReanalyzing(false);
     }
   }, [activeDraft, essayId, ownerUid, user, editor.content]);
+
+  // Orchestration: save teacher criteria (Firestore write + clear analysis)
+  const isOwner = !ownerUid;
+  const handleSaveCriteria = useCallback(async (text: string, source: DocSource | null) => {
+    if (!essayId || !user) return;
+    const uid = ownerUid ?? user.uid;
+    const essayRef = doc(db, 'users', uid, 'essays', essayId);
+    await updateDoc(essayRef, {
+      teacherCriteria: text.trim() || null,
+      criteriaSource: source,
+    });
+    // Clear criteria analysis on current draft to trigger re-analysis
+    if (activeDraft) {
+      const draftRef = doc(db, 'users', uid, 'essays', essayId, 'drafts', activeDraft.id);
+      await updateDoc(draftRef, {
+        criteriaAnalysis: null,
+        criteriaStatus: null,
+        criteriaSnapshot: null,
+      });
+    }
+  }, [essayId, user, ownerUid, activeDraft]);
 
   const setEssayHeader = useSetEssayHeader();
   const gdocChange = useGDocChangeDetection(essay, activeDraft ?? null, isLatestDraft);
@@ -470,6 +500,32 @@ export default function EssayPage() {
         >
           <DuplicationView content={activeDraft.content} analysis={activeDraft.duplicationAnalysis!} />
         </AnalysisPanel>
+      )}
+
+      {activeView === 'criteria' && (
+        essay.teacherCriteria ? (
+          <AnalysisPanel
+            data={activeDraft.criteriaAnalysis}
+            error={actions.errors.criteria}
+            loading={actions.loading.criteria}
+            status={activeDraft.criteriaStatus}
+            onRetry={() => { actions.ensure('criteria'); }}
+            onRerun={() => { actions.rerun('criteria'); }}
+            rerunLoading={actions.loading.criteria}
+            defaultMessage="Analyzing criteria..."
+            placeholder="Criteria analysis is loading..."
+          >
+            <CriteriaPanel
+              analysis={activeDraft.criteriaAnalysis!}
+              teacherCriteria={essay.teacherCriteria}
+              criteriaSource={essay.criteriaSource ?? null}
+              isOwner={isOwner}
+              onSaveCriteria={handleSaveCriteria}
+            />
+          </AnalysisPanel>
+        ) : (
+          <CriteriaEmptyState isOwner={isOwner} onAdd={() => setShowCriteriaEdit(true)} />
+        )
       )}
 
     </div>

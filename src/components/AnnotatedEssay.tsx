@@ -1,14 +1,17 @@
 import { useMemo, useRef } from 'react';
 import type { TraitKey, TraitAnnotation } from '../types';
+import type { CriteriaAnnotation } from '../utils';
 import { useCommentLayout } from '../hooks/useCommentLayout';
 import { useActiveMarker } from '../hooks/useActiveMarker';
 import { classifyAnnotation } from '../utils';
 
 export type { TraitAnnotation } from '../types';
 
+export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation;
+
 interface Props {
   content: string;
-  annotations: TraitAnnotation[];
+  annotations: AnyAnnotation[];
   onChange?: (content: string) => void;
   readOnly?: boolean;
   activeTrait?: TraitKey | null;
@@ -17,7 +20,7 @@ interface Props {
 interface AnnotationMarker {
   start: number;
   end: number;
-  annotation: TraitAnnotation;
+  annotation: AnyAnnotation;
   id: string;
   kind: 'praise' | 'suggestion';
 }
@@ -29,7 +32,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
   // Filter annotations by active trait if set
   const filteredAnnotations = useMemo(() => {
     if (!activeTrait) return annotations;
-    return annotations.filter(a => a.traitKey === activeTrait);
+    return annotations.filter(a => 'traitKey' in a && a.traitKey === activeTrait);
   }, [annotations, activeTrait]);
 
   // Find all annotation positions in the escaped content
@@ -116,7 +119,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
               style={{ top: commentPositions[m.id] ?? 0 }}
               onClick={() => handleMarkClick(m.id)}
             >
-              <span className="sidebar-comment-trait">{m.annotation.traitLabel}</span>
+              <span className="sidebar-comment-trait">{'traitLabel' in m.annotation ? m.annotation.traitLabel : m.annotation.criterionText}</span>
               <span className="sidebar-comment-text">{m.annotation.comment}</span>
             </div>
           ))}
