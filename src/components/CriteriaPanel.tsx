@@ -113,44 +113,46 @@ export function CriteriaPanel({
         )}
       </div>
 
-      {/* Collapsible criteria checklist */}
-      <div
-        className="criteria-checklist-header"
-        onClick={collapsible ? () => setCollapsed(c => !c) : undefined}
-        style={collapsible ? { cursor: 'pointer', userSelect: 'none' } : undefined}
-      >
-        {collapsible && (
-          <span style={{
-            fontSize: 11,
-            color: 'var(--color-text-muted)',
-            transition: 'transform 150ms',
-            transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-            display: 'inline-block',
-            marginRight: 6,
-          }}>
-            ▼
-          </span>
-        )}
-        <Text size="xs" fw={600} c="dimmed" component="span" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          {totalCount} criteria
-        </Text>
-      </div>
-
-      {!collapsed && (
-        <div className="criteria-checklist">
-          {analysis.criteria.map((cr, i) => (
-            <div key={i} className="criteria-checklist-item">
-              <Badge color={STATUS_BADGE_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0 }}>
-                {STATUS_LABELS[cr.status]}
-              </Badge>
-              <div>
-                <Text size="sm" fw={500}>{cr.criterion}</Text>
-                <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
-              </div>
-            </div>
-          ))}
+      {/* Criteria checklist in its own summary card */}
+      <div className="analysis-summary">
+        <div
+          className="criteria-checklist-header"
+          onClick={collapsible ? () => setCollapsed(c => !c) : undefined}
+          style={collapsible ? { cursor: 'pointer', userSelect: 'none' } : undefined}
+        >
+          {collapsible && (
+            <span style={{
+              fontSize: 11,
+              color: 'var(--color-text-muted)',
+              transition: 'transform 150ms',
+              transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+              display: 'inline-block',
+              marginRight: 6,
+            }}>
+              ▼
+            </span>
+          )}
+          <Text size="xs" fw={600} c="dimmed" component="span" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {totalCount} criteria
+          </Text>
         </div>
-      )}
+
+        {!collapsed && (
+          <div className="criteria-checklist">
+            {analysis.criteria.map((cr, i) => (
+              <div key={i} className="criteria-checklist-item">
+                <Badge color={STATUS_BADGE_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0 }}>
+                  {STATUS_LABELS[cr.status]}
+                </Badge>
+                <div>
+                  <Text size="sm" fw={500}>{cr.criterion}</Text>
+                  <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Edit modal */}
       <Modal opened={editOpen} onClose={() => setEditOpen(false)} title="Edit Teacher Criteria" size="lg">
