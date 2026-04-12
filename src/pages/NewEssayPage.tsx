@@ -166,6 +166,7 @@ export default function NewEssayPage() {
           onChange={(val) => val && setWritingType(val as WritingType)}
           data={WRITING_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
           mb="md"
+          style={{ maxWidth: 240 }}
         />
         <ContentInput
           label="Assignment Prompt"
