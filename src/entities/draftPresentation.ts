@@ -24,10 +24,11 @@ export interface DraftPresentation {
   verdict: VerdictPresentation;
   canEdit: boolean;
   hasPrompt: boolean;
+  hasCriteria: boolean;
   isLatest: boolean;
 }
 
-const REPORT_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication'];
+const REPORT_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria'];
 const ONE_MINUTE = 60_000;
 const THREE_MINUTES = 180_000;
 const FIVE_MINUTES = 300_000;
@@ -37,8 +38,10 @@ function resolveReportStatus(
   key: AnalysisKey,
   draftAge: number,
   hasPrompt: boolean,
+  hasCriteria: boolean,
 ): ReportStatus {
   if (key === 'prompt' && !hasPrompt) return 'unavailable';
+  if (key === 'criteria' && !hasCriteria) return 'unavailable';
 
   const base = entity.analysisStatus(key);
 
@@ -84,12 +87,13 @@ export function presentDraft(
   hasPrompt: boolean,
   isLatest: boolean,
   _isOwner?: boolean,
+  hasCriteria?: boolean,
 ): DraftPresentation {
   const reports = {} as Record<AnalysisKey, ReportPresentation>;
 
   for (const key of REPORT_KEYS) {
     reports[key] = {
-      status: resolveReportStatus(entity, key, draftAge, hasPrompt),
+      status: resolveReportStatus(entity, key, draftAge, hasPrompt, !!hasCriteria),
       issueCount: entity.issueCount(key),
       isRecommended: entity.recommendedReport === key,
       statusMessage: entity.statusMessage(key),
@@ -101,6 +105,7 @@ export function presentDraft(
     verdict: resolveVerdict(entity, draftAge),
     canEdit: isLatest,
     hasPrompt,
+    hasCriteria: !!hasCriteria,
     isLatest,
   };
 }
