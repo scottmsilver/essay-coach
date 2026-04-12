@@ -66,7 +66,8 @@ export default function NewEssayPage() {
 
   const handlePickerImport = async (target: 'prompt' | 'essay' | 'criteria') => {
     try {
-      const result = await openGooglePicker(user?.email ?? undefined);
+      const purposeLabels = { prompt: 'assignment prompt', essay: 'essay', criteria: 'teacher criteria' };
+      const result = await openGooglePicker(user?.email ?? undefined, purposeLabels[target]);
       if (!result) return; // user cancelled
       // Open the dialog with the URL pre-filled — it will auto-fetch
       setLastImportedUrl(result.url);

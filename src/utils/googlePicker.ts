@@ -118,7 +118,7 @@ export interface PickerResult {
  * Returns null if the user cancels.
  * @param userEmail - the signed-in user's email, used to select the right account when multiple are signed in
  */
-export async function openGooglePicker(userEmail?: string): Promise<PickerResult | null> {
+export async function openGooglePicker(userEmail?: string, purpose?: string): Promise<PickerResult | null> {
   await Promise.all([ensurePickerApi(), ensureGis()]);
   const token = await getToken(userEmail);
 
@@ -130,7 +130,7 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
     const builder = new google.picker.PickerBuilder()
       .setOAuthToken(token)
       .addView(view)
-      .setTitle('Select a Google Doc')
+      .setTitle(purpose ? `Select a Google Doc for your ${purpose}` : 'Select a Google Doc')
       .setOrigin(window.location.origin)
       .setCallback((data) => {
         const action = data[google.picker.Response.ACTION];
