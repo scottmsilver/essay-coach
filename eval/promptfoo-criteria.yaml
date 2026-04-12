@@ -1,0 +1,16 @@
+description: Teacher Criteria Analysis Evaluation
+providers:
+- id: file://providers/gemini-criteria-grader.ts
+  label: gemini-3.1-pro-preview (criteria)
+  config:
+    model: gemini-3.1-pro-preview
+prompts:
+- 'Evaluate criteria: {{content}}'
+tests: file://criteria-tests.ts
+defaultTest:
+  options:
+    provider:
+      anthropic:
+        modelName: claude-sonnet-4-6
+  assert:
+  - type: is-json

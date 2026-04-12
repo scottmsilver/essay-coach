@@ -6,6 +6,7 @@ import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
 import { analyzePromptWithGemini } from './promptAdherence';
 import { analyzeDuplicationWithGemini } from './duplication';
+import { analyzeCriteriaWithGemini } from './criteria';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
@@ -149,6 +150,37 @@ export const onDraftCreated = onDocumentCreated(
         });
 
         logger.info('Mega analysis complete', { uid, essayId, draftId, model: megaModel });
+
+        // Criteria analysis runs separately from mega — fire if criteria exist
+        const teacherCriteria = essayData?.teacherCriteria;
+        if (teacherCriteria?.trim()) {
+          try {
+            const criteriaInput = {
+              teacherCriteria,
+              assignmentPrompt,
+              writingType,
+              content,
+              previousCriteriaAnalysis: undefined as string | undefined,
+              previousCriteriaSnapshot: undefined as string | undefined,
+            };
+            if (draftNumber > 1) {
+              const prevDrafts = await draftRef.parent.where('draftNumber', '==', draftNumber - 1).limit(1).get();
+              if (!prevDrafts.empty) {
+                const prevData = prevDrafts.docs[0].data();
+                if (prevData.criteriaAnalysis) criteriaInput.previousCriteriaAnalysis = JSON.stringify(prevData.criteriaAnalysis);
+                if (prevData.criteriaSnapshot) criteriaInput.previousCriteriaSnapshot = prevData.criteriaSnapshot;
+              }
+            }
+            const criteriaResult = await analyzeCriteriaWithGemini(geminiApiKey.value(), criteriaInput, draftRef);
+            await draftRef.update({ criteriaAnalysis: criteriaResult, criteriaStatus: null, criteriaSnapshot: teacherCriteria });
+            logger.info('Criteria analysis complete (post-mega)', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Criteria analysis failed (post-mega)', { error: msg, essayId, draftId });
+            await draftRef.update({ criteriaStatus: { stage: 'error', message: 'Criteria analysis failed' } });
+          }
+        }
+
         return; // Done — skip the entire existing parallel path
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -305,6 +337,46 @@ export const onDraftCreated = onDocumentCreated(
       }
     } else {
       logger.info('Prompt adherence already processing or complete, skipping', { essayId, draftId });
+    }
+
+    // Criteria analysis: conditional on teacher criteria existing
+    if (!isActivelyProcessing(data.criteriaStatus) && !data.criteriaAnalysis) {
+      const essayRef = draftRef.parent.parent!;
+      const essaySnap = await essayRef.get();
+      const teacherCriteria = essaySnap.data()?.teacherCriteria;
+
+      if (teacherCriteria?.trim()) {
+        logger.info('Criteria analysis not actively processing — trigger firing', { essayId, draftId });
+        tasks.push(
+          (async () => {
+            try {
+              const essayData = essaySnap.data()!;
+              const criteriaInput: Parameters<typeof analyzeCriteriaWithGemini>[1] = {
+                teacherCriteria,
+                assignmentPrompt: essayData.assignmentPrompt || '',
+                writingType: essayData.writingType || 'argumentative',
+                content,
+              };
+              const draftNumber = data.draftNumber || 1;
+              if (draftNumber > 1) {
+                const prevDrafts = await draftRef.parent.where('draftNumber', '==', draftNumber - 1).limit(1).get();
+                if (!prevDrafts.empty) {
+                  const prevData = prevDrafts.docs[0].data();
+                  if (prevData.criteriaAnalysis) criteriaInput.previousCriteriaAnalysis = JSON.stringify(prevData.criteriaAnalysis);
+                  if (prevData.criteriaSnapshot) criteriaInput.previousCriteriaSnapshot = prevData.criteriaSnapshot;
+                }
+              }
+              const analysis = await analyzeCriteriaWithGemini(apiKey, criteriaInput, draftRef);
+              await draftRef.update({ criteriaAnalysis: analysis, criteriaStatus: null, criteriaSnapshot: teacherCriteria });
+              logger.info('Trigger criteria analysis complete', { essayId, draftId });
+            } catch (error: unknown) {
+              const msg = error instanceof Error ? error.message : String(error);
+              logger.error('Trigger criteria analysis failed', { error: msg, essayId, draftId });
+              await draftRef.update({ criteriaStatus: { stage: 'error', message: 'Criteria analysis failed' } });
+            }
+          })()
+        );
+      }
     }
 
     if (tasks.length > 0) {

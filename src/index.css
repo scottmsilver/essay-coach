@@ -1990,3 +1990,99 @@ mark {
   font-size: 13px;
   color: var(--color-text-muted);
 }
+
+/* ── ContentInput — collapsed zone / preview ─────────────────────────── */
+.content-input-zone {
+  border: 1.5px dashed var(--color-border);
+  border-radius: 8px;
+  padding: 20px 16px;
+  background: var(--color-surface);
+}
+
+.content-input-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.content-input-action:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.content-input-action-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.content-input-divider {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+}
+
+.content-input-preview {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: border-color 150ms ease;
+}
+.content-input-preview:hover {
+  border-color: var(--color-primary);
+}
+
+.content-input-imported {
+  border-left: 3px solid var(--color-primary);
+}
+
+.content-input-doc-badge {
+  color: var(--color-primary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ── CriteriaPanel — checklist below summary card ────────────────────── */
+.criteria-view {
+  margin-bottom: 24px;
+}
+
+.criteria-checklist-header {
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+}
+
+.criteria-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.criteria-checklist-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.criteria-checklist-item:last-child {
+  border-bottom: none;
+}
+
+.criteria-bar-segment {
+  height: 100%;
+}

@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Button, Group, Select, Text, TextInput, Textarea } from '@mantine/core';
+import { Button, Select, Text, TextInput } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { WRITING_TYPES, type WritingType, type DocSource } from '../types';
 import { countWords } from '../utils';
-import { handleRichPaste } from '../utils/pasteHandler';
 import GDocImportDialog from '../components/GDocImportDialog';
+import ContentInput from '../components/ContentInput';
 import { fireAllAnalyses } from '../utils/submitEssay';
 import { openGooglePicker } from '../utils/googlePicker';
 
@@ -23,7 +23,9 @@ export default function NewEssayPage() {
   const [error, setError] = useState<string | null>(null);
   const [promptSource, setPromptSource] = useState<DocSource | null>(null);
   const [contentSource, setContentSource] = useState<DocSource | null>(null);
-  const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | null>(null);
+  const [teacherCriteria, setTeacherCriteria] = useState('');
+  const [criteriaSource, setCriteriaSource] = useState<DocSource | null>(null);
+  const [importTarget, setImportTarget] = useState<'prompt' | 'essay' | 'criteria' | null>(null);
   const [lastImportedUrl, setLastImportedUrl] = useState('');
   const [lastImportedDocName, setLastImportedDocName] = useState('');
   const [titleIsGenerated, setTitleIsGenerated] = useState(false);
@@ -40,6 +42,9 @@ export default function NewEssayPage() {
     } else if (importTarget === 'essay') {
       setContent(text);
       setContentSource(source);
+    } else if (importTarget === 'criteria') {
+      setTeacherCriteria(text);
+      setCriteriaSource(source);
     }
     setImportTarget(null);
   };
@@ -54,9 +59,15 @@ export default function NewEssayPage() {
     setContent('');
   };
 
-  const handlePickerImport = async (target: 'prompt' | 'essay') => {
+  const clearCriteriaSource = () => {
+    setCriteriaSource(null);
+    setTeacherCriteria('');
+  };
+
+  const handlePickerImport = async (target: 'prompt' | 'essay' | 'criteria') => {
     try {
-      const result = await openGooglePicker(user?.email ?? undefined);
+      const purposeLabels = { prompt: 'assignment prompt', essay: 'essay', criteria: 'teacher criteria' };
+      const result = await openGooglePicker(user?.email ?? undefined, purposeLabels[target]);
       if (!result) return; // user cancelled
       // Open the dialog with the URL pre-filled — it will auto-fetch
       setLastImportedUrl(result.url);
@@ -121,6 +132,8 @@ export default function NewEssayPage() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           currentDraftNumber: 1,
+          teacherCriteria: teacherCriteria.trim() || null,
+          criteriaSource: criteriaSource,
           ...(promptSource && { promptSource }),
           ...(contentSource && { contentSource }),
         }),
@@ -137,7 +150,7 @@ export default function NewEssayPage() {
       navigate(`/essay/${essayRef.id}`);
 
       // Fire all 3 analyses in parallel (fire-and-forget)
-      fireAllAnalyses(essayRef.id, draftRef.id);
+      fireAllAnalyses(essayRef.id, draftRef.id, undefined, teacherCriteria);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to submit essay. Please try again.');
       setSubmitting(false);
@@ -145,7 +158,7 @@ export default function NewEssayPage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
       <h2>New Essay</h2>
       <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
         <Select
@@ -154,35 +167,36 @@ export default function NewEssayPage() {
           onChange={(val) => val && setWritingType(val as WritingType)}
           data={WRITING_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
           mb="md"
+          withCheckIcon={false}
+          w="fit-content"
+          styles={{ input: { minWidth: 160 } }}
         />
-        {/* Assignment Prompt */}
-        <Group justify="space-between" mb={4}>
-          <Text fw={500} size="sm">Assignment Prompt <span style={{ color: 'red' }}>*</span></Text>
-          {promptSource ? (
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>Change</Button>
-              <Button variant="subtle" size="compact-xs" color="red" onClick={clearPromptSource}>Clear</Button>
-            </Group>
-          ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>
-              Import from Google Docs
-            </Button>
-          )}
-        </Group>
-        <Textarea
-          value={assignmentPrompt}
-          onChange={(e) => {
-            setAssignmentPrompt(e.currentTarget.value);
-            if (promptSource) setPromptSource(null);
-          }}
-          maxLength={10000}
+        <ContentInput
+          label="Assignment Prompt"
           required
+          value={assignmentPrompt}
+          onChange={(v) => { setAssignmentPrompt(v); if (promptSource) setPromptSource(null); }}
+          imported={!!promptSource}
+          onImportClick={() => handlePickerImport('prompt')}
+          onClear={clearPromptSource}
           placeholder="Paste the assignment prompt here..."
-          rows={3}
-          description={`${assignmentPrompt.length}/10,000 characters`}
-          mb="md"
-          readOnly={!!promptSource}
+
+          maxLength={10000}
+          minRows={3}
+          maxRows={8}
+        />
+        <ContentInput
+          label="Teacher Criteria"
+          optional
+          value={teacherCriteria}
+          onChange={(v) => { setTeacherCriteria(v); if (criteriaSource) setCriteriaSource(null); }}
+          imported={!!criteriaSource}
+          onImportClick={() => handlePickerImport('criteria')}
+          onClear={clearCriteriaSource}
+          placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
+
+          minRows={3}
+          maxRows={8}
         />
         <div style={{ position: 'relative' }}>
           <TextInput
@@ -202,35 +216,20 @@ export default function NewEssayPage() {
             <Text size="xs" c="dimmed" style={{ position: 'absolute', right: 0, top: 0 }}>AI-suggested</Text>
           )}
         </div>
-        {/* Essay Content */}
-        <Group justify="space-between" mb={4}>
-          <Text fw={500} size="sm">Your Essay <span style={{ color: 'red' }}>*</span></Text>
-          {contentSource ? (
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>Change</Button>
-              <Button variant="subtle" size="compact-xs" color="red" onClick={clearContentSource}>Clear</Button>
-            </Group>
-          ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>
-              Import from Google Docs
-            </Button>
-          )}
-        </Group>
-        <Textarea
-          value={content}
-          onChange={(e) => {
-            setContent(e.currentTarget.value);
-            if (contentSource) setContentSource(null);
-          }}
-          onPaste={(e) => handleRichPaste(e, setContent)}
+        <ContentInput
+          label="Your Essay"
           required
+          value={content}
+          onChange={(v) => { setContent(v); if (contentSource) setContentSource(null); }}
+          imported={!!contentSource}
+          onImportClick={() => handlePickerImport('essay')}
+          onClear={clearContentSource}
           placeholder="Paste or type your essay here..."
-          rows={16}
-          description={`${wordCount.toLocaleString()} / 10,000 words`}
-          error={wordCount > 10000 ? 'Essay exceeds 10,000 word limit' : undefined}
-          mb="md"
-          readOnly={!!contentSource}
+
+          minRows={8}
+          maxRows={20}
+          showWordCount
+          wordLimit={10000}
         />
         {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
         <Button type="submit" disabled={submitting || !title || !assignmentPrompt || !content || wordCount > 10000} loading={submitting}>
@@ -241,7 +240,7 @@ export default function NewEssayPage() {
         opened={importTarget !== null}
         onClose={() => setImportTarget(null)}
         onImport={handleImport}
-        label={importTarget === 'prompt' ? 'prompt' : 'essay'}
+        label={importTarget === 'prompt' ? 'prompt' : importTarget === 'criteria' ? 'criteria' : 'essay'}
         initialUrl={lastImportedUrl}
         initialDocName={lastImportedDocName}
       />

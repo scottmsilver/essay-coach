@@ -15,6 +15,15 @@ function getClientId(): string {
   return id;
 }
 
+function getApiKey(): string {
+  return import.meta.env.VITE_FIREBASE_API_KEY || '';
+}
+
+function getAppId(): string {
+  // GCP project number — same as Firebase messaging sender ID
+  return import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '';
+}
+
 // ---- Script loading ----
 
 let pickerLoaded = false;
@@ -109,7 +118,7 @@ export interface PickerResult {
  * Returns null if the user cancels.
  * @param userEmail - the signed-in user's email, used to select the right account when multiple are signed in
  */
-export async function openGooglePicker(userEmail?: string): Promise<PickerResult | null> {
+export async function openGooglePicker(userEmail?: string, purpose?: string): Promise<PickerResult | null> {
   await Promise.all([ensurePickerApi(), ensureGis()]);
   const token = await getToken(userEmail);
 
@@ -117,10 +126,11 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
     const view = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS);
     view.setMimeTypes('application/vnd.google-apps.document');
 
+    const apiKey = getApiKey();
     const builder = new google.picker.PickerBuilder()
       .setOAuthToken(token)
       .addView(view)
-      .setTitle('Select a Google Doc')
+      .setTitle(purpose ? `Select a Google Doc for your ${purpose}` : 'Select a Google Doc')
       .setOrigin(window.location.origin)
       .setCallback((data) => {
         const action = data[google.picker.Response.ACTION];
@@ -142,6 +152,15 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
     // When multiple Google accounts are signed in, tell the Picker which one to use
     if (userEmail) {
       (builder as unknown as { setAuthUser(email: string): void }).setAuthUser(userEmail);
+    }
+
+    // setDeveloperKey + setAppId are required by Google Picker but missing from type defs
+    if (apiKey) {
+      (builder as unknown as { setDeveloperKey(key: string): void }).setDeveloperKey(apiKey);
+    }
+    const appId = getAppId();
+    if (appId) {
+      (builder as unknown as { setAppId(id: string): void }).setAppId(appId);
     }
 
     const picker = builder.build();
