@@ -100,23 +100,17 @@ export function CriteriaPanel({
         </Card>
       )}
 
-      {/* Criteria checklist */}
+      {/* Criteria checklist — compact summary */}
       {analysis.criteria.map((cr, i) => (
-        <Card key={i} padding="sm" radius="sm" withBorder>
-          <Group justify="space-between" mb={4}>
-            <Badge color={STATUS_COLORS[cr.status]} variant="light" size="sm">
-              {STATUS_LABELS[cr.status]}
-            </Badge>
-            {cr.annotations.length > 0 && (
-              <Badge variant="default" size="sm">
-                {cr.annotations.length} annotation{cr.annotations.length !== 1 ? 's' : ''}
-              </Badge>
-            )}
-          </Group>
-          <Text size="sm" fw={600} mb={4}>{cr.criterion}</Text>
-          <Text size="xs" c="dimmed" mb={4}>{cr.evidence}</Text>
-          <Text size="sm">{cr.comment}</Text>
-        </Card>
+        <Group key={i} gap="sm" wrap="nowrap" align="flex-start">
+          <Badge color={STATUS_COLORS[cr.status]} variant="light" size="sm" style={{ flexShrink: 0, marginTop: 2 }}>
+            {STATUS_LABELS[cr.status]}
+          </Badge>
+          <div>
+            <Text size="sm" fw={500}>{cr.criterion}</Text>
+            <Text size="xs" c="dimmed" mt={2}>{cr.comment}</Text>
+          </div>
+        </Group>
       ))}
 
       {/* Edit modal */}
