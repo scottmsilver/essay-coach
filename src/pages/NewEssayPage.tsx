@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Button, Group, Select, Text, TextInput, Textarea } from '@mantine/core';
+import { Button, Select, Text, TextInput } from '@mantine/core';
 import { functions, db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { WRITING_TYPES, type WritingType, type DocSource } from '../types';
 import { countWords } from '../utils';
-import { handleRichPaste } from '../utils/pasteHandler';
 import GDocImportDialog from '../components/GDocImportDialog';
+import ContentInput from '../components/ContentInput';
 import { fireAllAnalyses } from '../utils/submitEssay';
 import { openGooglePicker } from '../utils/googlePicker';
 
@@ -167,63 +167,32 @@ export default function NewEssayPage() {
           data={WRITING_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
           mb="md"
         />
-        {/* Assignment Prompt */}
-        <Group justify="space-between" mb={4}>
-          <Text fw={500} size="sm">Assignment Prompt <span style={{ color: 'red' }}>*</span></Text>
-          {promptSource ? (
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>Change</Button>
-              <Button variant="subtle" size="compact-xs" color="red" onClick={clearPromptSource}>Clear</Button>
-            </Group>
-          ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('prompt')}>
-              Import from Google Docs
-            </Button>
-          )}
-        </Group>
-        <Textarea
-          value={assignmentPrompt}
-          onChange={(e) => {
-            setAssignmentPrompt(e.currentTarget.value);
-            if (promptSource) setPromptSource(null);
-          }}
-          maxLength={10000}
+        <ContentInput
+          label="Assignment Prompt"
           required
+          value={assignmentPrompt}
+          onChange={(v) => { setAssignmentPrompt(v); if (promptSource) setPromptSource(null); }}
+          imported={!!promptSource}
+          onImportClick={() => handlePickerImport('prompt')}
+          onClear={clearPromptSource}
           placeholder="Paste the assignment prompt here..."
-          rows={3}
-          description={`${assignmentPrompt.length}/10,000 characters`}
-          mb="md"
-          readOnly={!!promptSource}
-        />
-        {/* Teacher Criteria */}
-        <Group justify="space-between" mb={4}>
-          <Text fw={500} size="sm">Teacher Criteria <span style={{ color: 'var(--mantine-color-dimmed)' }}>(optional)</span></Text>
-          {criteriaSource ? (
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('criteria')}>Change</Button>
-              <Button variant="subtle" size="compact-xs" color="red" onClick={clearCriteriaSource}>Clear</Button>
-            </Group>
-          ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('criteria')}>
-              Import from Google Docs
-            </Button>
-          )}
-        </Group>
-        <Textarea
-          value={teacherCriteria}
-          onChange={(e) => {
-            setTeacherCriteria(e.currentTarget.value);
-            if (criteriaSource) setCriteriaSource(null);
-          }}
-          onPaste={(e) => handleRichPaste(e, setTeacherCriteria)}
-          placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
-          autosize
+
+          maxLength={10000}
           minRows={3}
           maxRows={8}
-          mb="md"
-          readOnly={!!criteriaSource}
+        />
+        <ContentInput
+          label="Teacher Criteria"
+          optional
+          value={teacherCriteria}
+          onChange={(v) => { setTeacherCriteria(v); if (criteriaSource) setCriteriaSource(null); }}
+          imported={!!criteriaSource}
+          onImportClick={() => handlePickerImport('criteria')}
+          onClear={clearCriteriaSource}
+          placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
+
+          minRows={3}
+          maxRows={8}
         />
         <div style={{ position: 'relative' }}>
           <TextInput
@@ -243,35 +212,20 @@ export default function NewEssayPage() {
             <Text size="xs" c="dimmed" style={{ position: 'absolute', right: 0, top: 0 }}>AI-suggested</Text>
           )}
         </div>
-        {/* Essay Content */}
-        <Group justify="space-between" mb={4}>
-          <Text fw={500} size="sm">Your Essay <span style={{ color: 'red' }}>*</span></Text>
-          {contentSource ? (
-            <Group gap="xs">
-              <Text size="xs" c="dimmed">Imported from Google Docs</Text>
-              <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>Change</Button>
-              <Button variant="subtle" size="compact-xs" color="red" onClick={clearContentSource}>Clear</Button>
-            </Group>
-          ) : (
-            <Button variant="subtle" size="compact-xs" onClick={() => handlePickerImport('essay')}>
-              Import from Google Docs
-            </Button>
-          )}
-        </Group>
-        <Textarea
-          value={content}
-          onChange={(e) => {
-            setContent(e.currentTarget.value);
-            if (contentSource) setContentSource(null);
-          }}
-          onPaste={(e) => handleRichPaste(e, setContent)}
+        <ContentInput
+          label="Your Essay"
           required
+          value={content}
+          onChange={(v) => { setContent(v); if (contentSource) setContentSource(null); }}
+          imported={!!contentSource}
+          onImportClick={() => handlePickerImport('essay')}
+          onClear={clearContentSource}
           placeholder="Paste or type your essay here..."
-          rows={16}
-          description={`${wordCount.toLocaleString()} / 10,000 words`}
-          error={wordCount > 10000 ? 'Essay exceeds 10,000 word limit' : undefined}
-          mb="md"
-          readOnly={!!contentSource}
+
+          minRows={8}
+          maxRows={20}
+          showWordCount
+          wordLimit={10000}
         />
         {error && <div className="error-state" style={{ marginBottom: 16 }}>{error}</div>}
         <Button type="submit" disabled={submitting || !title || !assignmentPrompt || !content || wordCount > 10000} loading={submitting}>
