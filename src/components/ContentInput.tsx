@@ -91,11 +91,6 @@ export default function ContentInput({
         <div
           className="content-input-zone"
           onPaste={handleCollapsedPaste}
-          tabIndex={0}
-          onFocus={expand}
-          onKeyDown={(e) => {
-            if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) expand();
-          }}
         >
           <Group gap="lg" justify="center">
             <UnstyledButton onClick={expand} className="content-input-action">

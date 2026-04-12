@@ -1996,14 +1996,7 @@ mark {
   border: 1.5px dashed var(--color-border);
   border-radius: 8px;
   padding: 20px 16px;
-  cursor: pointer;
-  transition: border-color 200ms ease, background 200ms ease;
   background: var(--color-surface);
-}
-.content-input-zone:hover,
-.content-input-zone:focus-within {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
 }
 
 .content-input-action {
@@ -2013,22 +2006,22 @@ mark {
   font-family: var(--font-ui);
   font-size: 14px;
   color: var(--color-text-secondary);
-  padding: 6px 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  transition: color 150ms ease, background 150ms ease;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 .content-input-action:hover {
   color: var(--color-primary);
+  border-color: var(--color-primary);
   background: var(--color-primary-light);
 }
 
 .content-input-action-icon {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
-  opacity: 0.6;
-}
-.content-input-action:hover .content-input-action-icon {
-  opacity: 1;
 }
 
 .content-input-divider {
