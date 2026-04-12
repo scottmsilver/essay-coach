@@ -1,4 +1,4 @@
-import { Badge, Card, Group, Stack, Text, ActionIcon, Modal, Textarea, Button } from '@mantine/core';
+import { Badge, Group, Stack, Text, ActionIcon, Modal, Textarea, Button } from '@mantine/core';
 import { IconPencil, IconFileImport } from '@tabler/icons-react';
 import { useState } from 'react';
 import type { CriteriaAnalysis, DocSource } from '../types';
