@@ -63,7 +63,7 @@ export default function EssayPage() {
     () => sessionStorage.getItem('essaycoach_notif_dismissed') === '1'
   );
   const [resubmitError] = useState<string | null>(null);
-  const [showCriteriaEdit, setShowCriteriaEdit] = useState(false);
+
   const popoverRef = useClickOutside<HTMLDivElement>((e) => {
     const badge = (e.target as Element)?.closest?.('.score-pill');
     if (!badge) setActiveTrait(null);
@@ -524,7 +524,7 @@ export default function EssayPage() {
             />
           </AnalysisPanel>
         ) : (
-          <CriteriaEmptyState isOwner={isOwner} onAdd={() => setShowCriteriaEdit(true)} />
+          <CriteriaEmptyState isOwner={isOwner} onSaveCriteria={handleSaveCriteria} />
         )
       )}
 

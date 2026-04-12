@@ -182,16 +182,72 @@ export function CriteriaPanel({
   );
 }
 
-export function CriteriaEmptyState({ isOwner, onAdd }: { isOwner: boolean; onAdd: () => void }) {
+export function CriteriaEmptyState({ isOwner, onSaveCriteria }: { isOwner: boolean; onSaveCriteria: (text: string, source: DocSource | null) => void }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [editSource, setEditSource] = useState<DocSource | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const handleSave = () => {
+    onSaveCriteria(editText, editSource);
+    setEditOpen(false);
+  };
+
+  const handleImport = (text: string, source: DocSource) => {
+    setEditText(text);
+    setEditSource(source);
+    setImportOpen(false);
+  };
+
   return (
     <Stack align="center" gap="md" py="xl">
       <Text size="sm" c="dimmed" ta="center">
         No teacher criteria provided. Add your teacher's rubric to see how your essay measures up.
       </Text>
       {isOwner && (
-        <Button variant="light" onClick={onAdd}>
-          Add Criteria
-        </Button>
+        <>
+          <Button variant="light" onClick={() => setEditOpen(true)}>
+            Add Criteria
+          </Button>
+          <Modal opened={editOpen} onClose={() => setEditOpen(false)} title="Add Teacher Criteria" size="lg">
+            <Stack gap="md">
+              <Group justify="flex-end">
+                {editSource ? (
+                  <Group gap="xs">
+                    <Badge size="xs" variant="light">Imported from Google Docs</Badge>
+                    <ActionIcon size="xs" variant="subtle" onClick={() => setImportOpen(true)}>
+                      <IconPencil size={12} />
+                    </ActionIcon>
+                  </Group>
+                ) : (
+                  <Button variant="subtle" size="compact-xs" leftSection={<IconFileImport size={14} />} onClick={() => setImportOpen(true)}>
+                    Import from Google Docs
+                  </Button>
+                )}
+              </Group>
+              <Textarea
+                placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
+                value={editText}
+                onChange={(e) => setEditText(e.currentTarget.value)}
+                onPaste={(e) => handleRichPaste(e, setEditText)}
+                readOnly={!!editSource}
+                autosize
+                minRows={6}
+                maxRows={15}
+              />
+              <Group justify="flex-end">
+                <Button variant="subtle" onClick={() => setEditOpen(false)}>Cancel</Button>
+                <Button onClick={handleSave} disabled={!editText.trim()}>Save & Analyze</Button>
+              </Group>
+            </Stack>
+            <GDocImportDialog
+              opened={importOpen}
+              onClose={() => setImportOpen(false)}
+              onImport={handleImport}
+              label="criteria"
+            />
+          </Modal>
+        </>
       )}
     </Stack>
   );
