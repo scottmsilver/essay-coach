@@ -15,6 +15,10 @@ function getClientId(): string {
   return id;
 }
 
+function getApiKey(): string {
+  return import.meta.env.VITE_FIREBASE_API_KEY || '';
+}
+
 // ---- Script loading ----
 
 let pickerLoaded = false;
@@ -117,6 +121,7 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
     const view = new google.picker.DocsView(google.picker.ViewId.DOCUMENTS);
     view.setMimeTypes('application/vnd.google-apps.document');
 
+    const apiKey = getApiKey();
     const builder = new google.picker.PickerBuilder()
       .setOAuthToken(token)
       .addView(view)
@@ -142,6 +147,11 @@ export async function openGooglePicker(userEmail?: string): Promise<PickerResult
     // When multiple Google accounts are signed in, tell the Picker which one to use
     if (userEmail) {
       (builder as unknown as { setAuthUser(email: string): void }).setAuthUser(userEmail);
+    }
+
+    // setDeveloperKey is required by Google Picker but missing from the type defs
+    if (apiKey) {
+      (builder as unknown as { setDeveloperKey(key: string): void }).setDeveloperKey(apiKey);
     }
 
     const picker = builder.build();
