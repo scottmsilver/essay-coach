@@ -527,7 +527,6 @@ export default function EssayPage() {
               content={activeDraft.content}
               annotations={allAnnotations}
               readOnly
-              hideSidebar
             />
           </AnalysisPanel>
         ) : (
