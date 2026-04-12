@@ -76,13 +76,17 @@ export type { MatrixCell, MatrixRow, PromptMatrix, PromptQuestion, PromptAnalysi
 import type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis } from '../shared/duplicationTypes';
 export type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis };
 
+// Criteria analysis types — canonical definitions in shared/criteriaTypes.ts
+import type { CriterionResult, CriteriaAnalysis, CriteriaComparison } from '../shared/criteriaTypes';
+export type { CriterionResult, CriteriaAnalysis, CriteriaComparison };
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -92,6 +96,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   transitions: 'Transitions',
   prompt: 'Prompt Fit',
   duplication: 'Duplication',
+  criteria: 'Criteria',
 };
 
 export interface ReportSummary {
@@ -125,6 +130,9 @@ export interface Draft {
   promptStatus?: EvaluationStatus | null;
   duplicationAnalysis?: DuplicationAnalysis | null;
   duplicationStatus?: EvaluationStatus | null;
+  criteriaAnalysis?: CriteriaAnalysis | null;
+  criteriaStatus?: EvaluationStatus | null;
+  criteriaSnapshot?: string | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;
@@ -142,6 +150,8 @@ export interface Essay {
   currentDraftNumber: number;
   promptSource?: DocSource | null;
   contentSource?: DocSource | null;
+  teacherCriteria?: string | null;
+  criteriaSource?: DocSource | null;
 }
 
 export interface Share {
