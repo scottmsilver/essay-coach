@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { signInWithCustomToken } from 'firebase/auth';
 import { Button, Stack } from '@mantine/core';
@@ -14,11 +14,10 @@ const DEV_USERS = [
 export default function LoginPage() {
   const { user, loading, allowed, signIn, logOut } = useAuth();
   const [devLoading, setDevLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const autoLoginRef = useRef(false);
 
-  if (loading) return <div className="center">Loading...</div>;
-  if (user && allowed) return <Navigate to="/" />;
-
-  const handleDevSignIn = async (email: string) => {
+  const handleDevSignIn = useCallback(async (email: string) => {
     setDevLoading(true);
     try {
       const devSignIn = httpsCallable<{ email: string }, { token: string }>(functions, 'devSignIn');
@@ -29,7 +28,32 @@ export default function LoginPage() {
     } finally {
       setDevLoading(false);
     }
-  };
+  }, []);
+
+  // Auto-login via ?as=alice or ?as=bob (dev/headless QA passthrough)
+  const asParam = searchParams.get('as');
+  useEffect(() => {
+    if (!asParam || autoLoginRef.current || user) return;
+    const devUser = DEV_USERS.find(u => u.label.toLowerCase().includes(asParam.toLowerCase()));
+    if (devUser) {
+      autoLoginRef.current = true;
+      (async () => {
+        try {
+          const fn = httpsCallable<{ email: string }, { token: string }>(functions, 'devSignIn');
+          const result = await fn({ email: devUser.email });
+          await signInWithCustomToken(auth, result.data.token);
+          // Hard redirect so Playwright doesn't lose the page context
+          const target = searchParams.get('then') || '/';
+          window.location.href = target;
+        } catch (err) {
+          console.error('Auto dev sign-in failed:', err);
+        }
+      })();
+    }
+  }, [asParam, user, handleDevSignIn, searchParams]);
+
+  if (loading || (asParam && !user)) return <div className="center">Loading...</div>;
+  if (user && allowed) return <Navigate to="/" />;
 
   return (
     <div className="login-page">
