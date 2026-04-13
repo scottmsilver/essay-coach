@@ -23,6 +23,7 @@ import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from
 import { handleRichPaste } from '../utils/pasteHandler';
 import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
 import RevisionJourney from '../components/RevisionJourney';
+import EssaySettingsModal, { type EssaySettingsUpdate } from '../components/EssaySettingsModal';
 import { useNavbarContext } from '../hooks/useNavbarContext';
 import { useGDocChangeDetection } from '../hooks/useGDocChangeDetection';
 import type { ReportKey, DocSource } from '../types';
@@ -52,6 +53,7 @@ export default function EssayPage() {
   const { essay, drafts, loading } = useEssay(essayId, ownerUid);
   const { updateData: updateNavbar, set: setNavbar } = useNavbarContext();
   const [activeTrait, setActiveTrait] = useState<TraitKey | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const activeView = viewFromPath(location.pathname);
   const basePath = ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`;
@@ -182,6 +184,36 @@ export default function EssayPage() {
     }
   }, [essayId, user, ownerUid, activeDraft]);
 
+  const handleSaveSettings = useCallback(async (updates: EssaySettingsUpdate) => {
+    if (!essayId || !user) return;
+    const uid = ownerUid ?? user.uid;
+    const essayRef = doc(db, 'users', uid, 'essays', essayId);
+
+    const promptChanged = updates.assignmentPrompt !== essay?.assignmentPrompt;
+    const criteriaChanged = (updates.teacherCriteria ?? '') !== (essay?.teacherCriteria ?? '');
+    const typeChanged = updates.writingType !== essay?.writingType;
+
+    await updateDoc(essayRef, {
+      title: updates.title,
+      writingType: updates.writingType,
+      assignmentPrompt: updates.assignmentPrompt,
+      promptSource: updates.promptSource,
+      teacherCriteria: updates.teacherCriteria,
+      criteriaSource: updates.criteriaSource,
+    });
+
+    if (activeDraft) {
+      const draftDocRef = doc(db, 'users', uid, 'essays', essayId, 'drafts', activeDraft.id);
+      const clears: Record<string, null> = {};
+      if (typeChanged) { clears.evaluation = null; clears.evaluationStatus = null; }
+      if (promptChanged) { clears.promptAnalysis = null; clears.promptStatus = null; }
+      if (criteriaChanged) { clears.criteriaAnalysis = null; clears.criteriaStatus = null; clears.criteriaSnapshot = null; }
+      if (Object.keys(clears).length > 0) {
+        await updateDoc(draftDocRef, clears);
+      }
+    }
+  }, [essayId, user, ownerUid, essay, activeDraft]);
+
   const setEssayHeader = useSetEssayHeader();
   const gdocChange = useGDocChangeDetection(essay, activeDraft ?? null, isLatestDraft);
 
@@ -214,6 +246,7 @@ export default function EssayPage() {
         : gdocChange.changed
         ? `v${activeDraft.draftNumber} — doc changed, needs re-analysis`
         : `v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`,
+      onOpenSettings: () => setSettingsOpen(true),
     });
     return () => setEssayHeader(null);
   }, [essay, activeDraft, editor.content]);
@@ -534,6 +567,17 @@ export default function EssayPage() {
         )
       )}
 
+      {essay && (
+        <EssaySettingsModal
+          opened={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          essay={essay}
+          essayId={essayId!}
+          ownerUid={ownerUid}
+          onSave={handleSaveSettings}
+          editPageUrl={ownerUid ? `/user/${ownerUid}/essay/${essayId}/edit` : `/essay/${essayId}/edit`}
+        />
+      )}
     </div>
   );
 }
