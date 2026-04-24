@@ -71,6 +71,14 @@ export default function EditEssayPage() {
   };
 
   const handlePickerImport = async (target: 'prompt' | 'criteria') => {
+    // Reuse an already-picked doc from another field when available.
+    const reusable = [essay?.contentSource, promptSource, criteriaSource].find((s) => s?.docId);
+    if (reusable?.docId) {
+      setLastImportedUrl(`https://docs.google.com/document/d/${reusable.docId}/edit`);
+      setLastImportedDocName(reusable.docName ?? '');
+      setImportTarget(target);
+      return;
+    }
     try {
       const purposeLabels = { prompt: 'assignment prompt', criteria: 'teacher criteria' };
       const result = await openGooglePicker(user?.email ?? undefined, purposeLabels[target]);
@@ -180,6 +188,7 @@ export default function EditEssayPage() {
           value={assignmentPrompt}
           onChange={(v) => { setAssignmentPrompt(v); if (promptSource) setPromptSource(null); }}
           imported={!!promptSource}
+          docName={promptSource?.docName}
           onImportClick={() => handlePickerImport('prompt')}
           onClear={clearPromptSource}
           placeholder="Paste the assignment prompt here..."
@@ -194,6 +203,7 @@ export default function EditEssayPage() {
           value={teacherCriteria}
           onChange={(v) => { setTeacherCriteria(v); if (criteriaSource) setCriteriaSource(null); }}
           imported={!!criteriaSource}
+          docName={criteriaSource?.docName}
           onImportClick={() => handlePickerImport('criteria')}
           onClear={clearCriteriaSource}
           placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."

@@ -65,6 +65,15 @@ export default function NewEssayPage() {
   };
 
   const handlePickerImport = async (target: 'prompt' | 'essay' | 'criteria') => {
+    // If another field is already imported from a Google Doc, default to that
+    // same doc — the user can still pick a different one from inside the dialog.
+    const reusable = [contentSource, promptSource, criteriaSource].find((s) => s?.docId);
+    if (reusable?.docId) {
+      setLastImportedUrl(`https://docs.google.com/document/d/${reusable.docId}/edit`);
+      setLastImportedDocName(reusable.docName ?? '');
+      setImportTarget(target);
+      return;
+    }
     try {
       const purposeLabels = { prompt: 'assignment prompt', essay: 'essay', criteria: 'teacher criteria' };
       const result = await openGooglePicker(user?.email ?? undefined, purposeLabels[target]);
@@ -177,6 +186,7 @@ export default function NewEssayPage() {
           value={assignmentPrompt}
           onChange={(v) => { setAssignmentPrompt(v); if (promptSource) setPromptSource(null); }}
           imported={!!promptSource}
+          docName={promptSource?.docName}
           onImportClick={() => handlePickerImport('prompt')}
           onClear={clearPromptSource}
           placeholder="Paste the assignment prompt here..."
@@ -191,6 +201,7 @@ export default function NewEssayPage() {
           value={teacherCriteria}
           onChange={(v) => { setTeacherCriteria(v); if (criteriaSource) setCriteriaSource(null); }}
           imported={!!criteriaSource}
+          docName={criteriaSource?.docName}
           onImportClick={() => handlePickerImport('criteria')}
           onClear={clearCriteriaSource}
           placeholder="Paste your teacher's rubric, checklist, or assignment requirements..."
@@ -222,6 +233,7 @@ export default function NewEssayPage() {
           value={content}
           onChange={(v) => { setContent(v); if (contentSource) setContentSource(null); }}
           imported={!!contentSource}
+          docName={contentSource?.docName}
           onImportClick={() => handlePickerImport('essay')}
           onClear={clearContentSource}
           placeholder="Paste or type your essay here..."

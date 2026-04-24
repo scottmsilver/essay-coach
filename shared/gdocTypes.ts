@@ -6,6 +6,8 @@ export interface DocSource {
   docId: string;
   tab: string;
   sectionIndex: number;
+  /** Human-readable doc title at pick time. Shown in UI so the user knows which doc. */
+  docName?: string;
 }
 
 /** Bookmark position as returned by the Apps Script web app */
