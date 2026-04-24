@@ -35,8 +35,16 @@ export function collectCriteriaAnnotations(analysis: CriteriaAnalysis): Criteria
   return result;
 }
 
-export function classifyAnnotation(comment: string): 'praise' | 'suggestion' {
-  return comment.includes('?') ? 'suggestion' : 'praise';
+/**
+ * Classify an annotation as praise or suggestion.
+ *
+ * Gemini now labels each annotation with `kind`. For legacy drafts written
+ * before that field existed, fall back to the old punctuation heuristic so
+ * the UI still shows something reasonable.
+ */
+export function classifyAnnotation(ann: { comment: string; kind?: 'praise' | 'suggestion' }): 'praise' | 'suggestion' {
+  if (ann.kind) return ann.kind;
+  return ann.comment.includes('?') ? 'suggestion' : 'praise';
 }
 
 export function countWords(text: string): number {

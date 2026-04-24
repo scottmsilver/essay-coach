@@ -56,7 +56,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
 
       for (let i = idx; i < idx + needle.length; i++) used.add(i);
       const id = `ann-${idx}`;
-      found.push({ start: idx, end: idx + needle.length, annotation: ann, id, kind: classifyAnnotation(ann.comment) });
+      found.push({ start: idx, end: idx + needle.length, annotation: ann, id, kind: classifyAnnotation(ann) });
     }
 
     return found.sort((a, b) => a.start - b.start);

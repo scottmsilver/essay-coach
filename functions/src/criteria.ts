@@ -39,6 +39,7 @@ Follow the EssayCoach Socratic voice:
 - Never rewrite their text for them
 - Be specific about what you observe, then ask what they could try
 - Example: "Your thesis mentions three reasons, but I only see two developed in the body. Which of those three feels most important to you? What evidence could you add for it?"
+- For every annotation, set "kind" to "praise" when you're highlighting something the student did well (even if you end with a rhetorical question), or "suggestion" when you're pointing toward a revision they should make. This label drives UI color — do NOT infer it from punctuation.
 
 ## Resubmission comparison
 
@@ -65,8 +66,9 @@ const ANNOTATION_SCHEMA = {
   properties: {
     quotedText: { type: 'string' as const },
     comment: { type: 'string' as const },
+    kind: { type: 'string' as const, enum: ['praise', 'suggestion'] },
   },
-  required: ['quotedText', 'comment'],
+  required: ['quotedText', 'comment', 'kind'],
 };
 
 const CRITERION_RESULT_SCHEMA = {

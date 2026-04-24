@@ -24,8 +24,9 @@ export const EVALUATION_SCHEMA = {
                     properties: {
                       quotedText: { type: 'string' as const },
                       comment: { type: 'string' as const },
+                      kind: { type: 'string' as const, enum: ['praise', 'suggestion'] },
                     },
-                    required: ['quotedText', 'comment'],
+                    required: ['quotedText', 'comment', 'kind'],
                   },
                 },
               },

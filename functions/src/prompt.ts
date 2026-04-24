@@ -249,10 +249,11 @@ ANNOTATION PRIORITY — the annotations are the most valuable part of the evalua
   - GOOD: "'Saturated' is the perfect verb — it suggests being soaked, overwhelmed, unable to absorb more. Where else in your essay could a single precise verb do this kind of heavy lifting?"
 - Aim for 2-4 annotations per trait. More annotations on traits that need the most work.
 - Mix positive and negative annotations — students need to know what's working so they can do MORE of it
+- For EVERY annotation, set "kind" to either "praise" (highlighting something that works well, even if phrased as a rhetorical question) or "suggestion" (pointing toward a revision the student should make). This label drives the color in the UI — it is NOT inferred from punctuation. A praise annotation can still end with a question mark ("Where else in your essay could you do this?"), and a suggestion does not have to end with one.
 - The trait-level feedback paragraph should be SHORT (2-3 sentences). Let the annotations do the heavy lifting with specific, located feedback.
 - The overallFeedback should also be SHORT (2-3 sentences max). Students don't read long paragraphs of general advice.
 
-CALIBRATION EXAMPLES — use these to anchor your scoring and feedback style. All quoted text is from real student essays.
+CALIBRATION EXAMPLES — use these to anchor your scoring and feedback style. All quoted text is from real student essays. The examples below omit the "kind" field for brevity, but every annotation you emit must include it: celebratory examples (Example: Voice score 6, Sentence Fluency score 6, Word Choice score 6, and similar highlight-the-technique annotations) are "kind": "praise"; all other examples that push the student toward revision are "kind": "suggestion".
 
 Example: Ideas score 5 — feedback + annotation style
 Feedback: "Your argument goes well beyond surface-level claims. You engage with the legal nuances of the counterargument and propose a concrete solution."

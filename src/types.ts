@@ -22,9 +22,14 @@ export const TRAIT_LABELS: Record<TraitKey, string> = {
   presentation: 'Presentation',
 };
 
+export type AnnotationKind = 'praise' | 'suggestion';
+
 export interface Annotation {
   quotedText: string;
   comment: string;
+  /** Gemini-assigned sentiment so UI doesn't have to infer it from punctuation.
+   *  Optional because pre-existing drafts in Firestore predate this field. */
+  kind?: AnnotationKind;
 }
 
 export interface TraitAnnotation extends Annotation {
