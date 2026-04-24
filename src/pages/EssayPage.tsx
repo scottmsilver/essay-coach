@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@mantine/core';
-import { functions, db } from '../firebase';
+import { db } from '../firebase';
+import { fetchGDocInfo } from '../utils/gdocImport';
+import { parseSections } from '../../shared/gdocTypes';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -21,7 +22,6 @@ import PromptAnalysisView from '../components/PromptAnalysisView';
 import { CriteriaPanel, CriteriaEmptyState } from '../components/CriteriaPanel';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
-import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
 import RevisionJourney from '../components/RevisionJourney';
 import EssaySettingsModal, { type EssaySettingsUpdate } from '../components/EssaySettingsModal';
 import { useNavbarContext } from '../hooks/useNavbarContext';
@@ -144,33 +144,74 @@ export default function EssayPage() {
     }
   }, [actions, setActiveView]);
 
-  // Orchestration: re-analyze (crosses editor + analysis boundaries)
+  // Orchestration: re-analyze (crosses editor + analysis boundaries).
+  //
+  // Creates the next draft directly in Firestore — same pattern NewEssayPage
+  // uses — so the UI switches to the new draft's "Analyzing..." state as soon
+  // as the write settles (roughly one RTT) instead of waiting 15-30s for the
+  // server-side evaluation to finish inside a callable. The onDraftCreated
+  // Firestore trigger picks it up and runs every analysis.
   const [reanalyzing, setReanalyzing] = useState(false);
   const handleReanalyze = useCallback(async () => {
-    if (!activeDraft || !user) return;
+    if (!activeDraft || !user || !essay || !essayId) return;
     if (!window.confirm('Re-analyze this essay? This will create a new draft with fresh feedback.')) return;
     setReanalyzing(true);
     try {
-      const contentToSubmit = (editor.content && editor.content !== activeDraft.content)
-        ? editor.content : activeDraft.content;
-      const resubmitDraft = httpsCallable(functions, 'resubmitDraft', { timeout: FUNCTION_TIMEOUT });
-      await resubmitDraft({ essayId: essayId!, content: contentToSubmit, ownerUid });
-      setSelectedDraftId(null);
-    } catch (err: unknown) {
-      // Surface GDoc resolution failures so the user can re-pick the source.
-      // Firebase callable surfaces HttpsError as FirebaseError with `code` like
-      // 'functions/failed-precondition' — we treat any failed-precondition as a
-      // source problem the user can fix.
-      const e = err as { code?: string; message?: string };
-      if (e?.code === 'functions/failed-precondition' && e.message) {
-        window.alert(`${e.message}\n\nOpen settings to re-pick the Google Doc source.`);
-        setSettingsOpen(true);
+      const uid = ownerUid ?? user.uid;
+      const userEdited = !!editor.content && editor.content !== activeDraft.content;
+      let content = userEdited ? editor.content : activeDraft.content;
+
+      // Refresh from the Google Doc when the student hasn't locally edited —
+      // the "Doc updated — re-analyze to refresh" banner promises this, and
+      // it's where moved/deleted bookmarks surface as a fixable error.
+      if (!userEdited && essay.contentSource) {
+        try {
+          const data = await fetchGDocInfo(essay.contentSource.docId, essay.contentSource.tab);
+          const sections = parseSections(data.text, data.bookmarks);
+          const idx = essay.contentSource.sectionIndex;
+          if (idx < 0 || idx >= sections.length) {
+            window.alert(
+              `The bookmarked section in your Google Doc can't be found — it may have been moved or deleted.\n\nOpen settings to re-pick the section.`
+            );
+            setSettingsOpen(true);
+            setReanalyzing(false);
+            return;
+          }
+          content = sections[idx].replace(/^[\n ]+/, '').replace(/\s+$/, '');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn('GDoc re-fetch failed; continuing with stored content:', msg);
+        }
       }
-      // Other errors are state-driven — the UI shows error based on the new draft's status.
+
+      const latestDraftNumber = drafts[0]?.draftNumber ?? activeDraft.draftNumber;
+      const nextDraftNumber = latestDraftNumber + 1;
+      const essayRef = doc(db, 'users', uid, 'essays', essayId);
+      const draftRef = doc(collection(db, 'users', uid, 'essays', essayId, 'drafts'));
+
+      await Promise.all([
+        setDoc(draftRef, {
+          draftNumber: nextDraftNumber,
+          content,
+          submittedAt: serverTimestamp(),
+          evaluationStatus: { stage: 'pending', message: 'Queued...' },
+          grammarStatus: { stage: 'pending', message: 'Queued...' },
+          transitionStatus: { stage: 'pending', message: 'Queued...' },
+        }),
+        updateDoc(essayRef, {
+          currentDraftNumber: nextDraftNumber,
+          updatedAt: serverTimestamp(),
+        }),
+      ]);
+
+      setSelectedDraftId(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start re-analyze.';
+      window.alert(msg);
     } finally {
       setReanalyzing(false);
     }
-  }, [activeDraft, essayId, ownerUid, user, editor.content]);
+  }, [activeDraft, essay, essayId, ownerUid, user, editor.content, drafts]);
 
   // Orchestration: save teacher criteria (Firestore write + clear analysis)
   const isOwner = !ownerUid;
