@@ -19,6 +19,7 @@ export interface NavbarMeta {
   reanalyzing: boolean;
   gdocChanged: boolean;
   gdocLastChecked: Date | null;
+  onOpenSettings?: () => void;
 }
 
 export interface NavbarState {

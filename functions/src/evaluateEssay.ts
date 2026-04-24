@@ -1,7 +1,7 @@
 import { createAnalysisHandler, type AnalysisContext } from './createAnalysisHandler';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { evaluateWithGemini } from './gemini';
-import { resolveDocSource } from './gdocResolver';
+import { resolveDocSource, GDocResolveError } from './gdocResolver';
 import { defineString } from 'firebase-functions/params';
 
 const gdocWebAppId = defineString('GDOC_WEBAPP_DEPLOYMENT_ID', { default: '' });
@@ -39,7 +39,9 @@ async function evaluateEssayForDraft(ctx: AnalysisContext): Promise<Evaluation> 
   const { draftNumber } = draftData;
 
   // Re-fetch from Google Docs if the essay/prompt were imported.
-  // Fails gracefully: if the GDoc fetch fails, we evaluate the stored content.
+  // Transient failures (network) fall back to stored content. Structural failures
+  // (section moved/deleted) throw GDocResolveError so the user gets a clear error
+  // and can re-pick the source in settings.
   const webAppId = gdocWebAppId.value();
   if (webAppId) {
     if (essayData.contentSource) {
@@ -47,6 +49,9 @@ async function evaluateEssayForDraft(ctx: AnalysisContext): Promise<Evaluation> 
         content = await resolveDocSource(essayData.contentSource, webAppId);
         await draftRef.update({ content });
       } catch (err) {
+        if (err instanceof GDocResolveError) {
+          throw new GDocResolveError(err.message, `Essay text — ${err.userMessage}`);
+        }
         console.warn('Failed to re-fetch essay from Google Docs, using stored content:', (err as Error).message);
       }
     }
@@ -55,6 +60,9 @@ async function evaluateEssayForDraft(ctx: AnalysisContext): Promise<Evaluation> 
         assignmentPrompt = await resolveDocSource(essayData.promptSource, webAppId);
         await essayRef.update({ assignmentPrompt });
       } catch (err) {
+        if (err instanceof GDocResolveError) {
+          throw new GDocResolveError(err.message, `Assignment prompt — ${err.userMessage}`);
+        }
         console.warn('Failed to re-fetch prompt from Google Docs, using stored prompt:', (err as Error).message);
       }
     }

@@ -156,8 +156,17 @@ export default function EssayPage() {
       const resubmitDraft = httpsCallable(functions, 'resubmitDraft', { timeout: FUNCTION_TIMEOUT });
       await resubmitDraft({ essayId: essayId!, content: contentToSubmit, ownerUid });
       setSelectedDraftId(null);
-    } catch {
-      // Error handling is state-driven — the UI shows error based on state
+    } catch (err: unknown) {
+      // Surface GDoc resolution failures so the user can re-pick the source.
+      // Firebase callable surfaces HttpsError as FirebaseError with `code` like
+      // 'functions/failed-precondition' — we treat any failed-precondition as a
+      // source problem the user can fix.
+      const e = err as { code?: string; message?: string };
+      if (e?.code === 'functions/failed-precondition' && e.message) {
+        window.alert(`${e.message}\n\nOpen settings to re-pick the Google Doc source.`);
+        setSettingsOpen(true);
+      }
+      // Other errors are state-driven — the UI shows error based on the new draft's status.
     } finally {
       setReanalyzing(false);
     }
@@ -289,6 +298,7 @@ export default function EssayPage() {
         reanalyzing,
         gdocChanged: gdocChange.changed,
         gdocLastChecked: gdocChange.lastChecked,
+        onOpenSettings: () => setSettingsOpen(true),
       },
     });
     return () => setNavbar(null);

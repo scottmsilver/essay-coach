@@ -41,6 +41,7 @@ vi.mock('firebase-functions/v2/https', () => ({
 
 vi.mock('firebase-functions/params', () => ({
   defineSecret: () => ({ value: () => 'fake-api-key' }),
+  defineString: () => ({ value: () => '' }),
 }));
 
 import { resubmitDraft } from '../src/resubmitDraft';

@@ -8,6 +8,7 @@ export interface DraftEntity {
   raw: Draft;
   analysisStatus: (key: AnalysisKey) => AnalysisStatus;
   statusMessage: (key: AnalysisKey) => string | null;
+  statusCode: (key: AnalysisKey) => string | null;
   issueCount: (key: AnalysisKey) => number | undefined;
   coachReadiness: CoachSynthesis['readiness'] | null;
   coachNote: string | null;
@@ -46,6 +47,11 @@ export function createDraftEntity(raw: Draft): DraftEntity {
   const statusMessage = (key: AnalysisKey): string | null => {
     const status = raw[STATUS_FIELDS[key]] as Draft['evaluationStatus'];
     return status?.message ?? null;
+  };
+
+  const statusCode = (key: AnalysisKey): string | null => {
+    const status = raw[STATUS_FIELDS[key]] as Draft['evaluationStatus'];
+    return status?.code ?? null;
   };
 
   const issueCount = (key: AnalysisKey): number | undefined => {
@@ -91,6 +97,7 @@ export function createDraftEntity(raw: Draft): DraftEntity {
     raw,
     analysisStatus,
     statusMessage,
+    statusCode,
     issueCount,
     coachReadiness: synthesis?.readiness ?? null,
     coachNote: synthesis?.coachNote ?? null,

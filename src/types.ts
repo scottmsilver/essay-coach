@@ -83,6 +83,8 @@ export type { CriterionResult, CriteriaAnalysis, CriteriaComparison };
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
+  /** Machine-readable error code (e.g., 'gdoc_resolve_failed') for targeted UI handling. */
+  code?: string;
 }
 
 // Coach synthesis types

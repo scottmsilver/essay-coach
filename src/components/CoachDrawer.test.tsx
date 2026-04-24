@@ -30,6 +30,7 @@ const entity = {
   },
   analysisStatus: vi.fn(),
   statusMessage: vi.fn(),
+  statusCode: vi.fn(() => null),
   issueCount: vi.fn((key: string) => {
     switch (key) {
       case 'overall': return 0;
