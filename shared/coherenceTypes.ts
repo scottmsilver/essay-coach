@@ -1,3 +1,7 @@
+/** Feature flag: paused while the prompt is being dialed in.
+ *  Flip to true to re-enable everywhere it's gated (sidebar, dispatch, trigger). */
+export const COHERENCE_ENABLED = false;
+
 export type ParagraphRelation = 'supports' | 'contrasts_acknowledged' | 'contrasts_unacknowledged' | 'off_topic';
 
 export interface ThesisParagraph {

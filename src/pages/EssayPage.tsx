@@ -28,6 +28,7 @@ import EssaySettingsModal, { type EssaySettingsUpdate } from '../components/Essa
 import { useNavbarContext } from '../hooks/useNavbarContext';
 import { useGDocChangeDetection } from '../hooks/useGDocChangeDetection';
 import type { ReportKey, DocSource } from '../types';
+import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
 import { createDraftEntity } from '../entities/draftEntity';
 import { presentDraft } from '../entities/draftPresentation';
 import { useDraftEditor } from '../hooks/useDraftEditor';
@@ -94,7 +95,7 @@ export default function EssayPage() {
   // can't be a useMemo dep without causing infinite re-renders).
   // For rendering, we also compute it here for local use.
   const draftAge = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
-  const hasCoherence = !!activeDraft && countParagraphs(activeDraft.content) > 1;
+  const hasCoherence = COHERENCE_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
   const presentation = entity ? presentDraft(
     entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria, hasCoherence,
   ) : null;

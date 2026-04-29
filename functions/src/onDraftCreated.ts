@@ -8,6 +8,7 @@ import { analyzePromptWithGemini } from './promptAdherence';
 import { analyzeDuplicationWithGemini } from './duplication';
 import { analyzeCriteriaWithGemini } from './criteria';
 import { analyzeCoherenceWithGemini } from './coherence';
+import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
@@ -187,7 +188,7 @@ export const onDraftCreated = onDocumentCreated(
         }
 
         // Coherence analysis runs separately from mega — fire if essay has more than 1 paragraph
-        if (countParagraphs(content) > 1) {
+        if (COHERENCE_ENABLED && countParagraphs(content) > 1) {
           try {
             const coherenceResult = await analyzeCoherenceWithGemini(
               geminiApiKey.value(),
@@ -402,7 +403,7 @@ export const onDraftCreated = onDocumentCreated(
     }
 
     // Coherence analysis: skip if essay has 1 or fewer paragraphs (don't even create a status)
-    if (!isActivelyProcessing(data.coherenceStatus) && !data.coherenceAnalysis && countParagraphs(content) > 1) {
+    if (COHERENCE_ENABLED && !isActivelyProcessing(data.coherenceStatus) && !data.coherenceAnalysis && countParagraphs(content) > 1) {
       logger.info('Coherence analysis not actively processing — trigger firing', { essayId, draftId });
       const essayRef = draftRef.parent.parent!;
       tasks.push(
