@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
+import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
 
 export const FUNCTION_TIMEOUT = 180_000;
 
@@ -28,5 +29,10 @@ export function fireAllAnalyses(essayId: string, draftId: string, ownerUid?: str
   if (COHERENCE_ENABLED) {
     const coherence = httpsCallable(functions, 'analyzeCoherence', { timeout: FUNCTION_TIMEOUT });
     coherence(args).catch((err) => console.error('Coherence analysis failed:', err));
+  }
+
+  if (STRUCTURE_ENABLED) {
+    const structure = httpsCallable(functions, 'analyzeStructure', { timeout: FUNCTION_TIMEOUT });
+    structure(args).catch((err) => console.error('Structure analysis failed:', err));
   }
 }

@@ -101,6 +101,22 @@ export type {
   CoherenceSummary,
 };
 
+// Structure analysis types — canonical definitions in shared/structureTypes.ts
+import type {
+  StructureAnalysis,
+  ParagraphStructure,
+  ParagraphComponent,
+  ParagraphClassification,
+  StructureSummary,
+} from '../shared/structureTypes';
+export type {
+  StructureAnalysis,
+  ParagraphStructure,
+  ParagraphComponent,
+  ParagraphClassification,
+  StructureSummary,
+};
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
@@ -109,7 +125,7 @@ export interface EvaluationStatus {
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -121,6 +137,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   duplication: 'Duplication',
   criteria: 'Criteria',
   coherence: 'Coherence',
+  structure: 'Structure',
 };
 
 export interface ReportSummary {
@@ -159,6 +176,8 @@ export interface Draft {
   criteriaSnapshot?: string | null;
   coherenceAnalysis?: CoherenceAnalysis | null;
   coherenceStatus?: EvaluationStatus | null;
+  structureAnalysis?: StructureAnalysis | null;
+  structureStatus?: EvaluationStatus | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;

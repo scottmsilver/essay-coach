@@ -8,7 +8,7 @@ import { parseSections } from '../../shared/gdocTypes';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, collectCoherenceAnnotations, scoreLabel } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, collectCoherenceAnnotations, collectStructureAnnotations, scoreLabel } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -21,6 +21,7 @@ import DuplicationView from '../components/DuplicationView';
 import PromptAnalysisView from '../components/PromptAnalysisView';
 import { CriteriaPanel, CriteriaEmptyState } from '../components/CriteriaPanel';
 import { CoherencePanel, CoherenceEmptyState } from '../components/CoherencePanel';
+import { StructurePanel, StructureEmptyState } from '../components/StructurePanel';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
 import RevisionJourney from '../components/RevisionJourney';
@@ -29,13 +30,14 @@ import { useNavbarContext } from '../hooks/useNavbarContext';
 import { useGDocChangeDetection } from '../hooks/useGDocChangeDetection';
 import type { ReportKey, DocSource } from '../types';
 import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
+import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
 import { createDraftEntity } from '../entities/draftEntity';
 import { presentDraft } from '../entities/draftPresentation';
 import { useDraftEditor } from '../hooks/useDraftEditor';
 import { useAnalysisActions } from '../hooks/useAnalysisActions';
 import type { ActionKey } from '../hooks/useAnalysisActions';
 
-type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria' | 'coherence';
+type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
@@ -44,6 +46,7 @@ function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/duplication')) return 'duplication';
   if (pathname.endsWith('/criteria')) return 'criteria';
   if (pathname.endsWith('/coherence')) return 'coherence';
+  if (pathname.endsWith('/structure')) return 'structure';
   if (pathname.endsWith('/overall')) return 'overall';
   return 'essay';
 }
@@ -96,8 +99,9 @@ export default function EssayPage() {
   // For rendering, we also compute it here for local use.
   const draftAge = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
   const hasCoherence = COHERENCE_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
+  const hasStructure = STRUCTURE_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
   const presentation = entity ? presentDraft(
-    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria, hasCoherence,
+    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria, hasCoherence, hasStructure,
   ) : null;
 
   // Hooks
@@ -136,6 +140,9 @@ export default function EssayPage() {
     if (activeView === 'coherence' && activeDraft?.coherenceAnalysis) {
       return collectCoherenceAnnotations(activeDraft.coherenceAnalysis);
     }
+    if (activeView === 'structure' && activeDraft?.structureAnalysis) {
+      return collectStructureAnnotations(activeDraft.structureAnalysis, activeDraft.content);
+    }
     if (activeView === 'overall' && activeDraft?.evaluation) {
       return collectAnnotations(activeDraft.evaluation);
     }
@@ -145,7 +152,7 @@ export default function EssayPage() {
   // Orchestration: report selection (composes actions.ensure + navigation)
   const handleDrawerSelectReport = useCallback((key: ReportKey) => {
     const view = key as ViewMode;
-    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria' || view === 'coherence') {
+    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria' || view === 'coherence' || view === 'structure') {
       actions.ensure(view as ActionKey);
       setActiveView(view);
     } else if (view === 'essay') {
@@ -651,6 +658,31 @@ export default function EssayPage() {
           </AnalysisPanel>
         ) : (
           <CoherenceEmptyState />
+        )
+      )}
+
+      {activeView === 'structure' && (
+        hasStructure ? (
+          <AnalysisPanel
+            data={activeDraft.structureAnalysis}
+            error={actions.errors.structure}
+            loading={actions.loading.structure}
+            status={activeDraft.structureStatus}
+            onRetry={() => { actions.ensure('structure'); }}
+            onRerun={() => { actions.rerun('structure'); }}
+            rerunLoading={actions.loading.structure}
+            defaultMessage="Analyzing paragraph structure..."
+            placeholder="Structure analysis is loading..."
+          >
+            <StructurePanel analysis={activeDraft.structureAnalysis!} />
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
+          </AnalysisPanel>
+        ) : (
+          <StructureEmptyState />
         )
       )}
 

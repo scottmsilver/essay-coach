@@ -1,13 +1,13 @@
 import { useMemo, useRef } from 'react';
 import type { TraitKey, TraitAnnotation } from '../types';
-import type { CriteriaAnnotation, CoherenceAnnotation } from '../utils';
+import type { CriteriaAnnotation, CoherenceAnnotation, StructureAnnotation } from '../utils';
 import { useCommentLayout } from '../hooks/useCommentLayout';
 import { useActiveMarker } from '../hooks/useActiveMarker';
 import { classifyAnnotation } from '../utils';
 
 export type { TraitAnnotation } from '../types';
 
-export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation | CoherenceAnnotation;
+export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation | CoherenceAnnotation | StructureAnnotation;
 
 interface Props {
   content: string;
@@ -125,7 +125,9 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
                   ? m.annotation.traitLabel
                   : 'criterionText' in m.annotation
                     ? m.annotation.criterionText
-                    : `${m.annotation.relationLabel} — paragraph ${m.annotation.paragraphIndex}`
+                    : 'classificationLabel' in m.annotation
+                      ? `${m.annotation.classificationLabel} — paragraph ${m.annotation.paragraphIndex}`
+                      : `${m.annotation.relationLabel} — paragraph ${m.annotation.paragraphIndex}`
               }</span>
               <span className="sidebar-comment-text">{m.annotation.comment}</span>
             </div>

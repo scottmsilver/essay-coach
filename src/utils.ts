@@ -1,5 +1,5 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from './types';
-import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation } from './types';
+import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation, StructureAnalysis, ParagraphClassification } from './types';
 
 export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
   const result: TraitAnnotation[] = [];
@@ -64,6 +64,90 @@ export function collectCoherenceAnnotations(analysis: CoherenceAnalysis): Cohere
       paragraphIndex: para.index,
       relation: para.relation,
       relationLabel: COHERENCE_RELATION_LABEL[para.relation],
+    });
+  }
+  return result;
+}
+
+export interface StructureAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for complete paragraphs, 'suggestion' for missing components. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  classification: ParagraphClassification;
+  classificationLabel: string;
+}
+
+const STRUCTURE_CLASSIFICATION_LABEL: Record<ParagraphClassification, string> = {
+  complete: 'Complete',
+  missing_analysis: 'Missing analysis',
+  missing_evidence: 'Missing evidence',
+  missing_claim: 'Missing claim',
+  off_pattern: 'Off pattern',
+};
+
+/** Take the first 5-15 words of a paragraph as a fallback anchor. */
+function fallbackQuote(paragraph: string): string {
+  const words = paragraph.trim().split(/\s+/);
+  const slice = words.slice(0, Math.min(words.length, 12));
+  return slice.join(' ');
+}
+
+export function collectStructureAnnotations(analysis: StructureAnalysis, content?: string): StructureAnnotation[] {
+  const result: StructureAnnotation[] = [];
+  // Split content into paragraphs once so we can fall back to a slice when no
+  // component is present in a missing_* paragraph.
+  const paragraphs = content
+    ? content.trim().split(/\n\s*\n+/).filter((p) => p.trim())
+    : [];
+
+  for (const para of analysis.paragraphs) {
+    if (para.classification === 'off_pattern') continue;
+
+    const label = STRUCTURE_CLASSIFICATION_LABEL[para.classification];
+
+    if (para.classification === 'complete') {
+      // Praise the analysis quote when present; fall back to evidence then claim.
+      const quote =
+        para.analysis.quotedText ??
+        para.evidence.quotedText ??
+        para.claim.quotedText;
+      if (!quote) continue;
+      result.push({
+        quotedText: quote,
+        comment: para.comment,
+        kind: 'praise',
+        paragraphIndex: para.index,
+        classification: para.classification,
+        classificationLabel: label,
+      });
+      continue;
+    }
+
+    // missing_* paragraphs: anchor on whichever component IS present
+    let quote: string | null =
+      para.analysis.quotedText ??
+      para.evidence.quotedText ??
+      para.claim.quotedText;
+
+    if (!quote) {
+      // 1-indexed paragraph -> 0-indexed array
+      const idx = para.index - 1;
+      if (idx >= 0 && idx < paragraphs.length) {
+        quote = fallbackQuote(paragraphs[idx]);
+      }
+    }
+
+    if (!quote) continue;
+
+    result.push({
+      quotedText: quote,
+      comment: para.comment,
+      kind: 'suggestion',
+      paragraphIndex: para.index,
+      classification: para.classification,
+      classificationLabel: label,
     });
   }
   return result;

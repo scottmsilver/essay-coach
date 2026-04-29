@@ -6,7 +6,7 @@ import type { DraftPresentation, VerdictPhase } from '../entities/draftPresentat
 import type { DraftEditorState } from '../hooks/useDraftEditor';
 import type { NavbarMeta } from '../hooks/useNavbarContext';
 
-const ANALYSIS_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence'];
+const ANALYSIS_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure'];
 
 function findGDocError(entity: DraftEntity): string | null {
   for (const key of ANALYSIS_KEYS) {

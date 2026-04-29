@@ -2169,3 +2169,29 @@ mark {
   align-items: center;
   gap: 10px;
 }
+
+/* ── StructurePanel — paragraph CEA breakdown ────────────────────────── */
+.structure-view {
+  margin-bottom: 24px;
+}
+
+.structure-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.structure-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.structure-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.structure-component-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}

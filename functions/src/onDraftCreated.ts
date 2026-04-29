@@ -9,6 +9,8 @@ import { analyzeDuplicationWithGemini } from './duplication';
 import { analyzeCriteriaWithGemini } from './criteria';
 import { analyzeCoherenceWithGemini } from './coherence';
 import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
+import { analyzeStructureWithGemini } from './structure';
+import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
@@ -201,6 +203,23 @@ export const onDraftCreated = onDocumentCreated(
             const msg = error instanceof Error ? error.message : String(error);
             logger.error('Coherence analysis failed (post-mega)', { error: msg, essayId, draftId });
             await draftRef.update({ coherenceStatus: { stage: 'error', message: 'Coherence analysis failed' } });
+          }
+        }
+
+        // Structure analysis runs separately from mega — fire if essay has more than 1 paragraph
+        if (STRUCTURE_ENABLED && countParagraphs(content) > 1) {
+          try {
+            const structureResult = await analyzeStructureWithGemini(
+              geminiApiKey.value(),
+              { assignmentPrompt, writingType, content },
+              draftRef,
+            );
+            await draftRef.update({ structureAnalysis: structureResult, structureStatus: null });
+            logger.info('Structure analysis complete (post-mega)', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Structure analysis failed (post-mega)', { error: msg, essayId, draftId });
+            await draftRef.update({ structureStatus: { stage: 'error', message: 'Structure analysis failed' } });
           }
         }
 
@@ -426,6 +445,35 @@ export const onDraftCreated = onDocumentCreated(
             const msg = error instanceof Error ? error.message : String(error);
             logger.error('Trigger coherence analysis failed', { error: msg, essayId, draftId });
             await draftRef.update({ coherenceStatus: { stage: 'error', message: 'Coherence analysis failed' } });
+          }
+        })()
+      );
+    }
+
+    // Structure analysis: skip if essay has 1 or fewer paragraphs (don't even create a status)
+    if (STRUCTURE_ENABLED && !isActivelyProcessing(data.structureStatus) && !data.structureAnalysis && countParagraphs(content) > 1) {
+      logger.info('Structure analysis not actively processing — trigger firing', { essayId, draftId });
+      const essayRef = draftRef.parent.parent!;
+      tasks.push(
+        (async () => {
+          try {
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data() || {};
+            const analysis = await analyzeStructureWithGemini(
+              apiKey,
+              {
+                assignmentPrompt: essayData.assignmentPrompt || '',
+                writingType: essayData.writingType || 'argumentative',
+                content,
+              },
+              draftRef,
+            );
+            await draftRef.update({ structureAnalysis: analysis, structureStatus: null });
+            logger.info('Trigger structure analysis complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger structure analysis failed', { error: msg, essayId, draftId });
+            await draftRef.update({ structureStatus: { stage: 'error', message: 'Structure analysis failed' } });
           }
         })()
       );
