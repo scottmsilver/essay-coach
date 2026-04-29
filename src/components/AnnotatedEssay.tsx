@@ -1,13 +1,13 @@
 import { useMemo, useRef } from 'react';
 import type { TraitKey, TraitAnnotation } from '../types';
-import type { CriteriaAnnotation, CoherenceAnnotation, StructureAnnotation } from '../utils';
+import type { CriteriaAnnotation, CoherenceAnnotation, StructureAnnotation, ReasoningAnnotation } from '../utils';
 import { useCommentLayout } from '../hooks/useCommentLayout';
 import { useActiveMarker } from '../hooks/useActiveMarker';
 import { classifyAnnotation } from '../utils';
 
 export type { TraitAnnotation } from '../types';
 
-export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation | CoherenceAnnotation | StructureAnnotation;
+export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation | CoherenceAnnotation | StructureAnnotation | ReasoningAnnotation;
 
 interface Props {
   content: string;

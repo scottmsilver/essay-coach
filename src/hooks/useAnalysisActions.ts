@@ -5,7 +5,7 @@ import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
 import { clearAnalysis } from '../utils/draftFirestore';
 import type { DraftEntity } from '../entities/draftEntity';
 
-export type ActionKey = 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure';
+export type ActionKey = 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure' | 'reasoning';
 
 export interface AnalysisActions {
   loading: Record<ActionKey, boolean>;
@@ -25,10 +25,11 @@ const ANALYSIS_CONFIG: Record<ActionKey, { fn: string; dataField: string; status
   criteria: { fn: 'analyzeCriteria', dataField: 'criteriaAnalysis', statusField: 'criteriaStatus' },
   coherence: { fn: 'analyzeCoherence', dataField: 'coherenceAnalysis', statusField: 'coherenceStatus' },
   structure: { fn: 'analyzeStructure', dataField: 'structureAnalysis', statusField: 'structureStatus' },
+  reasoning: { fn: 'analyzeReasoning', dataField: 'reasoningAnalysis', statusField: 'reasoningStatus' },
 };
 
-const INITIAL_LOADING: Record<ActionKey, boolean> = { grammar: false, transitions: false, prompt: false, duplication: false, criteria: false, coherence: false, structure: false };
-const INITIAL_ERRORS: Record<ActionKey, string | null> = { grammar: null, transitions: null, prompt: null, duplication: null, criteria: null, coherence: null, structure: null };
+const INITIAL_LOADING: Record<ActionKey, boolean> = { grammar: false, transitions: false, prompt: false, duplication: false, criteria: false, coherence: false, structure: false, reasoning: false };
+const INITIAL_ERRORS: Record<ActionKey, string | null> = { grammar: null, transitions: null, prompt: null, duplication: null, criteria: null, coherence: null, structure: null, reasoning: null };
 
 export function useAnalysisActions(
   entity: DraftEntity | null,

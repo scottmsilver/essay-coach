@@ -2195,3 +2195,29 @@ mark {
   align-items: flex-start;
   gap: 10px;
 }
+
+/* ── ReasoningPanel — paragraph circular-argument breakdown ──────────── */
+.reasoning-view {
+  margin-bottom: 24px;
+}
+
+.reasoning-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reasoning-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.reasoning-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reasoning-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}

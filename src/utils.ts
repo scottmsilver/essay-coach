@@ -1,5 +1,5 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from './types';
-import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation, StructureAnalysis, ParagraphClassification } from './types';
+import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation, StructureAnalysis, ParagraphClassification, ReasoningAnalysis, ReasoningClassification } from './types';
 
 export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
   const result: TraitAnnotation[] = [];
@@ -145,6 +145,64 @@ export function collectStructureAnnotations(analysis: StructureAnalysis, content
       quotedText: quote,
       comment: para.comment,
       kind: 'suggestion',
+      paragraphIndex: para.index,
+      classification: para.classification,
+      classificationLabel: label,
+    });
+  }
+  return result;
+}
+
+export interface ReasoningAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for sound paragraphs, 'suggestion' for circular paragraphs. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  classification: ReasoningClassification;
+  classificationLabel: string;
+}
+
+const REASONING_CLASSIFICATION_LABEL: Record<ReasoningClassification, string> = {
+  sound: 'Sound',
+  circular: 'Circular',
+  not_applicable: 'Not applicable',
+};
+
+export function collectReasoningAnnotations(analysis: ReasoningAnalysis, content?: string): ReasoningAnnotation[] {
+  const result: ReasoningAnnotation[] = [];
+  const paragraphs = content
+    ? content.trim().split(/\n\s*\n+/).filter((p) => p.trim())
+    : [];
+
+  for (const para of analysis.paragraphs) {
+    if (para.classification === 'not_applicable') continue;
+
+    const label = REASONING_CLASSIFICATION_LABEL[para.classification];
+
+    if (para.classification === 'circular') {
+      const quote = para.claimEcho;
+      if (!quote) continue;
+      result.push({
+        quotedText: quote,
+        comment: para.comment,
+        kind: 'suggestion',
+        paragraphIndex: para.index,
+        classification: para.classification,
+        classificationLabel: label,
+      });
+      continue;
+    }
+
+    // sound paragraphs: anchor on the first 5-15 words of the paragraph
+    const idx = para.index - 1;
+    if (idx < 0 || idx >= paragraphs.length) continue;
+    const quote = fallbackQuote(paragraphs[idx]);
+    if (!quote) continue;
+    result.push({
+      quotedText: quote,
+      comment: para.comment,
+      kind: 'praise',
       paragraphIndex: para.index,
       classification: para.classification,
       classificationLabel: label,

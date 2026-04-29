@@ -117,6 +117,20 @@ export type {
   StructureSummary,
 };
 
+// Reasoning analysis types — canonical definitions in shared/reasoningTypes.ts
+import type {
+  ReasoningAnalysis,
+  ParagraphReasoning,
+  ReasoningClassification,
+  ReasoningSummary,
+} from '../shared/reasoningTypes';
+export type {
+  ReasoningAnalysis,
+  ParagraphReasoning,
+  ReasoningClassification,
+  ReasoningSummary,
+};
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
@@ -125,7 +139,7 @@ export interface EvaluationStatus {
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure', 'reasoning'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -138,6 +152,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   criteria: 'Criteria',
   coherence: 'Coherence',
   structure: 'Structure',
+  reasoning: 'Reasoning',
 };
 
 export interface ReportSummary {
@@ -178,6 +193,8 @@ export interface Draft {
   coherenceStatus?: EvaluationStatus | null;
   structureAnalysis?: StructureAnalysis | null;
   structureStatus?: EvaluationStatus | null;
+  reasoningAnalysis?: ReasoningAnalysis | null;
+  reasoningStatus?: EvaluationStatus | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;

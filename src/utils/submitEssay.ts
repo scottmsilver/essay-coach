@@ -2,6 +2,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
 import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
+import { REASONING_ENABLED } from '../../shared/reasoningTypes';
 
 export const FUNCTION_TIMEOUT = 180_000;
 
@@ -34,5 +35,10 @@ export function fireAllAnalyses(essayId: string, draftId: string, ownerUid?: str
   if (STRUCTURE_ENABLED) {
     const structure = httpsCallable(functions, 'analyzeStructure', { timeout: FUNCTION_TIMEOUT });
     structure(args).catch((err) => console.error('Structure analysis failed:', err));
+  }
+
+  if (REASONING_ENABLED) {
+    const reasoning = httpsCallable(functions, 'analyzeReasoning', { timeout: FUNCTION_TIMEOUT });
+    reasoning(args).catch((err) => console.error('Reasoning analysis failed:', err));
   }
 }

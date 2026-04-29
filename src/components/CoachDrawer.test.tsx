@@ -56,6 +56,7 @@ const presentation = {
     criteria: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
     coherence: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
     structure: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    reasoning: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
   },
   verdict: {
     phase: 'has_verdict',
@@ -68,6 +69,7 @@ const presentation = {
   hasCriteria: false,
   hasCoherence: false,
   hasStructure: false,
+  hasReasoning: false,
   isLatest: true,
 } satisfies DraftPresentation;
 

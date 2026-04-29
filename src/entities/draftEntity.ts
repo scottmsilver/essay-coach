@@ -1,6 +1,6 @@
 import type { Draft, CoachSynthesis } from '../types';
 
-export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure';
+export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure' | 'reasoning';
 export type AnalysisStatus = 'ready' | 'loading' | 'error' | 'pending';
 
 export interface DraftEntity {
@@ -25,6 +25,7 @@ const DATA_FIELDS: Record<AnalysisKey, keyof Draft> = {
   criteria: 'criteriaAnalysis',
   coherence: 'coherenceAnalysis',
   structure: 'structureAnalysis',
+  reasoning: 'reasoningAnalysis',
 };
 
 const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
@@ -36,6 +37,7 @@ const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
   criteria: 'criteriaStatus',
   coherence: 'coherenceStatus',
   structure: 'structureStatus',
+  reasoning: 'reasoningStatus',
 };
 
 export function createDraftEntity(raw: Draft): DraftEntity {
@@ -92,6 +94,10 @@ export function createDraftEntity(raw: Draft): DraftEntity {
       case 'structure':
         return raw.structureAnalysis
           ? raw.structureAnalysis.summary.missingAnalysis + raw.structureAnalysis.summary.missingEvidence + raw.structureAnalysis.summary.missingClaim
+          : undefined;
+      case 'reasoning':
+        return raw.reasoningAnalysis
+          ? raw.reasoningAnalysis.summary.circular
           : undefined;
     }
   };
