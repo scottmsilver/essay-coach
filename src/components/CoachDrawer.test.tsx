@@ -54,6 +54,7 @@ const presentation = {
     prompt: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
     duplication: { status: 'ready', issueCount: 0, isRecommended: false, statusMessage: null },
     criteria: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    coherence: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
   },
   verdict: {
     phase: 'has_verdict',
@@ -64,6 +65,7 @@ const presentation = {
   canEdit: false,
   hasPrompt: true,
   hasCriteria: false,
+  hasCoherence: false,
   isLatest: true,
 } satisfies DraftPresentation;
 

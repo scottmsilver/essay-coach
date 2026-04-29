@@ -2149,3 +2149,23 @@ mark {
 .criteria-bar-segment {
   height: 100%;
 }
+
+/* ── CoherencePanel — paragraph assessments ──────────────────────────── */
+.coherence-view {
+  margin-bottom: 24px;
+}
+
+.coherence-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.coherence-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.coherence-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

@@ -85,6 +85,22 @@ export type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis };
 import type { CriterionResult, CriteriaAnalysis, CriteriaComparison } from '../shared/criteriaTypes';
 export type { CriterionResult, CriteriaAnalysis, CriteriaComparison };
 
+// Coherence analysis types — canonical definitions in shared/coherenceTypes.ts
+import type {
+  CoherenceAnalysis,
+  ParagraphAssessment,
+  ParagraphRelation,
+  ThesisParagraph,
+  CoherenceSummary,
+} from '../shared/coherenceTypes';
+export type {
+  CoherenceAnalysis,
+  ParagraphAssessment,
+  ParagraphRelation,
+  ThesisParagraph,
+  CoherenceSummary,
+};
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
@@ -93,7 +109,7 @@ export interface EvaluationStatus {
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -104,6 +120,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   prompt: 'Prompt Fit',
   duplication: 'Duplication',
   criteria: 'Criteria',
+  coherence: 'Coherence',
 };
 
 export interface ReportSummary {
@@ -140,6 +157,8 @@ export interface Draft {
   criteriaAnalysis?: CriteriaAnalysis | null;
   criteriaStatus?: EvaluationStatus | null;
   criteriaSnapshot?: string | null;
+  coherenceAnalysis?: CoherenceAnalysis | null;
+  coherenceStatus?: EvaluationStatus | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;

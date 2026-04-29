@@ -16,3 +16,4 @@ export { suggestTitle } from './suggestTitle';
 export { analyzePromptAdherence } from './analyzePromptAdherence';
 export { analyzeDuplication } from './analyzeDuplication';
 export { analyzeCriteria } from './analyzeCriteria';
+export { analyzeCoherence } from './analyzeCoherence';

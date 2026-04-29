@@ -8,7 +8,7 @@ import { parseSections } from '../../shared/gdocTypes';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, scoreLabel } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, collectCoherenceAnnotations, scoreLabel } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -20,6 +20,7 @@ import GrammarView from '../components/GrammarView';
 import DuplicationView from '../components/DuplicationView';
 import PromptAnalysisView from '../components/PromptAnalysisView';
 import { CriteriaPanel, CriteriaEmptyState } from '../components/CriteriaPanel';
+import { CoherencePanel, CoherenceEmptyState } from '../components/CoherencePanel';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
 import RevisionJourney from '../components/RevisionJourney';
@@ -33,7 +34,7 @@ import { useDraftEditor } from '../hooks/useDraftEditor';
 import { useAnalysisActions } from '../hooks/useAnalysisActions';
 import type { ActionKey } from '../hooks/useAnalysisActions';
 
-type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria';
+type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria' | 'coherence';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
@@ -41,8 +42,13 @@ function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/prompt')) return 'prompt';
   if (pathname.endsWith('/duplication')) return 'duplication';
   if (pathname.endsWith('/criteria')) return 'criteria';
+  if (pathname.endsWith('/coherence')) return 'coherence';
   if (pathname.endsWith('/overall')) return 'overall';
   return 'essay';
+}
+
+function countParagraphs(content: string): number {
+  return content.trim().split(/\n\s*\n+/).filter((p) => p.trim()).length;
 }
 
 export default function EssayPage() {
@@ -88,8 +94,9 @@ export default function EssayPage() {
   // can't be a useMemo dep without causing infinite re-renders).
   // For rendering, we also compute it here for local use.
   const draftAge = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
+  const hasCoherence = !!activeDraft && countParagraphs(activeDraft.content) > 1;
   const presentation = entity ? presentDraft(
-    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria,
+    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria, hasCoherence,
   ) : null;
 
   // Hooks
@@ -125,6 +132,9 @@ export default function EssayPage() {
     if (activeView === 'criteria' && activeDraft?.criteriaAnalysis) {
       return collectCriteriaAnnotations(activeDraft.criteriaAnalysis);
     }
+    if (activeView === 'coherence' && activeDraft?.coherenceAnalysis) {
+      return collectCoherenceAnnotations(activeDraft.coherenceAnalysis);
+    }
     if (activeView === 'overall' && activeDraft?.evaluation) {
       return collectAnnotations(activeDraft.evaluation);
     }
@@ -134,7 +144,7 @@ export default function EssayPage() {
   // Orchestration: report selection (composes actions.ensure + navigation)
   const handleDrawerSelectReport = useCallback((key: ReportKey) => {
     const view = key as ViewMode;
-    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria') {
+    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria' || view === 'coherence') {
       actions.ensure(view as ActionKey);
       setActiveView(view);
     } else if (view === 'essay') {
@@ -615,6 +625,31 @@ export default function EssayPage() {
           </AnalysisPanel>
         ) : (
           <CriteriaEmptyState isOwner={isOwner} onSaveCriteria={handleSaveCriteria} />
+        )
+      )}
+
+      {activeView === 'coherence' && (
+        hasCoherence ? (
+          <AnalysisPanel
+            data={activeDraft.coherenceAnalysis}
+            error={actions.errors.coherence}
+            loading={actions.loading.coherence}
+            status={activeDraft.coherenceStatus}
+            onRetry={() => { actions.ensure('coherence'); }}
+            onRerun={() => { actions.rerun('coherence'); }}
+            rerunLoading={actions.loading.coherence}
+            defaultMessage="Checking thesis coherence..."
+            placeholder="Coherence analysis is loading..."
+          >
+            <CoherencePanel analysis={activeDraft.coherenceAnalysis!} />
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
+          </AnalysisPanel>
+        ) : (
+          <CoherenceEmptyState />
         )
       )}
 

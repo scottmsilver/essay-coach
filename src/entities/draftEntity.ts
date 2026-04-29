@@ -1,6 +1,6 @@
 import type { Draft, CoachSynthesis } from '../types';
 
-export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria';
+export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence';
 export type AnalysisStatus = 'ready' | 'loading' | 'error' | 'pending';
 
 export interface DraftEntity {
@@ -23,6 +23,7 @@ const DATA_FIELDS: Record<AnalysisKey, keyof Draft> = {
   prompt: 'promptAnalysis',
   duplication: 'duplicationAnalysis',
   criteria: 'criteriaAnalysis',
+  coherence: 'coherenceAnalysis',
 };
 
 const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
@@ -32,6 +33,7 @@ const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
   prompt: 'promptStatus',
   duplication: 'duplicationStatus',
   criteria: 'criteriaStatus',
+  coherence: 'coherenceStatus',
 };
 
 export function createDraftEntity(raw: Draft): DraftEntity {
@@ -80,6 +82,10 @@ export function createDraftEntity(raw: Draft): DraftEntity {
       case 'criteria':
         return raw.criteriaAnalysis
           ? raw.criteriaAnalysis.criteria.filter((c) => c.status !== 'met').length
+          : undefined;
+      case 'coherence':
+        return raw.coherenceAnalysis
+          ? raw.coherenceAnalysis.summary.contrastsUnacknowledged + raw.coherenceAnalysis.summary.offTopic
           : undefined;
     }
   };

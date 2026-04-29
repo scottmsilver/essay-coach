@@ -27,6 +27,7 @@ export default function App() {
             <Route path="/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/essay/:essayId/duplication" element={<EssayPage />} />
             <Route path="/essay/:essayId/criteria" element={<EssayPage />} />
+            <Route path="/essay/:essayId/coherence" element={<EssayPage />} />
             <Route path="/essay/:essayId/edit" element={<EditEssayPage />} />
             <Route path="/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/user/:ownerUid/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/duplication" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/criteria" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/coherence" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/edit" element={<EditEssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/sharing" element={<SharingPage />} />

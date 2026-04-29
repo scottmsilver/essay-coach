@@ -23,4 +23,7 @@ export function fireAllAnalyses(essayId: string, draftId: string, ownerUid?: str
     const criteria = httpsCallable(functions, 'analyzeCriteria', { timeout: FUNCTION_TIMEOUT });
     criteria(args).catch((err) => console.error('Criteria analysis failed:', err));
   }
+
+  const coherence = httpsCallable(functions, 'analyzeCoherence', { timeout: FUNCTION_TIMEOUT });
+  coherence(args).catch((err) => console.error('Coherence analysis failed:', err));
 }

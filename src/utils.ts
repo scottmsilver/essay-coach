@@ -1,5 +1,5 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from './types';
-import type { Evaluation, TraitAnnotation, CriteriaAnalysis } from './types';
+import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation } from './types';
 
 export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
   const result: TraitAnnotation[] = [];
@@ -31,6 +31,40 @@ export function collectCriteriaAnnotations(analysis: CriteriaAnalysis): Criteria
         criterionText: criterion.criterion,
       });
     }
+  }
+  return result;
+}
+
+export interface CoherenceAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for supports + contrasts_acknowledged, 'suggestion' for problems. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  relation: ParagraphRelation;
+  relationLabel: string;
+}
+
+const COHERENCE_RELATION_LABEL: Record<ParagraphRelation, string> = {
+  supports: 'Supports',
+  contrasts_acknowledged: 'Counterargument',
+  contrasts_unacknowledged: 'Contradicts',
+  off_topic: 'Off topic',
+};
+
+export function collectCoherenceAnnotations(analysis: CoherenceAnalysis): CoherenceAnnotation[] {
+  const result: CoherenceAnnotation[] = [];
+  for (const para of analysis.paragraphs) {
+    if (!para.quotedText) continue;
+    const isPositive = para.relation === 'supports' || para.relation === 'contrasts_acknowledged';
+    result.push({
+      quotedText: para.quotedText,
+      comment: para.comment,
+      kind: isPositive ? 'praise' : 'suggestion',
+      paragraphIndex: para.index,
+      relation: para.relation,
+      relationLabel: COHERENCE_RELATION_LABEL[para.relation],
+    });
   }
   return result;
 }
