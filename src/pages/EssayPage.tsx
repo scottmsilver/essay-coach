@@ -5,6 +5,7 @@ import { Button } from '@mantine/core';
 import { db } from '../firebase';
 import { fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
+import { confirmAction, alertAction, showError } from '../utils/dialogs';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -177,9 +178,8 @@ export default function EssayPage() {
   // server-side evaluation to finish inside a callable. The onDraftCreated
   // Firestore trigger picks it up and runs every analysis.
   const [reanalyzing, setReanalyzing] = useState(false);
-  const handleReanalyze = useCallback(async () => {
+  const runReanalyze = useCallback(async () => {
     if (!activeDraft || !user || !essay || !essayId) return;
-    if (!window.confirm('Re-analyze this essay? This will create a new draft with fresh feedback.')) return;
     setReanalyzing(true);
     try {
       const uid = ownerUid ?? user.uid;
@@ -195,10 +195,12 @@ export default function EssayPage() {
           const sections = parseSections(data.text, data.bookmarks);
           const idx = essay.contentSource.sectionIndex;
           if (idx < 0 || idx >= sections.length) {
-            window.alert(
-              `The bookmarked section in your Google Doc can't be found — it may have been moved or deleted.\n\nOpen settings to re-pick the section.`
-            );
-            setSettingsOpen(true);
+            alertAction({
+              title: 'Source section not found',
+              message: 'The bookmarked section in your Google Doc can\'t be found — it may have been moved or deleted.',
+              actionLabel: 'Open settings',
+              onAction: () => setSettingsOpen(true),
+            });
             setReanalyzing(false);
             return;
           }
@@ -232,11 +234,21 @@ export default function EssayPage() {
       setSelectedDraftId(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to start re-analyze.';
-      window.alert(msg);
+      showError({ title: 'Re-analyze failed', message: msg });
     } finally {
       setReanalyzing(false);
     }
   }, [activeDraft, essay, essayId, ownerUid, user, editor.content, drafts]);
+
+  const handleReanalyze = useCallback(() => {
+    if (!activeDraft || !user || !essay || !essayId) return;
+    confirmAction({
+      title: 'Re-analyze this essay?',
+      message: 'This will create a new draft with fresh feedback.',
+      confirmLabel: 'Re-analyze',
+      onConfirm: runReanalyze,
+    });
+  }, [activeDraft, user, essay, essayId, runReanalyze]);
 
   // Orchestration: save teacher criteria (Firestore write + clear analysis)
   const isOwner = !ownerUid;

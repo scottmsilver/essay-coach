@@ -27,6 +27,7 @@
   "dependencies": {
     "@mantine/core": "^8.3.17",
     "@mantine/hooks": "^8.3.17",
+    "@mantine/modals": "^8.3.17",
     "@mantine/notifications": "^8.3.18",
     "@react-spring/web": "^10.0.3",
     "@tabler/icons-react": "^3.41.1",
