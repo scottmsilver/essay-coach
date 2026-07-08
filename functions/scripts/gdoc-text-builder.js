@@ -37,19 +37,30 @@ var GDocBuilder = (function () {
       }
     }
     // Docs JSON terminates every paragraph with \n; DocumentApp getText() does not.
-    return s.replace(/\n$/, '');
+    // Soft line breaks (Shift+Enter) are \u000B (vertical tab) in Docs JSON but
+    // \r in DocumentApp getText() — normalize to match (corpus-harness finding).
+    return s.replace(/\n$/, '').replace(/\u000B/g, '\r');
   }
 
-  function isNumbered(p, lists) {
+  function isNumbered(p, lists, glyphOverrides) {
     var b = p.bullet;
     if (!b || !lists) return false;
     var list = lists[b.listId];
     if (!list || !list.listProperties || !list.listProperties.nestingLevels) return false;
     var lvl = list.listProperties.nestingLevels[b.nestingLevel || 0];
-    return !!(lvl && NUMBERED_GLYPHS[lvl.glyphType]);
+    if (!lvl) return false;
+    if (NUMBERED_GLYPHS[lvl.glyphType]) return true;
+    if (lvl.glyphSymbol) return false;
+    // Corpus-harness finding: some lists come back GLYPH_TYPE_UNSPECIFIED with
+    // no glyphSymbol, and the REST API metadata is IDENTICAL for numbered and
+    // bulleted ones. Only DocumentApp can tell them apart, so the Apps Script
+    // caller passes a listId -> 'numbered'|'bullet' override map built from
+    // DocumentApp glyph types. Unknown listIds fall back to bullet (the
+    // pre-existing default).
+    return !!(glyphOverrides && glyphOverrides[b.listId] === 'numbered');
   }
 
-  function projectTab(body, lists) {
+  function projectTab(body, lists, glyphOverrides) {
     var elements = bodyElements(body);
     var childMeta = [];
     var chunks = [];
@@ -67,7 +78,7 @@ var GDocBuilder = (function () {
         ctext = paragraphText(p);
         if (p.bullet) {
           isListItem = true;
-          if (isNumbered(p, lists)) {
+          if (isNumbered(p, lists, glyphOverrides)) {
             var listId = p.bullet.listId;
             if (!listCounters[listId]) listCounters[listId] = 0;
             listCounters[listId]++;

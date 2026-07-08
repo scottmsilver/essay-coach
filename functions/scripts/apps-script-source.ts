@@ -61,7 +61,27 @@ function getBookmarksAndText(docId, tabTitle, suggestionMode) {
     return { error: 'Tab not found in Docs API response' };
   }
 
-  var built = GDocBuilder.projectTab(projTab.documentTab.body, projTab.documentTab.lists);
+  // Glyph override map: the REST API returns identical metadata for some
+  // numbered vs bulleted lists (GLYPH_TYPE_UNSPECIFIED, no glyphSymbol);
+  // only DocumentApp can tell them apart.
+  var docTabForGlyphs = tab.asDocumentTab();
+  var glyphBody = docTabForGlyphs.getBody();
+  var glyphOverrides = {};
+  for (var gi = 0; gi < glyphBody.getNumChildren(); gi++) {
+    var gchild = glyphBody.getChild(gi);
+    if (gchild.getType() === DocumentApp.ElementType.LIST_ITEM) {
+      var gli = gchild.asListItem();
+      var gt = gli.getGlyphType();
+      var numbered = gt === DocumentApp.GlyphType.NUMBER ||
+                     gt === DocumentApp.GlyphType.LATIN_UPPER ||
+                     gt === DocumentApp.GlyphType.LATIN_LOWER ||
+                     gt === DocumentApp.GlyphType.ROMAN_UPPER ||
+                     gt === DocumentApp.GlyphType.ROMAN_LOWER;
+      glyphOverrides[gli.getListId()] = numbered ? 'numbered' : 'bullet';
+    }
+  }
+
+  var built = GDocBuilder.projectTab(projTab.documentTab.body, projTab.documentTab.lists, glyphOverrides);
   var vis = GDocBuilder.elementVisibility(defTab.documentTab.body);
   var docHasSuggestions = GDocBuilder.hasSuggestions(defTab.documentTab.body);
 

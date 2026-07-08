@@ -75,6 +75,60 @@ describe('projectTab — FORMAT CONTRACT', () => {
   });
 });
 
+describe('degenerate lists (corpus-harness finding)', () => {
+  // REST metadata is IDENTICAL for these numbered vs bulleted lists —
+  // GLYPH_TYPE_UNSPECIFIED, no glyphSymbol. The caller passes a DocumentApp-
+  // derived override map to disambiguate.
+  const AMBIGUOUS = {
+    L3: { listProperties: { nestingLevels: [{ glyphType: 'GLYPH_TYPE_UNSPECIFIED', startNumber: 1 }] } },
+  };
+
+  it('numbers an ambiguous list when the override says numbered', () => {
+    const { text } = GDocBuilder.projectTab(
+      body(P('first', { bullet: { listId: 'L3' } }), P('second', { bullet: { listId: 'L3' } })),
+      AMBIGUOUS,
+      { L3: 'numbered' },
+    );
+    expect(text).toBe('1. first\n2. second');
+  });
+
+  it('bullets an ambiguous list when the override says bullet', () => {
+    const { text } = GDocBuilder.projectTab(
+      body(P('a', { bullet: { listId: 'L3' } })),
+      AMBIGUOUS,
+      { L3: 'bullet' },
+    );
+    expect(text).toBe('• a');
+  });
+
+  it('falls back to bullet for ambiguous lists with no override (pre-existing default)', () => {
+    const { text } = GDocBuilder.projectTab(
+      body(P('a', { bullet: { listId: 'L3' } })),
+      AMBIGUOUS,
+    );
+    expect(text).toBe('• a');
+  });
+
+  it('override does not affect lists with explicit glyph metadata', () => {
+    const { text } = GDocBuilder.projectTab(
+      body(P('a', { bullet: { listId: 'L2' } })),
+      BULLET_LISTS,
+      { L2: 'numbered' }, // glyphSymbol wins — override only breaks ties
+    );
+    expect(text).toBe('• a');
+  });
+});
+
+describe('soft line breaks (corpus-harness finding)', () => {
+  it('normalizes \\u000B vertical tabs to \\r to match DocumentApp', () => {
+    const { text } = GDocBuilder.projectTab(
+      body(para([{ content: 'line one\u000Bline two\n' }])),
+      {},
+    );
+    expect(text).toBe('line one\rline two');
+  });
+});
+
 describe('suggestions', () => {
   const withSuggestions = body(
     P('Kept.'),
