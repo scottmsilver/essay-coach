@@ -1,6 +1,6 @@
 import type { Draft, CoachSynthesis } from '../types';
 
-export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria';
+export type AnalysisKey = 'overall' | 'grammar' | 'transitions' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure' | 'reasoning';
 export type AnalysisStatus = 'ready' | 'loading' | 'error' | 'pending';
 
 export interface DraftEntity {
@@ -8,6 +8,7 @@ export interface DraftEntity {
   raw: Draft;
   analysisStatus: (key: AnalysisKey) => AnalysisStatus;
   statusMessage: (key: AnalysisKey) => string | null;
+  statusCode: (key: AnalysisKey) => string | null;
   issueCount: (key: AnalysisKey) => number | undefined;
   coachReadiness: CoachSynthesis['readiness'] | null;
   coachNote: string | null;
@@ -22,6 +23,9 @@ const DATA_FIELDS: Record<AnalysisKey, keyof Draft> = {
   prompt: 'promptAnalysis',
   duplication: 'duplicationAnalysis',
   criteria: 'criteriaAnalysis',
+  coherence: 'coherenceAnalysis',
+  structure: 'structureAnalysis',
+  reasoning: 'reasoningAnalysis',
 };
 
 const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
@@ -31,6 +35,9 @@ const STATUS_FIELDS: Record<AnalysisKey, keyof Draft> = {
   prompt: 'promptStatus',
   duplication: 'duplicationStatus',
   criteria: 'criteriaStatus',
+  coherence: 'coherenceStatus',
+  structure: 'structureStatus',
+  reasoning: 'reasoningStatus',
 };
 
 export function createDraftEntity(raw: Draft): DraftEntity {
@@ -46,6 +53,11 @@ export function createDraftEntity(raw: Draft): DraftEntity {
   const statusMessage = (key: AnalysisKey): string | null => {
     const status = raw[STATUS_FIELDS[key]] as Draft['evaluationStatus'];
     return status?.message ?? null;
+  };
+
+  const statusCode = (key: AnalysisKey): string | null => {
+    const status = raw[STATUS_FIELDS[key]] as Draft['evaluationStatus'];
+    return status?.code ?? null;
   };
 
   const issueCount = (key: AnalysisKey): number | undefined => {
@@ -75,6 +87,18 @@ export function createDraftEntity(raw: Draft): DraftEntity {
         return raw.criteriaAnalysis
           ? raw.criteriaAnalysis.criteria.filter((c) => c.status !== 'met').length
           : undefined;
+      case 'coherence':
+        return raw.coherenceAnalysis
+          ? raw.coherenceAnalysis.summary.contrastsUnacknowledged + raw.coherenceAnalysis.summary.offTopic
+          : undefined;
+      case 'structure':
+        return raw.structureAnalysis
+          ? raw.structureAnalysis.summary.missingAnalysis + raw.structureAnalysis.summary.missingEvidence + raw.structureAnalysis.summary.missingClaim
+          : undefined;
+      case 'reasoning':
+        return raw.reasoningAnalysis
+          ? raw.reasoningAnalysis.summary.circular
+          : undefined;
     }
   };
 
@@ -91,6 +115,7 @@ export function createDraftEntity(raw: Draft): DraftEntity {
     raw,
     analysisStatus,
     statusMessage,
+    statusCode,
     issueCount,
     coachReadiness: synthesis?.readiness ?? null,
     coachNote: synthesis?.coachNote ?? null,

@@ -1,6 +1,6 @@
 import { createAnalysisHandler, type AnalysisContext } from './createAnalysisHandler';
 import { analyzeCriteriaWithGemini, type CriteriaAnalysis } from './criteria';
-import { resolveDocSource } from './gdocResolver';
+import { resolveDocSource, GDocResolveError } from './gdocResolver';
 import { defineString } from 'firebase-functions/params';
 
 const gdocWebAppId = defineString('GDOC_WEBAPP_DEPLOYMENT_ID', { default: '' });
@@ -27,6 +27,9 @@ async function analyzeCriteriaForDraft(ctx: AnalysisContext): Promise<CriteriaAn
       teacherCriteria = await resolveDocSource(essayData.criteriaSource, webAppId);
       await essayRef.update({ teacherCriteria });
     } catch (err) {
+      if (err instanceof GDocResolveError) {
+        throw new GDocResolveError(err.message, `Teacher criteria — ${err.userMessage}`);
+      }
       console.warn('Failed to re-fetch criteria from Google Docs, using stored criteria:', (err as Error).message);
     }
   }

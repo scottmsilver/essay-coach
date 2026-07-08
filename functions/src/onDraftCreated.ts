@@ -7,6 +7,12 @@ import { analyzeTransitionsWithGemini } from './transitions';
 import { analyzePromptWithGemini } from './promptAdherence';
 import { analyzeDuplicationWithGemini } from './duplication';
 import { analyzeCriteriaWithGemini } from './criteria';
+import { analyzeCoherenceWithGemini } from './coherence';
+import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
+import { analyzeStructureWithGemini } from './structure';
+import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
+import { analyzeReasoningWithGemini } from './reasoning';
+import { REASONING_ENABLED } from '../../shared/reasoningTypes';
 import { evaluateWithGemini } from './gemini';
 import { buildEvaluationPrompt, buildResubmissionPrompt } from './prompt';
 import { synthesizeCoachForDraft } from './synthesizeCoach';
@@ -19,6 +25,10 @@ const geminiApiKey = defineSecret('GEMINI_API_KEY');
 function isActivelyProcessing(status: { stage: string } | null | undefined): boolean {
   if (!status) return false;
   return status.stage === 'thinking' || status.stage === 'generating';
+}
+
+function countParagraphs(content: string): number {
+  return content.trim().split(/\n\s*\n+/).filter((p) => p.trim()).length;
 }
 
 /**
@@ -178,6 +188,57 @@ export const onDraftCreated = onDocumentCreated(
             const msg = error instanceof Error ? error.message : String(error);
             logger.error('Criteria analysis failed (post-mega)', { error: msg, essayId, draftId });
             await draftRef.update({ criteriaStatus: { stage: 'error', message: 'Criteria analysis failed' } });
+          }
+        }
+
+        // Coherence analysis runs separately from mega — fire if essay has more than 1 paragraph
+        if (COHERENCE_ENABLED && countParagraphs(content) > 1) {
+          try {
+            const coherenceResult = await analyzeCoherenceWithGemini(
+              geminiApiKey.value(),
+              { assignmentPrompt, writingType, content },
+              draftRef,
+            );
+            await draftRef.update({ coherenceAnalysis: coherenceResult, coherenceStatus: null });
+            logger.info('Coherence analysis complete (post-mega)', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Coherence analysis failed (post-mega)', { error: msg, essayId, draftId });
+            await draftRef.update({ coherenceStatus: { stage: 'error', message: 'Coherence analysis failed' } });
+          }
+        }
+
+        // Structure analysis runs separately from mega — fire if essay has more than 1 paragraph
+        if (STRUCTURE_ENABLED && countParagraphs(content) > 1) {
+          try {
+            const structureResult = await analyzeStructureWithGemini(
+              geminiApiKey.value(),
+              { assignmentPrompt, writingType, content },
+              draftRef,
+            );
+            await draftRef.update({ structureAnalysis: structureResult, structureStatus: null });
+            logger.info('Structure analysis complete (post-mega)', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Structure analysis failed (post-mega)', { error: msg, essayId, draftId });
+            await draftRef.update({ structureStatus: { stage: 'error', message: 'Structure analysis failed' } });
+          }
+        }
+
+        // Reasoning analysis runs separately from mega — fire if essay has more than 1 paragraph
+        if (REASONING_ENABLED && countParagraphs(content) > 1) {
+          try {
+            const reasoningResult = await analyzeReasoningWithGemini(
+              geminiApiKey.value(),
+              { assignmentPrompt, writingType, content },
+              draftRef,
+            );
+            await draftRef.update({ reasoningAnalysis: reasoningResult, reasoningStatus: null });
+            logger.info('Reasoning analysis complete (post-mega)', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Reasoning analysis failed (post-mega)', { error: msg, essayId, draftId });
+            await draftRef.update({ reasoningStatus: { stage: 'error', message: 'Reasoning analysis failed' } });
           }
         }
 
@@ -377,6 +438,93 @@ export const onDraftCreated = onDocumentCreated(
           })()
         );
       }
+    }
+
+    // Coherence analysis: skip if essay has 1 or fewer paragraphs (don't even create a status)
+    if (COHERENCE_ENABLED && !isActivelyProcessing(data.coherenceStatus) && !data.coherenceAnalysis && countParagraphs(content) > 1) {
+      logger.info('Coherence analysis not actively processing — trigger firing', { essayId, draftId });
+      const essayRef = draftRef.parent.parent!;
+      tasks.push(
+        (async () => {
+          try {
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data() || {};
+            const analysis = await analyzeCoherenceWithGemini(
+              apiKey,
+              {
+                assignmentPrompt: essayData.assignmentPrompt || '',
+                writingType: essayData.writingType || 'argumentative',
+                content,
+              },
+              draftRef,
+            );
+            await draftRef.update({ coherenceAnalysis: analysis, coherenceStatus: null });
+            logger.info('Trigger coherence analysis complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger coherence analysis failed', { error: msg, essayId, draftId });
+            await draftRef.update({ coherenceStatus: { stage: 'error', message: 'Coherence analysis failed' } });
+          }
+        })()
+      );
+    }
+
+    // Structure analysis: skip if essay has 1 or fewer paragraphs (don't even create a status)
+    if (STRUCTURE_ENABLED && !isActivelyProcessing(data.structureStatus) && !data.structureAnalysis && countParagraphs(content) > 1) {
+      logger.info('Structure analysis not actively processing — trigger firing', { essayId, draftId });
+      const essayRef = draftRef.parent.parent!;
+      tasks.push(
+        (async () => {
+          try {
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data() || {};
+            const analysis = await analyzeStructureWithGemini(
+              apiKey,
+              {
+                assignmentPrompt: essayData.assignmentPrompt || '',
+                writingType: essayData.writingType || 'argumentative',
+                content,
+              },
+              draftRef,
+            );
+            await draftRef.update({ structureAnalysis: analysis, structureStatus: null });
+            logger.info('Trigger structure analysis complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger structure analysis failed', { error: msg, essayId, draftId });
+            await draftRef.update({ structureStatus: { stage: 'error', message: 'Structure analysis failed' } });
+          }
+        })()
+      );
+    }
+
+    // Reasoning analysis: skip if essay has 1 or fewer paragraphs (don't even create a status)
+    if (REASONING_ENABLED && !isActivelyProcessing(data.reasoningStatus) && !data.reasoningAnalysis && countParagraphs(content) > 1) {
+      logger.info('Reasoning analysis not actively processing — trigger firing', { essayId, draftId });
+      const essayRef = draftRef.parent.parent!;
+      tasks.push(
+        (async () => {
+          try {
+            const essaySnap = await essayRef.get();
+            const essayData = essaySnap.data() || {};
+            const analysis = await analyzeReasoningWithGemini(
+              apiKey,
+              {
+                assignmentPrompt: essayData.assignmentPrompt || '',
+                writingType: essayData.writingType || 'argumentative',
+                content,
+              },
+              draftRef,
+            );
+            await draftRef.update({ reasoningAnalysis: analysis, reasoningStatus: null });
+            logger.info('Trigger reasoning analysis complete', { essayId, draftId });
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error('Trigger reasoning analysis failed', { error: msg, essayId, draftId });
+            await draftRef.update({ reasoningStatus: { stage: 'error', message: 'Reasoning analysis failed' } });
+          }
+        })()
+      );
     }
 
     if (tasks.length > 0) {

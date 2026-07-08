@@ -1,5 +1,5 @@
 import { TRAIT_KEYS, TRAIT_LABELS } from './types';
-import type { Evaluation, TraitAnnotation, CriteriaAnalysis } from './types';
+import type { Evaluation, TraitAnnotation, CriteriaAnalysis, CoherenceAnalysis, ParagraphRelation, StructureAnalysis, ParagraphClassification, ReasoningAnalysis, ReasoningClassification } from './types';
 
 export function collectAnnotations(evaluation: Evaluation): TraitAnnotation[] {
   const result: TraitAnnotation[] = [];
@@ -35,8 +35,192 @@ export function collectCriteriaAnnotations(analysis: CriteriaAnalysis): Criteria
   return result;
 }
 
-export function classifyAnnotation(comment: string): 'praise' | 'suggestion' {
-  return comment.includes('?') ? 'suggestion' : 'praise';
+export interface CoherenceAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for supports + contrasts_acknowledged, 'suggestion' for problems. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  relation: ParagraphRelation;
+  relationLabel: string;
+}
+
+const COHERENCE_RELATION_LABEL: Record<ParagraphRelation, string> = {
+  supports: 'Supports',
+  contrasts_acknowledged: 'Counterargument',
+  contrasts_unacknowledged: 'Contradicts',
+  off_topic: 'Off topic',
+};
+
+export function collectCoherenceAnnotations(analysis: CoherenceAnalysis): CoherenceAnnotation[] {
+  const result: CoherenceAnnotation[] = [];
+  for (const para of analysis.paragraphs) {
+    if (!para.quotedText) continue;
+    const isPositive = para.relation === 'supports' || para.relation === 'contrasts_acknowledged';
+    result.push({
+      quotedText: para.quotedText,
+      comment: para.comment,
+      kind: isPositive ? 'praise' : 'suggestion',
+      paragraphIndex: para.index,
+      relation: para.relation,
+      relationLabel: COHERENCE_RELATION_LABEL[para.relation],
+    });
+  }
+  return result;
+}
+
+export interface StructureAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for complete paragraphs, 'suggestion' for missing components. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  classification: ParagraphClassification;
+  classificationLabel: string;
+}
+
+const STRUCTURE_CLASSIFICATION_LABEL: Record<ParagraphClassification, string> = {
+  complete: 'Complete',
+  missing_analysis: 'Missing analysis',
+  missing_evidence: 'Missing evidence',
+  missing_claim: 'Missing claim',
+  off_pattern: 'Off pattern',
+};
+
+/** Take the first 5-15 words of a paragraph as a fallback anchor. */
+function fallbackQuote(paragraph: string): string {
+  const words = paragraph.trim().split(/\s+/);
+  const slice = words.slice(0, Math.min(words.length, 12));
+  return slice.join(' ');
+}
+
+export function collectStructureAnnotations(analysis: StructureAnalysis, content?: string): StructureAnnotation[] {
+  const result: StructureAnnotation[] = [];
+  // Split content into paragraphs once so we can fall back to a slice when no
+  // component is present in a missing_* paragraph.
+  const paragraphs = content
+    ? content.trim().split(/\n\s*\n+/).filter((p) => p.trim())
+    : [];
+
+  for (const para of analysis.paragraphs) {
+    if (para.classification === 'off_pattern') continue;
+
+    const label = STRUCTURE_CLASSIFICATION_LABEL[para.classification];
+
+    if (para.classification === 'complete') {
+      // Praise the analysis quote when present; fall back to evidence then claim.
+      const quote =
+        para.analysis.quotedText ??
+        para.evidence.quotedText ??
+        para.claim.quotedText;
+      if (!quote) continue;
+      result.push({
+        quotedText: quote,
+        comment: para.comment,
+        kind: 'praise',
+        paragraphIndex: para.index,
+        classification: para.classification,
+        classificationLabel: label,
+      });
+      continue;
+    }
+
+    // missing_* paragraphs: anchor on whichever component IS present
+    let quote: string | null =
+      para.analysis.quotedText ??
+      para.evidence.quotedText ??
+      para.claim.quotedText;
+
+    if (!quote) {
+      // 1-indexed paragraph -> 0-indexed array
+      const idx = para.index - 1;
+      if (idx >= 0 && idx < paragraphs.length) {
+        quote = fallbackQuote(paragraphs[idx]);
+      }
+    }
+
+    if (!quote) continue;
+
+    result.push({
+      quotedText: quote,
+      comment: para.comment,
+      kind: 'suggestion',
+      paragraphIndex: para.index,
+      classification: para.classification,
+      classificationLabel: label,
+    });
+  }
+  return result;
+}
+
+export interface ReasoningAnnotation {
+  quotedText: string;
+  comment: string;
+  /** 'praise' for sound paragraphs, 'suggestion' for circular paragraphs. */
+  kind: 'praise' | 'suggestion';
+  paragraphIndex: number;
+  classification: ReasoningClassification;
+  classificationLabel: string;
+}
+
+const REASONING_CLASSIFICATION_LABEL: Record<ReasoningClassification, string> = {
+  sound: 'Sound',
+  circular: 'Circular',
+  not_applicable: 'Not applicable',
+};
+
+export function collectReasoningAnnotations(analysis: ReasoningAnalysis, content?: string): ReasoningAnnotation[] {
+  const result: ReasoningAnnotation[] = [];
+  const paragraphs = content
+    ? content.trim().split(/\n\s*\n+/).filter((p) => p.trim())
+    : [];
+
+  for (const para of analysis.paragraphs) {
+    if (para.classification === 'not_applicable') continue;
+
+    const label = REASONING_CLASSIFICATION_LABEL[para.classification];
+
+    if (para.classification === 'circular') {
+      const quote = para.claimEcho;
+      if (!quote) continue;
+      result.push({
+        quotedText: quote,
+        comment: para.comment,
+        kind: 'suggestion',
+        paragraphIndex: para.index,
+        classification: para.classification,
+        classificationLabel: label,
+      });
+      continue;
+    }
+
+    // sound paragraphs: anchor on the first 5-15 words of the paragraph
+    const idx = para.index - 1;
+    if (idx < 0 || idx >= paragraphs.length) continue;
+    const quote = fallbackQuote(paragraphs[idx]);
+    if (!quote) continue;
+    result.push({
+      quotedText: quote,
+      comment: para.comment,
+      kind: 'praise',
+      paragraphIndex: para.index,
+      classification: para.classification,
+      classificationLabel: label,
+    });
+  }
+  return result;
+}
+
+/**
+ * Classify an annotation as praise or suggestion.
+ *
+ * Gemini now labels each annotation with `kind`. For legacy drafts written
+ * before that field existed, fall back to the old punctuation heuristic so
+ * the UI still shows something reasonable.
+ */
+export function classifyAnnotation(ann: { comment: string; kind?: 'praise' | 'suggestion' }): 'praise' | 'suggestion' {
+  if (ann.kind) return ann.kind;
+  return ann.comment.includes('?') ? 'suggestion' : 'praise';
 }
 
 export function countWords(text: string): number {

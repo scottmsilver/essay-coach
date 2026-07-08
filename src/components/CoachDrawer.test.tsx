@@ -30,6 +30,7 @@ const entity = {
   },
   analysisStatus: vi.fn(),
   statusMessage: vi.fn(),
+  statusCode: vi.fn(() => null),
   issueCount: vi.fn((key: string) => {
     switch (key) {
       case 'overall': return 0;
@@ -53,6 +54,9 @@ const presentation = {
     prompt: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
     duplication: { status: 'ready', issueCount: 0, isRecommended: false, statusMessage: null },
     criteria: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    coherence: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    structure: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
+    reasoning: { status: 'unavailable', issueCount: undefined, isRecommended: false, statusMessage: null },
   },
   verdict: {
     phase: 'has_verdict',
@@ -63,6 +67,9 @@ const presentation = {
   canEdit: false,
   hasPrompt: true,
   hasCriteria: false,
+  hasCoherence: false,
+  hasStructure: false,
+  hasReasoning: false,
   isLatest: true,
 } satisfies DraftPresentation;
 

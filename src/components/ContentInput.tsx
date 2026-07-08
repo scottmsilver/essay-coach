@@ -10,6 +10,8 @@ interface ContentInputProps {
   value: string;
   onChange: (value: string) => void;
   imported?: boolean;
+  /** Doc title to show in preview when imported (e.g., "Imported from My Thesis"). */
+  docName?: string;
   onImportClick: () => void;
   onClear: () => void;
   placeholder?: string;
@@ -29,6 +31,7 @@ export default function ContentInput({
   value,
   onChange,
   imported,
+  docName,
   onImportClick,
   onClear,
   placeholder = 'Paste or type here...',
@@ -152,7 +155,9 @@ export default function ContentInput({
           {imported && (
             <Group gap="xs" mb={4}>
               <span className="content-input-doc-badge">⬡</span>
-              <Text size="xs" fw={500} c="dimmed">Imported from Google Docs</Text>
+              <Text size="xs" fw={500} c="dimmed">
+                {docName ? `Imported from ${docName}` : 'Imported from Google Docs'}
+              </Text>
             </Group>
           )}
           <Text size="sm" c="dimmed" lineClamp={3} style={{ fontFamily: 'var(--font-body)', cursor: imported ? 'default' : 'pointer' }}>

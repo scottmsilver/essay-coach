@@ -21,6 +21,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
 import { isEmailAllowed } from './allowlist';
 import { resolveEssayOwner } from './resolveEssayOwner';
+import { GDocResolveError } from './gdocResolver';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
@@ -133,6 +134,14 @@ export function createAnalysisHandler<T>(config: AnalysisHandlerConfig<T>) {
             await draftRef.update({ [config.statusField]: { stage: 'error', message: 'Analysis failed' } });
             throw new HttpsError('internal', `Failed to analyze ${config.name}. Please try again.`);
           }
+        }
+        // Surface GDoc resolution failures with a user-facing message + code so the UI
+        // can show a "re-pick source" CTA instead of a generic failure.
+        if (error instanceof GDocResolveError) {
+          await draftRef.update({
+            [config.statusField]: { stage: 'error', message: error.userMessage, code: 'gdoc_resolve_failed' },
+          });
+          throw new HttpsError('failed-precondition', error.userMessage);
         }
         await draftRef.update({ [config.statusField]: { stage: 'error', message: 'Analysis failed' } });
         throw new HttpsError('internal', `Failed to analyze ${config.name}: ${errMsg}`);

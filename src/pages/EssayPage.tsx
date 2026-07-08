@@ -1,13 +1,15 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { httpsCallable } from 'firebase/functions';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@mantine/core';
-import { functions, db } from '../firebase';
+import { db } from '../firebase';
+import { fetchGDocInfo } from '../utils/gdocImport';
+import { parseSections } from '../../shared/gdocTypes';
+import { confirmAction, alertAction, showError } from '../utils/dialogs';
 import { useEssay } from '../hooks/useEssay';
 import { useAuth } from '../hooks/useAuth';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, scoreLabel } from '../utils';
+import { scoreColor, relativeTime, collectAnnotations, collectCriteriaAnnotations, collectCoherenceAnnotations, collectStructureAnnotations, collectReasoningAnnotations, scoreLabel } from '../utils';
 import { TRAIT_LABELS } from '../types';
 import type { TraitKey } from '../types';
 import { useSetEssayHeader } from '../hooks/useEssayHeaderContext';
@@ -19,20 +21,26 @@ import GrammarView from '../components/GrammarView';
 import DuplicationView from '../components/DuplicationView';
 import PromptAnalysisView from '../components/PromptAnalysisView';
 import { CriteriaPanel, CriteriaEmptyState } from '../components/CriteriaPanel';
+import { CoherencePanel, CoherenceEmptyState } from '../components/CoherencePanel';
+import { StructurePanel, StructureEmptyState } from '../components/StructurePanel';
+import { ReasoningPanel, ReasoningEmptyState } from '../components/ReasoningPanel';
 import { shouldAskPermission, requestPermission, notifyEvaluationComplete } from '../utils/notifications';
 import { handleRichPaste } from '../utils/pasteHandler';
-import { FUNCTION_TIMEOUT } from '../utils/submitEssay';
 import RevisionJourney from '../components/RevisionJourney';
+import EssaySettingsModal, { type EssaySettingsUpdate } from '../components/EssaySettingsModal';
 import { useNavbarContext } from '../hooks/useNavbarContext';
 import { useGDocChangeDetection } from '../hooks/useGDocChangeDetection';
 import type { ReportKey, DocSource } from '../types';
+import { COHERENCE_ENABLED } from '../../shared/coherenceTypes';
+import { STRUCTURE_ENABLED } from '../../shared/structureTypes';
+import { REASONING_ENABLED } from '../../shared/reasoningTypes';
 import { createDraftEntity } from '../entities/draftEntity';
 import { presentDraft } from '../entities/draftPresentation';
 import { useDraftEditor } from '../hooks/useDraftEditor';
 import { useAnalysisActions } from '../hooks/useAnalysisActions';
 import type { ActionKey } from '../hooks/useAnalysisActions';
 
-type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria';
+type ViewMode = 'essay' | 'overall' | 'transitions' | 'grammar' | 'prompt' | 'duplication' | 'criteria' | 'coherence' | 'structure' | 'reasoning';
 
 function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/transitions')) return 'transitions';
@@ -40,8 +48,15 @@ function viewFromPath(pathname: string): ViewMode {
   if (pathname.endsWith('/prompt')) return 'prompt';
   if (pathname.endsWith('/duplication')) return 'duplication';
   if (pathname.endsWith('/criteria')) return 'criteria';
+  if (pathname.endsWith('/coherence')) return 'coherence';
+  if (pathname.endsWith('/structure')) return 'structure';
+  if (pathname.endsWith('/reasoning')) return 'reasoning';
   if (pathname.endsWith('/overall')) return 'overall';
   return 'essay';
+}
+
+function countParagraphs(content: string): number {
+  return content.trim().split(/\n\s*\n+/).filter((p) => p.trim()).length;
 }
 
 export default function EssayPage() {
@@ -52,6 +67,7 @@ export default function EssayPage() {
   const { essay, drafts, loading } = useEssay(essayId, ownerUid);
   const { updateData: updateNavbar, set: setNavbar } = useNavbarContext();
   const [activeTrait, setActiveTrait] = useState<TraitKey | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const activeView = viewFromPath(location.pathname);
   const basePath = ownerUid ? `/user/${ownerUid}/essay/${essayId}` : `/essay/${essayId}`;
@@ -86,8 +102,11 @@ export default function EssayPage() {
   // can't be a useMemo dep without causing infinite re-renders).
   // For rendering, we also compute it here for local use.
   const draftAge = activeDraft ? Date.now() - activeDraft.submittedAt.getTime() : 0;
+  const hasCoherence = COHERENCE_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
+  const hasStructure = STRUCTURE_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
+  const hasReasoning = REASONING_ENABLED && !!activeDraft && countParagraphs(activeDraft.content) > 1;
   const presentation = entity ? presentDraft(
-    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria,
+    entity, draftAge, !!essay?.assignmentPrompt?.trim(), isLatestDraft, !ownerUid, !!essay?.teacherCriteria, hasCoherence, hasStructure, hasReasoning,
   ) : null;
 
   // Hooks
@@ -123,6 +142,15 @@ export default function EssayPage() {
     if (activeView === 'criteria' && activeDraft?.criteriaAnalysis) {
       return collectCriteriaAnnotations(activeDraft.criteriaAnalysis);
     }
+    if (activeView === 'coherence' && activeDraft?.coherenceAnalysis) {
+      return collectCoherenceAnnotations(activeDraft.coherenceAnalysis);
+    }
+    if (activeView === 'structure' && activeDraft?.structureAnalysis) {
+      return collectStructureAnnotations(activeDraft.structureAnalysis, activeDraft.content);
+    }
+    if (activeView === 'reasoning' && activeDraft?.reasoningAnalysis) {
+      return collectReasoningAnnotations(activeDraft.reasoningAnalysis, activeDraft.content);
+    }
     if (activeView === 'overall' && activeDraft?.evaluation) {
       return collectAnnotations(activeDraft.evaluation);
     }
@@ -132,7 +160,7 @@ export default function EssayPage() {
   // Orchestration: report selection (composes actions.ensure + navigation)
   const handleDrawerSelectReport = useCallback((key: ReportKey) => {
     const view = key as ViewMode;
-    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria') {
+    if (view === 'transitions' || view === 'grammar' || view === 'prompt' || view === 'duplication' || view === 'criteria' || view === 'coherence' || view === 'structure' || view === 'reasoning') {
       actions.ensure(view as ActionKey);
       setActiveView(view);
     } else if (view === 'essay') {
@@ -142,24 +170,85 @@ export default function EssayPage() {
     }
   }, [actions, setActiveView]);
 
-  // Orchestration: re-analyze (crosses editor + analysis boundaries)
+  // Orchestration: re-analyze (crosses editor + analysis boundaries).
+  //
+  // Creates the next draft directly in Firestore — same pattern NewEssayPage
+  // uses — so the UI switches to the new draft's "Analyzing..." state as soon
+  // as the write settles (roughly one RTT) instead of waiting 15-30s for the
+  // server-side evaluation to finish inside a callable. The onDraftCreated
+  // Firestore trigger picks it up and runs every analysis.
   const [reanalyzing, setReanalyzing] = useState(false);
-  const handleReanalyze = useCallback(async () => {
-    if (!activeDraft || !user) return;
-    if (!window.confirm('Re-analyze this essay? This will create a new draft with fresh feedback.')) return;
+  const runReanalyze = useCallback(async () => {
+    if (!activeDraft || !user || !essay || !essayId) return;
     setReanalyzing(true);
     try {
-      const contentToSubmit = (editor.content && editor.content !== activeDraft.content)
-        ? editor.content : activeDraft.content;
-      const resubmitDraft = httpsCallable(functions, 'resubmitDraft', { timeout: FUNCTION_TIMEOUT });
-      await resubmitDraft({ essayId: essayId!, content: contentToSubmit, ownerUid });
+      const uid = ownerUid ?? user.uid;
+      const userEdited = !!editor.content && editor.content !== activeDraft.content;
+      let content = userEdited ? editor.content : activeDraft.content;
+
+      // Refresh from the Google Doc when the student hasn't locally edited —
+      // the "Doc updated — re-analyze to refresh" banner promises this, and
+      // it's where moved/deleted bookmarks surface as a fixable error.
+      if (!userEdited && essay.contentSource) {
+        try {
+          const data = await fetchGDocInfo(essay.contentSource.docId, essay.contentSource.tab);
+          const sections = parseSections(data.text, data.bookmarks);
+          const idx = essay.contentSource.sectionIndex;
+          if (idx < 0 || idx >= sections.length) {
+            alertAction({
+              title: 'Source section not found',
+              message: 'The bookmarked section in your Google Doc can\'t be found — it may have been moved or deleted.',
+              actionLabel: 'Open settings',
+              onAction: () => setSettingsOpen(true),
+            });
+            setReanalyzing(false);
+            return;
+          }
+          content = sections[idx].replace(/^[\n ]+/, '').replace(/\s+$/, '');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn('GDoc re-fetch failed; continuing with stored content:', msg);
+        }
+      }
+
+      const latestDraftNumber = drafts[0]?.draftNumber ?? activeDraft.draftNumber;
+      const nextDraftNumber = latestDraftNumber + 1;
+      const essayRef = doc(db, 'users', uid, 'essays', essayId);
+      const draftRef = doc(collection(db, 'users', uid, 'essays', essayId, 'drafts'));
+
+      await Promise.all([
+        setDoc(draftRef, {
+          draftNumber: nextDraftNumber,
+          content,
+          submittedAt: serverTimestamp(),
+          evaluationStatus: { stage: 'pending', message: 'Queued...' },
+          grammarStatus: { stage: 'pending', message: 'Queued...' },
+          transitionStatus: { stage: 'pending', message: 'Queued...' },
+        }),
+        updateDoc(essayRef, {
+          currentDraftNumber: nextDraftNumber,
+          updatedAt: serverTimestamp(),
+        }),
+      ]);
+
       setSelectedDraftId(null);
-    } catch {
-      // Error handling is state-driven — the UI shows error based on state
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start re-analyze.';
+      showError({ title: 'Re-analyze failed', message: msg });
     } finally {
       setReanalyzing(false);
     }
-  }, [activeDraft, essayId, ownerUid, user, editor.content]);
+  }, [activeDraft, essay, essayId, ownerUid, user, editor.content, drafts]);
+
+  const handleReanalyze = useCallback(() => {
+    if (!activeDraft || !user || !essay || !essayId) return;
+    confirmAction({
+      title: 'Re-analyze this essay?',
+      message: 'This will create a new draft with fresh feedback.',
+      confirmLabel: 'Re-analyze',
+      onConfirm: runReanalyze,
+    });
+  }, [activeDraft, user, essay, essayId, runReanalyze]);
 
   // Orchestration: save teacher criteria (Firestore write + clear analysis)
   const isOwner = !ownerUid;
@@ -181,6 +270,36 @@ export default function EssayPage() {
       });
     }
   }, [essayId, user, ownerUid, activeDraft]);
+
+  const handleSaveSettings = useCallback(async (updates: EssaySettingsUpdate) => {
+    if (!essayId || !user) return;
+    const uid = ownerUid ?? user.uid;
+    const essayRef = doc(db, 'users', uid, 'essays', essayId);
+
+    const promptChanged = updates.assignmentPrompt !== essay?.assignmentPrompt;
+    const criteriaChanged = (updates.teacherCriteria ?? '') !== (essay?.teacherCriteria ?? '');
+    const typeChanged = updates.writingType !== essay?.writingType;
+
+    await updateDoc(essayRef, {
+      title: updates.title,
+      writingType: updates.writingType,
+      assignmentPrompt: updates.assignmentPrompt,
+      promptSource: updates.promptSource,
+      teacherCriteria: updates.teacherCriteria,
+      criteriaSource: updates.criteriaSource,
+    });
+
+    if (activeDraft) {
+      const draftDocRef = doc(db, 'users', uid, 'essays', essayId, 'drafts', activeDraft.id);
+      const clears: Record<string, null> = {};
+      if (typeChanged) { clears.evaluation = null; clears.evaluationStatus = null; }
+      if (promptChanged) { clears.promptAnalysis = null; clears.promptStatus = null; }
+      if (criteriaChanged) { clears.criteriaAnalysis = null; clears.criteriaStatus = null; clears.criteriaSnapshot = null; }
+      if (Object.keys(clears).length > 0) {
+        await updateDoc(draftDocRef, clears);
+      }
+    }
+  }, [essayId, user, ownerUid, essay, activeDraft]);
 
   const setEssayHeader = useSetEssayHeader();
   const gdocChange = useGDocChangeDetection(essay, activeDraft ?? null, isLatestDraft);
@@ -214,6 +333,7 @@ export default function EssayPage() {
         : gdocChange.changed
         ? `v${activeDraft.draftNumber} — doc changed, needs re-analysis`
         : `v${activeDraft.draftNumber} — ${relativeTime(activeDraft.submittedAt)}`,
+      onOpenSettings: () => setSettingsOpen(true),
     });
     return () => setEssayHeader(null);
   }, [essay, activeDraft, editor.content]);
@@ -256,6 +376,7 @@ export default function EssayPage() {
         reanalyzing,
         gdocChanged: gdocChange.changed,
         gdocLastChecked: gdocChange.lastChecked,
+        onOpenSettings: () => setSettingsOpen(true),
       },
     });
     return () => setNavbar(null);
@@ -534,6 +655,92 @@ export default function EssayPage() {
         )
       )}
 
+      {activeView === 'coherence' && (
+        hasCoherence ? (
+          <AnalysisPanel
+            data={activeDraft.coherenceAnalysis}
+            error={actions.errors.coherence}
+            loading={actions.loading.coherence}
+            status={activeDraft.coherenceStatus}
+            onRetry={() => { actions.ensure('coherence'); }}
+            onRerun={() => { actions.rerun('coherence'); }}
+            rerunLoading={actions.loading.coherence}
+            defaultMessage="Checking thesis coherence..."
+            placeholder="Coherence analysis is loading..."
+          >
+            <CoherencePanel analysis={activeDraft.coherenceAnalysis!} />
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
+          </AnalysisPanel>
+        ) : (
+          <CoherenceEmptyState />
+        )
+      )}
+
+      {activeView === 'structure' && (
+        hasStructure ? (
+          <AnalysisPanel
+            data={activeDraft.structureAnalysis}
+            error={actions.errors.structure}
+            loading={actions.loading.structure}
+            status={activeDraft.structureStatus}
+            onRetry={() => { actions.ensure('structure'); }}
+            onRerun={() => { actions.rerun('structure'); }}
+            rerunLoading={actions.loading.structure}
+            defaultMessage="Analyzing paragraph structure..."
+            placeholder="Structure analysis is loading..."
+          >
+            <StructurePanel analysis={activeDraft.structureAnalysis!} />
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
+          </AnalysisPanel>
+        ) : (
+          <StructureEmptyState />
+        )
+      )}
+
+      {activeView === 'reasoning' && (
+        hasReasoning ? (
+          <AnalysisPanel
+            data={activeDraft.reasoningAnalysis}
+            error={actions.errors.reasoning}
+            loading={actions.loading.reasoning}
+            status={activeDraft.reasoningStatus}
+            onRetry={() => { actions.ensure('reasoning'); }}
+            onRerun={() => { actions.rerun('reasoning'); }}
+            rerunLoading={actions.loading.reasoning}
+            defaultMessage="Checking for circular arguments..."
+            placeholder="Reasoning analysis is loading..."
+          >
+            <ReasoningPanel analysis={activeDraft.reasoningAnalysis!} />
+            <AnnotatedEssay
+              content={activeDraft.content}
+              annotations={allAnnotations}
+              readOnly
+            />
+          </AnalysisPanel>
+        ) : (
+          <ReasoningEmptyState />
+        )
+      )}
+
+      {essay && (
+        <EssaySettingsModal
+          opened={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          essay={essay}
+          essayId={essayId!}
+          ownerUid={ownerUid}
+          onSave={handleSaveSettings}
+          editPageUrl={ownerUid ? `/user/${ownerUid}/essay/${essayId}/edit` : `/essay/${essayId}/edit`}
+        />
+      )}
     </div>
   );
 }

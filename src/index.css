@@ -1178,6 +1178,21 @@ mark {
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+.app-header-settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 150ms ease, background 150ms ease;
+  line-height: 1;
+}
+.app-header-settings-btn:hover {
+  color: var(--color-text);
+  background: var(--color-surface-warm);
+}
 .app-header-draft-pick {
   background: none;
   border: none;
@@ -1445,11 +1460,17 @@ mark {
 
 .coach-essay-section {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
   margin: 0 8px 8px;
   border-bottom: 1px solid var(--color-border);
   padding: 4px 0 8px;
+}
+
+.coach-essay-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .coach-essay-actions {
@@ -1458,6 +1479,7 @@ mark {
   align-items: center;
   flex: 1;
   min-width: 0;
+  justify-content: flex-end;
 }
 
 .coach-draft-select {
@@ -1508,6 +1530,42 @@ mark {
 
 .coach-gdoc-changed {
   color: var(--color-accent);
+}
+
+.coach-gdoc-error {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3f2;
+  border: 1px solid #fecaca;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coach-gdoc-error-msg {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #991b1b;
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+.coach-gdoc-error-btn {
+  align-self: flex-start;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #991b1b;
+  background: #fff;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.coach-gdoc-error-btn:hover {
+  background: #fef2f2;
 }
 
 .coach-sb-report {
@@ -2090,4 +2148,76 @@ mark {
 
 .criteria-bar-segment {
   height: 100%;
+}
+
+/* ── CoherencePanel — paragraph assessments ──────────────────────────── */
+.coherence-view {
+  margin-bottom: 24px;
+}
+
+.coherence-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.coherence-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.coherence-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── StructurePanel — paragraph CEA breakdown ────────────────────────── */
+.structure-view {
+  margin-bottom: 24px;
+}
+
+.structure-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.structure-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.structure-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.structure-component-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* ── ReasoningPanel — paragraph circular-argument breakdown ──────────── */
+.reasoning-view {
+  margin-bottom: 24px;
+}
+
+.reasoning-paragraph-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reasoning-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.reasoning-paragraph-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reasoning-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }

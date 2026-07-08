@@ -19,6 +19,12 @@ interface Props {
   initialDocName?: string;
 }
 
+/** Build a DocSource. docName is embedded in the source so future UIs can show
+ *  which Google Doc this field pulls from without a secondary fetch. */
+function makeSource(docId: string, tab: string, sectionIndex: number, docName: string): DocSource {
+  return { docId, tab, sectionIndex, docName: docName || undefined };
+}
+
 type Step = 'pick' | 'scope' | 'content';
 
 export default function GDocImportDialog({ opened, onClose, onImport, label, initialUrl, initialDocName }: Props) {
@@ -139,7 +145,7 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   const doImport = (text: string, sectionIndex: number) => {
     if (!selectedTab) return;
     const trimmed = text.replace(/^[\n ]+/, '').replace(/\s+$/, '');
-    onImport(trimmed, { docId, tab: selectedTab, sectionIndex }, url);
+    onImport(trimmed, makeSource(docId, selectedTab, sectionIndex, docName), url);
     handleClose();
   };
 
@@ -176,6 +182,13 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
       if (!result) return; // user cancelled
       setUrl(result.url);
       setDocName(result.name);
+      // Reset picked tab/section so the user re-selects for the new doc.
+      setTabs([]);
+      setSelectedTab(null);
+      setSections([]);
+      setSelectedSection(0);
+      setIsEntireDoc(false);
+      autoFetchedRef.current = result.url;
       await handleFetchTabs(result.url);
     } catch (err) {
       setPickerError(
@@ -192,6 +205,21 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   return (
     <Modal opened={opened} onClose={handleClose} title={`Import ${label} from Google Docs`} size="lg">
       {error && <Alert color="red" mb="md">{error}</Alert>}
+
+      {/* Current doc header — shown whenever we've picked/prefilled a doc.
+          Tells the user which Google Doc they're working with and offers a
+          one-click path to swap in a different one. */}
+      {docName && (step === 'scope' || step === 'content') && (
+        <Group gap="xs" mb="md" wrap="nowrap">
+          <Text size="lg">📄</Text>
+          <Text size="sm" fw={500} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {docName}
+          </Text>
+          <Button variant="subtle" size="compact-xs" onClick={handlePicker}>
+            Change doc
+          </Button>
+        </Group>
+      )}
 
       {/* Step 1: Pick a document */}
       {step === 'pick' && (

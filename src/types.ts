@@ -22,9 +22,14 @@ export const TRAIT_LABELS: Record<TraitKey, string> = {
   presentation: 'Presentation',
 };
 
+export type AnnotationKind = 'praise' | 'suggestion';
+
 export interface Annotation {
   quotedText: string;
   comment: string;
+  /** Gemini-assigned sentiment so UI doesn't have to infer it from punctuation.
+   *  Optional because pre-existing drafts in Firestore predate this field. */
+  kind?: AnnotationKind;
 }
 
 export interface TraitAnnotation extends Annotation {
@@ -80,13 +85,61 @@ export type { DuplicationInstance, DuplicationFinding, DuplicationAnalysis };
 import type { CriterionResult, CriteriaAnalysis, CriteriaComparison } from '../shared/criteriaTypes';
 export type { CriterionResult, CriteriaAnalysis, CriteriaComparison };
 
+// Coherence analysis types — canonical definitions in shared/coherenceTypes.ts
+import type {
+  CoherenceAnalysis,
+  ParagraphAssessment,
+  ParagraphRelation,
+  ThesisParagraph,
+  CoherenceSummary,
+} from '../shared/coherenceTypes';
+export type {
+  CoherenceAnalysis,
+  ParagraphAssessment,
+  ParagraphRelation,
+  ThesisParagraph,
+  CoherenceSummary,
+};
+
+// Structure analysis types — canonical definitions in shared/structureTypes.ts
+import type {
+  StructureAnalysis,
+  ParagraphStructure,
+  ParagraphComponent,
+  ParagraphClassification,
+  StructureSummary,
+} from '../shared/structureTypes';
+export type {
+  StructureAnalysis,
+  ParagraphStructure,
+  ParagraphComponent,
+  ParagraphClassification,
+  StructureSummary,
+};
+
+// Reasoning analysis types — canonical definitions in shared/reasoningTypes.ts
+import type {
+  ReasoningAnalysis,
+  ParagraphReasoning,
+  ReasoningClassification,
+  ReasoningSummary,
+} from '../shared/reasoningTypes';
+export type {
+  ReasoningAnalysis,
+  ParagraphReasoning,
+  ReasoningClassification,
+  ReasoningSummary,
+};
+
 export interface EvaluationStatus {
   stage: 'pending' | 'thinking' | 'generating' | 'error';
   message: string;
+  /** Machine-readable error code (e.g., 'gdoc_resolve_failed') for targeted UI handling. */
+  code?: string;
 }
 
 // Coach synthesis types
-export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria'] as const;
+export const REPORT_KEYS = ['essay', 'overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure', 'reasoning'] as const;
 export type ReportKey = typeof REPORT_KEYS[number];
 
 export const REPORT_LABELS: Record<ReportKey, string> = {
@@ -97,6 +150,9 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   prompt: 'Prompt Fit',
   duplication: 'Duplication',
   criteria: 'Criteria',
+  coherence: 'Coherence',
+  structure: 'Structure',
+  reasoning: 'Reasoning',
 };
 
 export interface ReportSummary {
@@ -133,6 +189,12 @@ export interface Draft {
   criteriaAnalysis?: CriteriaAnalysis | null;
   criteriaStatus?: EvaluationStatus | null;
   criteriaSnapshot?: string | null;
+  coherenceAnalysis?: CoherenceAnalysis | null;
+  coherenceStatus?: EvaluationStatus | null;
+  structureAnalysis?: StructureAnalysis | null;
+  structureStatus?: EvaluationStatus | null;
+  reasoningAnalysis?: ReasoningAnalysis | null;
+  reasoningStatus?: EvaluationStatus | null;
   coachSynthesis?: CoachSynthesis | null;
   coachSynthesisStatus?: EvaluationStatus | null;
   editedAt?: Date | null;

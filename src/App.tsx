@@ -9,6 +9,7 @@ import EssayPage from './pages/EssayPage';
 import ProgressPage from './pages/ProgressPage';
 import SharingPage from './pages/SharingPage';
 import ClipboardDebugPage from './pages/ClipboardDebugPage';
+import EditEssayPage from './pages/EditEssayPage';
 
 export default function App() {
   return (
@@ -26,6 +27,10 @@ export default function App() {
             <Route path="/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/essay/:essayId/duplication" element={<EssayPage />} />
             <Route path="/essay/:essayId/criteria" element={<EssayPage />} />
+            <Route path="/essay/:essayId/coherence" element={<EssayPage />} />
+            <Route path="/essay/:essayId/structure" element={<EssayPage />} />
+            <Route path="/essay/:essayId/reasoning" element={<EssayPage />} />
+            <Route path="/essay/:essayId/edit" element={<EditEssayPage />} />
             <Route path="/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/progress" element={<ProgressPage />} />
             <Route path="/user/:ownerUid/essay/:essayId" element={<EssayPage />} />
@@ -35,6 +40,10 @@ export default function App() {
             <Route path="/user/:ownerUid/essay/:essayId/prompt" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/duplication" element={<EssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/criteria" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/coherence" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/structure" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/reasoning" element={<EssayPage />} />
+            <Route path="/user/:ownerUid/essay/:essayId/edit" element={<EditEssayPage />} />
             <Route path="/user/:ownerUid/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/sharing" element={<SharingPage />} />
             <Route path="/debug/clipboard" element={<ClipboardDebugPage />} />

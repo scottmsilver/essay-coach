@@ -1,6 +1,8 @@
 export interface CriterionAnnotation {
   quotedText: string;
   comment: string;
+  /** Gemini-assigned sentiment; optional for backward compat with older drafts. */
+  kind?: 'praise' | 'suggestion';
 }
 
 export interface CriterionResult {

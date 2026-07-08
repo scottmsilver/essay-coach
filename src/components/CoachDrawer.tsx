@@ -1,10 +1,21 @@
 import type { ReportKey } from '../types';
 import { REPORT_KEYS, REPORT_LABELS } from '../types';
 import { relativeTime } from '../utils';
-import type { DraftEntity } from '../entities/draftEntity';
+import type { AnalysisKey, DraftEntity } from '../entities/draftEntity';
 import type { DraftPresentation, VerdictPhase } from '../entities/draftPresentation';
 import type { DraftEditorState } from '../hooks/useDraftEditor';
 import type { NavbarMeta } from '../hooks/useNavbarContext';
+
+const ANALYSIS_KEYS: AnalysisKey[] = ['overall', 'grammar', 'transitions', 'prompt', 'duplication', 'criteria', 'coherence', 'structure', 'reasoning'];
+
+function findGDocError(entity: DraftEntity): string | null {
+  for (const key of ANALYSIS_KEYS) {
+    if (entity.statusCode(key) === 'gdoc_resolve_failed') {
+      return entity.statusMessage(key);
+    }
+  }
+  return null;
+}
 
 interface Props {
   entity: DraftEntity;
@@ -31,11 +42,16 @@ const PHASE_TEXT: Record<VerdictPhase, { status: string; note: string }> = {
 
 export default function CoachDrawer({ entity, presentation, editor, meta }: Props) {
   const { verdict, reports, canEdit } = presentation;
-  const { activeReport, onSelectReport, draftOptions, onPickDraft, onReanalyze, reanalyzing, gdocChanged, gdocLastChecked } = meta;
+  const { activeReport, onSelectReport, draftOptions, onPickDraft, onReanalyze, reanalyzing, gdocChanged, gdocLastChecked, onOpenSettings } = meta;
   const isReady = verdict.coachReadiness === 'ready';
+  const gdocError = findGDocError(entity);
 
   const reportKeys = REPORT_KEYS.filter((k): k is Exclude<ReportKey, 'essay'> =>
-    k !== 'essay' && (k !== 'prompt' || presentation.hasPrompt)
+    k !== 'essay'
+    && (k !== 'prompt' || presentation.hasPrompt)
+    && (k !== 'coherence' || presentation.hasCoherence)
+    && (k !== 'structure' || presentation.hasStructure)
+    && (k !== 'reasoning' || presentation.hasReasoning)
   );
 
   return (
@@ -66,48 +82,60 @@ export default function CoachDrawer({ entity, presentation, editor, meta }: Prop
 
       {/* Essay + version section — always visible */}
       <div className="coach-essay-section">
-        {canEdit && (
-          <div
-            className={`coach-sb-essay ${activeReport === 'essay' ? 'coach-sb-essay-active' : ''}`}
-            onClick={() => onSelectReport('essay' as ReportKey)}
-          >
-            <div className="coach-sb-name">
-              {editor.hasUnsavedEdits ? 'Essay (revised)' : 'Essay'}
-              {editor.hasUnsavedEdits && <span className="coach-sb-unsaved-dot" title="Unsaved edits" />}
-              <span className="coach-sb-edit-link">edit</span>
-            </div>
-          </div>
-        )}
-        <div className="coach-essay-actions">
-          {draftOptions.length > 1 && (
-            <select
-              className="coach-draft-select"
-              value={entity.id}
-              onChange={(e) => onPickDraft(e.target.value)}
-            >
-              {draftOptions.map((d) => (
-                <option key={d.id} value={d.id}>{d.label}</option>
-              ))}
-            </select>
-          )}
+        <div className="coach-essay-row">
           {canEdit && (
-            <button
-              className="coach-reanalyze-btn"
-              onClick={onReanalyze}
-              disabled={reanalyzing}
+            <div
+              className={`coach-sb-essay ${activeReport === 'essay' ? 'coach-sb-essay-active' : ''}`}
+              onClick={() => onSelectReport('essay' as ReportKey)}
             >
-              {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
-            </button>
+              <div className="coach-sb-name">
+                {editor.hasUnsavedEdits ? 'Essay (revised)' : 'Essay'}
+                {editor.hasUnsavedEdits && <span className="coach-sb-unsaved-dot" title="Unsaved edits" />}
+                <span className="coach-sb-edit-link">edit</span>
+              </div>
+            </div>
           )}
+          <div className="coach-essay-actions">
+            {draftOptions.length > 1 && (
+              <select
+                className="coach-draft-select"
+                value={entity.id}
+                onChange={(e) => onPickDraft(e.target.value)}
+              >
+                {draftOptions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            )}
+            {canEdit && (
+              <button
+                className="coach-reanalyze-btn"
+                onClick={onReanalyze}
+                disabled={reanalyzing}
+              >
+                {reanalyzing ? 'Analyzing...' : 'Re-analyze'}
+              </button>
+            )}
+          </div>
         </div>
         {canEdit && editor.lastSaved && (
           <div className="coach-last-edited">
             Edited {relativeTime(editor.lastSaved)}
           </div>
         )}
-        {gdocChanged && gdocLastChecked && (
+        {gdocChanged && gdocLastChecked && !gdocError && (
           <div className="coach-last-edited coach-gdoc-changed">
             Doc updated {relativeTime(gdocLastChecked)} — re-analyze to refresh
+          </div>
+        )}
+        {gdocError && canEdit && (
+          <div className="coach-gdoc-error">
+            <div className="coach-gdoc-error-msg">{gdocError}</div>
+            {onOpenSettings && (
+              <button className="coach-gdoc-error-btn" onClick={onOpenSettings}>
+                Open settings
+              </button>
+            )}
           </div>
         )}
       </div>

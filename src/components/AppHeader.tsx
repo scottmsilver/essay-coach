@@ -15,6 +15,7 @@ export interface EssayHeaderContext {
   draftOptions?: DraftOption[];
   onPickDraft?: (id: string) => void;
   toolbar?: ReactNode;
+  onOpenSettings?: () => void;
 }
 
 interface Props {
@@ -39,12 +40,17 @@ export default function AppHeader({ essayContext }: Props) {
   );
 }
 
-function EssayHeader({ title, draftLabel }: EssayHeaderContext) {
+function EssayHeader({ title, draftLabel, onOpenSettings }: EssayHeaderContext) {
   return (
     <div className="app-header app-header-essay app-header-essay-single">
       <Link to="/" className="app-header-brand">EssayCoach</Link>
       <span className="app-header-sep">&rsaquo;</span>
       <span className="app-header-title">{title}</span>
+      {onOpenSettings && (
+        <button className="app-header-settings-btn" onClick={onOpenSettings} title="Essay settings">
+          ⚙
+        </button>
+      )}
       <span className="app-header-draft-label">{draftLabel}</span>
       <div style={{ marginLeft: 'auto' }}>
         <UserAvatarMenu />

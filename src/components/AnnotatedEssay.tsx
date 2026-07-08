@@ -1,13 +1,13 @@
 import { useMemo, useRef } from 'react';
 import type { TraitKey, TraitAnnotation } from '../types';
-import type { CriteriaAnnotation } from '../utils';
+import type { CriteriaAnnotation, CoherenceAnnotation, StructureAnnotation, ReasoningAnnotation } from '../utils';
 import { useCommentLayout } from '../hooks/useCommentLayout';
 import { useActiveMarker } from '../hooks/useActiveMarker';
 import { classifyAnnotation } from '../utils';
 
 export type { TraitAnnotation } from '../types';
 
-export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation;
+export type AnyAnnotation = TraitAnnotation | CriteriaAnnotation | CoherenceAnnotation | StructureAnnotation | ReasoningAnnotation;
 
 interface Props {
   content: string;
@@ -56,7 +56,7 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
 
       for (let i = idx; i < idx + needle.length; i++) used.add(i);
       const id = `ann-${idx}`;
-      found.push({ start: idx, end: idx + needle.length, annotation: ann, id, kind: classifyAnnotation(ann.comment) });
+      found.push({ start: idx, end: idx + needle.length, annotation: ann, id, kind: classifyAnnotation(ann) });
     }
 
     return found.sort((a, b) => a.start - b.start);
@@ -120,7 +120,15 @@ export default function AnnotatedEssay({ content, annotations, onChange, readOnl
               style={{ top: commentPositions[m.id] ?? 0 }}
               onClick={() => handleMarkClick(m.id)}
             >
-              <span className="sidebar-comment-trait">{'traitLabel' in m.annotation ? m.annotation.traitLabel : m.annotation.criterionText}</span>
+              <span className="sidebar-comment-trait">{
+                'traitLabel' in m.annotation
+                  ? m.annotation.traitLabel
+                  : 'criterionText' in m.annotation
+                    ? m.annotation.criterionText
+                    : 'classificationLabel' in m.annotation
+                      ? `${m.annotation.classificationLabel} — paragraph ${m.annotation.paragraphIndex}`
+                      : `${m.annotation.relationLabel} — paragraph ${m.annotation.paragraphIndex}`
+              }</span>
               <span className="sidebar-comment-text">{m.annotation.comment}</span>
             </div>
           ))}

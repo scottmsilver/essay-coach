@@ -55,6 +55,15 @@
 - **Transitions:** 150ms for hover states, 300ms for view changes
 - **Easing:** enter(ease-out) exit(ease-in) move(ease-in-out)
 
+## Dialogs and Notifications
+- **Never use native browser dialogs.** `window.alert`, `window.confirm`, and `window.prompt` break the Warm Editorial aesthetic, ignore the type system, and look jarring on top of the app's warm-stone surfaces. They are forbidden in production code paths.
+- **Use the `src/utils/dialogs.ts` helpers.** Three primitives, each with a specific job:
+  - `confirmAction({ title, message, confirmLabel, danger?, onConfirm })` — the user is about to do something significant or destructive (re-analyze, delete a draft, sign out). Renders a Mantine modal with a confirm + cancel pair. Pass `danger: true` for destructive actions to render the confirm button red.
+  - `alertAction({ title, message, actionLabel?, onAction? })` — an error or warning the user can act on (e.g. "the GDoc bookmark moved — open settings to re-pick"). Renders a Mantine modal. With no `actionLabel`, it's a single-button alert; with one, the button triggers the follow-up.
+  - `showError({ title?, message })` — non-blocking failure with no follow-up (network blip, transient API error). Renders a red toast notification (top-right) that auto-dismisses after 6s.
+- **Choosing between them:** if the user has a decision to make, use `confirmAction`. If they need to know about an error AND have a way to fix it, use `alertAction`. If they just need to know something failed, use `showError`.
+- **Providers:** `<ModalsProvider>` and `<Notifications>` are mounted in `src/main.tsx`. Don't mount your own.
+
 ## Information Architecture
 - **Header tabs:** My Essays | Progress | Sharing (views only, no actions)
 - **"+ New Essay":** Button in header, not a tab
@@ -77,3 +86,4 @@ To retheme: modify CSS custom properties in `:root` and the Mantine theme in `sr
 | 2026-03-18 | Amber celebration over green | Emotionally warmer "well done" vs clinical checkbox |
 | 2026-03-18 | New Essay as button, not tab | Tabs are views, buttons are actions — consistent IA |
 | 2026-03-18 | Back arrow in DocBar | Essay pages need a visible way home without opening burger |
+| 2026-04-29 | No native browser dialogs | window.alert/confirm break the warm editorial look — use src/utils/dialogs.ts (Mantine modals + notifications) instead |
