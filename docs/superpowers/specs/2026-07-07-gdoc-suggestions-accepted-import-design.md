@@ -44,7 +44,7 @@ Three layers, all reusing the existing pipeline
 - Switch from `DocumentApp` body-walking to the **Docs advanced service**:
   `Docs.Documents.get(docId, { suggestionsViewMode })`.
   - `suggestions=base` → `PREVIEW_WITHOUT_SUGGESTIONS`
-  - `suggestions=accepted` → `PREVIEW_SUGGESTIONS_ACCEPT_ALL`
+  - `suggestions=accepted` → `PREVIEW_SUGGESTIONS_ACCEPTED`
   - Param omitted → `base` (backward compatible with deployed clients).
 - New response field `hasSuggestions: boolean`: the script makes one extra
   `Docs.Documents.get` in `DEFAULT_FOR_CURRENT_ACCESS` mode (which keeps

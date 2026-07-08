@@ -487,7 +487,7 @@ export const APPS_SCRIPT_CODE = BUILDER_SOURCE + `
 function getBookmarksAndText(docId, tabTitle, suggestionMode) {
   var mode = suggestionMode === 'accepted' ? 'accepted' : 'base';
   var viewMode = mode === 'accepted'
-    ? 'PREVIEW_SUGGESTIONS_ACCEPT_ALL'
+    ? 'PREVIEW_SUGGESTIONS_ACCEPTED'
     : 'PREVIEW_WITHOUT_SUGGESTIONS';
 
   // DocumentApp: tab discovery + bookmarks (Docs REST API does not expose bookmarks).
