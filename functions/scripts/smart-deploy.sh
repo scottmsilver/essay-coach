@@ -56,6 +56,7 @@ declare -A FILE_TO_FUNCTIONS=(
   ["src/validation.ts"]="submitEssay resubmitDraft"
   ["src/onDraftCreated.ts"]="onDraftCreated"
   ["src/suggestTitle.ts"]="suggestTitle"
+  ["src/gdocResolver.ts"]="resubmitDraft evaluateEssay analyzeCriteria"
   # index.ts changes affect all functions (new exports, etc.)
   ["src/index.ts"]="__ALL__"
 )
@@ -111,6 +112,12 @@ else
         break
       elif [[ -n "$mapped" ]]; then
         DEPLOY_SET="$DEPLOY_SET $mapped"
+      elif [[ "$file" == src/*.ts && "$file" != *.test.ts ]]; then
+        # Unmapped runtime source: deploying everything beats silently skipping
+        # (this silently skipped src/gdocResolver.ts once — 2026-07-08).
+        echo "⚠️  $file changed but is not in FILE_TO_FUNCTIONS — deploying ALL functions to be safe. Add a mapping to narrow this."
+        DEPLOY_SET="$ALL_FUNCTIONS"
+        break
       fi
     done <<< "$CHANGED_FILES"
 
