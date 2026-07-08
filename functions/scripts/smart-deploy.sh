@@ -48,10 +48,16 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
   DEPLOY_TARGETS="$ALL_FUNCTIONS"
+elif ! git -C .. cat-file -e "$LAST_SHA^{commit}" 2>/dev/null; then
+  # Marker points at a commit that no longer exists (rebase/gc). A failed diff
+  # must NOT read as "no changes" — deploy everything instead.
+  echo "⚠️  Deploy marker $LAST_SHA is not a valid commit — deploying all functions."
+  DEPLOY_TARGETS="$ALL_FUNCTIONS"
 else
   # Get changed files since last deploy — from the REPO ROOT so ../shared
-  # changes are seen too (paths come back repo-root-relative).
-  CHANGED_FILES=$(git -C .. diff --name-only "$LAST_SHA" -- functions shared 2>/dev/null || echo "")
+  # changes are seen too (paths come back repo-root-relative). Root
+  # firebase.json is included: it configures functions deployment.
+  CHANGED_FILES=$(git -C .. diff --name-only "$LAST_SHA" -- functions shared firebase.json)
 
   if [[ -z "$CHANGED_FILES" ]]; then
     echo "No changes since last deploy ($LAST_SHA). Nothing to do."

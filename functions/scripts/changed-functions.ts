@@ -29,10 +29,19 @@ const INDEX = path.join(FUNCTIONS_DIR, 'src', 'index.ts');
 /** Parse `export { a, b } from './file';` lines into fnName -> entry file. */
 function parseEntries(): Map<string, string> {
   const entries = new Map<string, string>();
-  const src = fs.readFileSync(INDEX, 'utf-8');
+  // Strip comments so `// export { old } from './old'` isn't parsed as live.
+  const src = fs.readFileSync(INDEX, 'utf-8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  // `export type { ... }` is types-only — no runtime function to deploy.
   const re = /export\s*\{([^}]+)\}\s*from\s*['"](\.[^'"]+)['"]/g;
   for (const m of src.matchAll(re)) {
-    const names = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+    const names = m[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      // `export { internal as publicName }` — Firebase deploys the EXPORTED name.
+      .map((s) => s.split(/\s+as\s+/).pop()!);
     let rel = m[2];
     if (!/\.(ts|js)$/.test(rel)) rel += '.ts';
     const file = path.resolve(path.dirname(INDEX), rel);
