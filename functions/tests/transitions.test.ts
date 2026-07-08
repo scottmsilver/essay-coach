@@ -2,29 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { formatSentencesForPrompt, buildTransitionPrompt } from '../src/transitions';
 
 describe('formatSentencesForPrompt', () => {
-  it('formats single paragraph with numbered sentences', () => {
+  it('formats single paragraph with P.S numbered sentences', () => {
     const result = formatSentencesForPrompt({
       '0': ['First sentence.', 'Second sentence.'],
     });
-    expect(result).toBe('¶1 S1: "First sentence."\n¶1 S2: "Second sentence."');
+    expect(result).toBe('1.1 First sentence.\n1.2 Second sentence.');
   });
 
-  it('formats multiple paragraphs with breaks', () => {
+  it('formats multiple paragraphs with --- breaks', () => {
     const result = formatSentencesForPrompt({
       '0': ['Para one sent one.', 'Para one sent two.'],
       '1': ['Para two sent one.'],
     });
-    expect(result).toContain('¶1 S1: "Para one sent one."');
-    expect(result).toContain('¶1 S2: "Para one sent two."');
-    expect(result).toContain('--- PARAGRAPH BREAK (¶1 → ¶2) ---');
-    expect(result).toContain('¶2 S1: "Para two sent one."');
+    expect(result).toBe(
+      '1.1 Para one sent one.\n1.2 Para one sent two.\n---\n2.1 Para two sent one.'
+    );
   });
 
   it('formats all sentences without filtering (filtering is done upstream)', () => {
     const result = formatSentencesForPrompt({
       '0': ['Real sentence.', 'Another one.'],
     });
-    expect(result).toBe('¶1 S1: "Real sentence."\n¶1 S2: "Another one."');
+    expect(result).toBe('1.1 Real sentence.\n1.2 Another one.');
   });
 
   it('handles empty input', () => {

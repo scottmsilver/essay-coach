@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Modal, Button, Radio, Stack, Text, Loader, Alert,
-  Group, Accordion, ScrollArea, Box,
+  Group, Accordion, ScrollArea, Box, SegmentedControl,
 } from '@mantine/core';
 import { extractDocId, fetchGDocInfo } from '../utils/gdocImport';
 import { parseSections } from '../../shared/gdocTypes';
 import { countWords } from '../utils';
-import type { DocSource, GDocBookmark } from '../../shared/gdocTypes';
+import type { DocSource, GDocBookmark, SuggestionMode } from '../../shared/gdocTypes';
 import { openGooglePicker } from '../utils/googlePicker';
 import { useAuth } from '../hooks/useAuth';
 
@@ -21,8 +21,14 @@ interface Props {
 
 /** Build a DocSource. docName is embedded in the source so future UIs can show
  *  which Google Doc this field pulls from without a secondary fetch. */
-function makeSource(docId: string, tab: string, sectionIndex: number, docName: string): DocSource {
-  return { docId, tab, sectionIndex, docName: docName || undefined };
+function makeSource(docId: string, tab: string, sectionIndex: number, docName: string, mode: SuggestionMode): DocSource {
+  return {
+    docId, tab, sectionIndex,
+    docName: docName || undefined,
+    // Never persist suggestionMode: undefined — Firestore rejects it and
+    // undefined already means 'base'. Only set the key for accepted mode.
+    ...(mode === 'accepted' ? { suggestionMode: 'accepted' as const } : {}),
+  };
 }
 
 type Step = 'pick' | 'scope' | 'content';
@@ -45,6 +51,13 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   const [sections, setSections] = useState<string[]>([]);
   const [selectedSection, setSelectedSection] = useState<number>(0);
   const [isEntireDoc, setIsEntireDoc] = useState(false);
+
+  // Tracked-changes projection. Toggle is shown only when the doc has
+  // pending suggestions; it defaults to 'accepted' the first time we learn a
+  // doc has them, unless the user has explicitly picked a mode.
+  const [hasSuggestions, setHasSuggestions] = useState(false);
+  const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('base');
+  const userTouchedModeRef = useRef(false);
 
   // Pre-fill URL from prop when dialog opens, and auto-fetch if URL is provided
   const autoFetchedRef = useRef('');
@@ -76,6 +89,9 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
     setSections([]);
     setSelectedSection(0);
     setIsEntireDoc(false);
+    setHasSuggestions(false);
+    setSuggestionMode('base');
+    userTouchedModeRef.current = false;
   };
 
   const handleClose = () => {
@@ -117,7 +133,33 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
     setError(null);
     setLoading(true);
     try {
-      const data = await fetchGDocInfo(id, tab);
+      // Fetch in the current projection (base by default — param omitted).
+      const data = await fetchGDocInfo(id, tab, suggestionMode === 'base' ? undefined : suggestionMode);
+      setHasSuggestions(!!data.hasSuggestions);
+      // The first time we learn a doc has suggestions, default to the accepted
+      // projection and re-fetch so the displayed text matches that default.
+      if (data.hasSuggestions && suggestionMode === 'base' && !userTouchedModeRef.current) {
+        setSuggestionMode('accepted');
+        const accepted = await fetchGDocInfo(id, tab, 'accepted');
+        showContent(accepted.text, accepted.bookmarks);
+        return;
+      }
+      showContent(data.text, data.bookmarks);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch tab');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModeChange = async (mode: SuggestionMode) => {
+    userTouchedModeRef.current = true;
+    setSuggestionMode(mode);
+    if (!selectedTab) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const data = await fetchGDocInfo(docId, selectedTab, mode);
       showContent(data.text, data.bookmarks);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch tab');
@@ -145,7 +187,7 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
   const doImport = (text: string, sectionIndex: number) => {
     if (!selectedTab) return;
     const trimmed = text.replace(/^[\n ]+/, '').replace(/\s+$/, '');
-    onImport(trimmed, makeSource(docId, selectedTab, sectionIndex, docName), url);
+    onImport(trimmed, makeSource(docId, selectedTab, sectionIndex, docName, suggestionMode), url);
     handleClose();
   };
 
@@ -288,6 +330,20 @@ export default function GDocImportDialog({ opened, onClose, onImport, label, ini
       {/* Step 3: Content — two sub-modes based on bookmarks */}
       {step === 'content' && (
         <Stack>
+          {/* Tracked-changes projection toggle — only when the doc has
+              pending suggestions. Defaults to "Suggestions accepted". */}
+          {hasSuggestions && (
+            <SegmentedControl
+              fullWidth
+              disabled={loading}
+              value={suggestionMode}
+              onChange={(v) => handleModeChange(v as SuggestionMode)}
+              data={[
+                { label: 'Original', value: 'base' },
+                { label: 'Suggestions accepted', value: 'accepted' },
+              ]}
+            />
+          )}
           {sections.length === 0 ? (
             <Alert color="yellow">This document has no text content. Try a different tab or URL.</Alert>
           ) : hasBookmarks ? (

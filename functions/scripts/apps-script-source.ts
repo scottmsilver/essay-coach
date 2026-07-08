@@ -2,21 +2,35 @@
  * The Apps Script source code deployed as a web app for Google Docs reading.
  * Shared between setup-apps-script.ts and update-apps-script.ts.
  *
- * Preserves paragraph formatting: first-line indentation (\t prefix),
- * paragraph spacing (\n\n between paragraphs), and list markers (• or N.).
+ * Text extraction runs through the Docs advanced service (Docs.Documents.get
+ * with suggestionsViewMode) and a pure JSON→text builder (gdoc-text-builder.js),
+ * embedded verbatim so the same code runs under vitest. Bookmarks still come
+ * from DocumentApp (the Docs REST API does not expose bookmark positions) and
+ * are mapped into the projected text via elementVisibility/mapIndex.
  *
  * FORMAT CONTRACT (must stay in sync with src/utils/pasteHandler.ts):
  *   - Indented paragraphs → \t prefix
- *   - Bullet list items → \u2022 (•) prefix
+ *   - Bullet list items → • (•) prefix
  *   - Numbered list items → N. prefix
  *   - Paragraph separation → \n\n
  *   - Consecutive list items → \n
  */
-export const APPS_SCRIPT_CODE = `
-function getBookmarksAndText(docId, tabTitle) {
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+/** Pure builder shared with vitest — embedded verbatim into the deployed script. */
+const BUILDER_SOURCE = readFileSync(join(__dirname, 'gdoc-text-builder.js'), 'utf8');
+
+export const APPS_SCRIPT_CODE = BUILDER_SOURCE + `
+function getBookmarksAndText(docId, tabTitle, suggestionMode) {
+  var mode = suggestionMode === 'accepted' ? 'accepted' : 'base';
+  var viewMode = mode === 'accepted'
+    ? 'PREVIEW_SUGGESTIONS_ACCEPTED'
+    : 'PREVIEW_WITHOUT_SUGGESTIONS';
+
+  // DocumentApp: tab discovery + bookmarks (Docs REST API does not expose bookmarks).
   var doc = DocumentApp.openById(docId);
   var tabs = doc.getTabs();
-
   var tab;
   if (tabTitle) {
     tab = tabs.find(function(t) { return t.getTitle() === tabTitle; });
@@ -26,68 +40,54 @@ function getBookmarksAndText(docId, tabTitle) {
   } else {
     tab = tabs[0];
   }
+  var tabId = tab.getId();
 
-  var docTab = tab.asDocumentTab();
-  var body = docTab.getBody();
-  var n = body.getNumChildren();
+  // Docs advanced service: projected JSON for text, DEFAULT JSON for suggestion markers.
+  var projected = Docs.Documents.get(docId, { suggestionsViewMode: viewMode, includeTabsContent: true });
+  var defaultDoc = Docs.Documents.get(docId, { suggestionsViewMode: 'DEFAULT_FOR_CURRENT_ACCESS', includeTabsContent: true });
 
-  // Build text preserving paragraph indentation, spacing, and list markers.
-  // childMeta[i] = { startOffset, prefixLen } for bookmark offset mapping.
-  var childMeta = [];
-  var chunks = [];
-  var pos = 0;
-  var listCounters = {};
-
-  for (var i = 0; i < n; i++) {
-    var child = body.getChild(i);
-    var ctype = child.getType();
-    var ctext = '';
-    var prefix = '';
-
-    if (ctype === DocumentApp.ElementType.PARAGRAPH) {
-      ctext = child.asParagraph().getText();
-      if (ctext.length > 0) {
-        var indent = child.asParagraph().getIndentFirstLine();
-        if (indent !== null && indent > 0) prefix = '\\t';
-      }
-      listCounters = {};
-    } else if (ctype === DocumentApp.ElementType.LIST_ITEM) {
-      ctext = child.asListItem().getText();
-      var g = child.asListItem().getGlyphType();
-      var listId = child.asListItem().getListId();
-      if (g === DocumentApp.GlyphType.NUMBER ||
-          g === DocumentApp.GlyphType.LATIN_UPPER ||
-          g === DocumentApp.GlyphType.LATIN_LOWER ||
-          g === DocumentApp.GlyphType.ROMAN_UPPER ||
-          g === DocumentApp.GlyphType.ROMAN_LOWER) {
-        if (!listCounters[listId]) listCounters[listId] = 0;
-        listCounters[listId]++;
-        prefix = listCounters[listId] + '. ';
-      } else {
-        prefix = '\\u2022 ';
-      }
+  function findTab(d, id) {
+    var stack = (d.tabs || []).slice();
+    while (stack.length) {
+      var t = stack.shift();
+      if (t.tabProperties && t.tabProperties.tabId === id) return t;
+      if (t.childTabs) stack = stack.concat(t.childTabs);
     }
+    return null;
+  }
+  var projTab = findTab(projected, tabId);
+  var defTab = findTab(defaultDoc, tabId);
+  if (!projTab || !projTab.documentTab) {
+    return { error: 'Tab not found in Docs API response' };
+  }
 
-    childMeta.push({ startOffset: pos, prefixLen: prefix.length });
-    chunks.push(prefix + ctext);
-    pos += prefix.length + ctext.length;
-
-    // Separator: single \\n between consecutive list items, double \\n\\n otherwise
-    if (i < n - 1) {
-      var nextType = body.getChild(i + 1).getType();
-      if (ctype === DocumentApp.ElementType.LIST_ITEM &&
-          nextType === DocumentApp.ElementType.LIST_ITEM) {
-        pos += 1;
-      } else {
-        chunks.push('');
-        pos += 2;
-      }
+  // Glyph override map: the REST API returns identical metadata for some
+  // numbered vs bulleted lists (GLYPH_TYPE_UNSPECIFIED, no glyphSymbol);
+  // only DocumentApp can tell them apart.
+  var docTabForGlyphs = tab.asDocumentTab();
+  var glyphBody = docTabForGlyphs.getBody();
+  var glyphOverrides = {};
+  for (var gi = 0; gi < glyphBody.getNumChildren(); gi++) {
+    var gchild = glyphBody.getChild(gi);
+    if (gchild.getType() === DocumentApp.ElementType.LIST_ITEM) {
+      var gli = gchild.asListItem();
+      var gt = gli.getGlyphType();
+      var numbered = gt === DocumentApp.GlyphType.NUMBER ||
+                     gt === DocumentApp.GlyphType.LATIN_UPPER ||
+                     gt === DocumentApp.GlyphType.LATIN_LOWER ||
+                     gt === DocumentApp.GlyphType.ROMAN_UPPER ||
+                     gt === DocumentApp.GlyphType.ROMAN_LOWER;
+      glyphOverrides[gli.getListId()] = numbered ? 'numbered' : 'bullet';
     }
   }
 
-  var text = chunks.join('\\n');
+  var built = GDocBuilder.projectTab(projTab.documentTab.body, projTab.documentTab.lists, glyphOverrides);
+  var vis = GDocBuilder.elementVisibility(defTab.documentTab.body);
+  var docHasSuggestions = GDocBuilder.hasSuggestions(defTab.documentTab.body);
 
-  // Resolve bookmark offsets in the formatted text
+  // Bookmarks: DocumentApp position → base child index → projected element index → offset.
+  var docTab = tab.asDocumentTab();
+  var body = docTab.getBody();
   var bookmarks = docTab.getBookmarks();
   var bmResults = bookmarks.map(function(b) {
     var bpos = b.getPosition();
@@ -98,20 +98,23 @@ function getBookmarksAndText(docId, tabTitle) {
            cur.getParent().getType() !== DocumentApp.ElementType.BODY_SECTION) {
       cur = cur.getParent();
     }
-    var ci = body.getChildIndex(cur);
+    var baseIdx = body.getChildIndex(cur);
+    var idx = GDocBuilder.mapIndex(vis, baseIdx, mode);
+    var meta = built.childMeta[Math.min(idx, built.childMeta.length - 1)] || { startOffset: 0, prefixLen: 0, textLen: 0 };
     return {
       id: b.getId(),
-      offset: childMeta[ci].startOffset + childMeta[ci].prefixLen + elOff
+      offset: meta.startOffset + meta.prefixLen + Math.min(elOff, meta.textLen)
     };
   });
 
   return {
     tabTitle: tab.getTitle(),
-    tabId: tab.getId(),
-    textLength: text.length,
-    text: text,
+    tabId: tabId,
+    textLength: built.text.length,
+    text: built.text,
     bookmarks: bmResults,
-    tabs: tabs.map(function(t) { return { title: t.getTitle(), id: t.getId() }; })
+    tabs: tabs.map(function(t) { return { title: t.getTitle(), id: t.getId() }; }),
+    hasSuggestions: docHasSuggestions
   };
 }
 
@@ -122,7 +125,15 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({ error: 'docId parameter required' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  var result = getBookmarksAndText(docId, params.tab || '');
+  var result;
+  try {
+    result = getBookmarksAndText(docId, params.tab || '', params.suggestions || 'base');
+  } catch (err) {
+    // Anonymous endpoint: never echo raw exception text (can leak API/access
+    // internals). Details go to Stackdriver via console.error only.
+    console.error('getBookmarksAndText failed', err);
+    result = { error: 'Failed to fetch document' };
+  }
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -130,7 +141,11 @@ function doGet(e) {
 
 export const APPS_SCRIPT_MANIFEST = {
   timeZone: 'America/Los_Angeles',
-  dependencies: {},
+  dependencies: {
+    enabledAdvancedServices: [
+      { userSymbol: 'Docs', version: 'v1', serviceId: 'docs' },
+    ],
+  },
   exceptionLogging: 'STACKDRIVER',
   runtimeVersion: 'V8',
   webapp: {

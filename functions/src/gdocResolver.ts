@@ -46,6 +46,8 @@ export async function resolveDocSource(
   deploymentId: string,
 ): Promise<string> {
   const params = new URLSearchParams({ docId: source.docId, tab: source.tab });
+  // Re-read in the same projection the text was imported in (undefined = base).
+  if (source.suggestionMode) params.set('suggestions', source.suggestionMode);
   const url = `${WEBAPP_BASE}/${deploymentId}/exec?${params}`;
 
   const res = await fetchWithRetry(url);
