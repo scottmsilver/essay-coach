@@ -1,5 +1,5 @@
 import { WEBAPP_BASE } from '../../shared/gdocTypes';
-import type { GDocWebAppResponse } from '../../shared/gdocTypes';
+import type { GDocWebAppResponse, SuggestionMode } from '../../shared/gdocTypes';
 
 function getDeploymentId(): string {
   const id = import.meta.env.VITE_GDOC_WEBAPP_DEPLOYMENT_ID;
@@ -48,10 +48,12 @@ async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response> {
 export async function fetchGDocInfo(
   docId: string,
   tab?: string | null,
+  suggestions?: SuggestionMode,
 ): Promise<GDocWebAppResponse> {
   const deploymentId = getDeploymentId();
   const params = new URLSearchParams({ docId });
   if (tab) params.set('tab', tab);
+  if (suggestions) params.set('suggestions', suggestions);
   const url = `${WEBAPP_BASE}/${deploymentId}/exec?${params}`;
 
   const res = await fetchWithRetry(url);

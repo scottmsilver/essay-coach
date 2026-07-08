@@ -1,6 +1,9 @@
 /** Apps Script web app base URL */
 export const WEBAPP_BASE = 'https://script.google.com/macros/s';
 
+/** How suggestions (tracked changes) are projected when reading a doc. */
+export type SuggestionMode = 'base' | 'accepted';
+
 /** Reference to a section within a Google Doc tab */
 export interface DocSource {
   docId: string;
@@ -8,6 +11,9 @@ export interface DocSource {
   sectionIndex: number;
   /** Human-readable doc title at pick time. Shown in UI so the user knows which doc. */
   docName?: string;
+  /** How the doc text was projected at import. undefined = 'base'
+   *  (backward compatible with all existing essays). */
+  suggestionMode?: SuggestionMode;
 }
 
 /** Bookmark position as returned by the Apps Script web app */
@@ -24,6 +30,9 @@ export interface GDocWebAppResponse {
   text: string;
   bookmarks: GDocBookmark[];
   tabs: Array<{ title: string; id: string }>;
+  /** True when the doc contains pending suggested edits. Optional because
+   *  older script deployments don't return it. */
+  hasSuggestions?: boolean;
   error?: string;
 }
 

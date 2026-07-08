@@ -270,6 +270,53 @@ describe('GDocImportDialog', () => {
     expect(screen.getByRole('button', { name: /browse google docs/i })).toBeInTheDocument();
   });
 
+  // ---- Suggestions toggle ----
+
+  it('shows the suggestions toggle only when the doc has suggestions, defaulting to accepted', async () => {
+    mockFetchGDocInfo.mockResolvedValue({
+      tabTitle: 'Tab 1', tabId: 't1', textLength: 5, text: 'Hello',
+      bookmarks: [], tabs: [{ title: 'Tab 1', id: 't1' }], hasSuggestions: true,
+    });
+
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/sugg-doc/edit' });
+
+    expect(await screen.findByText('Suggestions accepted')).toBeInTheDocument();
+    expect(screen.getByText('Original')).toBeInTheDocument();
+  });
+
+  it('hides the suggestions toggle when hasSuggestions is false or missing', async () => {
+    mockFetchGDocInfo.mockResolvedValue({
+      tabTitle: 'Tab 1', tabId: 't1', textLength: 5, text: 'Hello',
+      bookmarks: [], tabs: [{ title: 'Tab 1', id: 't1' }],
+    });
+
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/no-sugg/edit' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/document preview/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Suggestions accepted')).not.toBeInTheDocument();
+  });
+
+  it('imports with suggestionMode accepted in the DocSource when toggle defaults to accepted', async () => {
+    const user = userEvent.setup();
+    mockFetchGDocInfo.mockResolvedValue({
+      tabTitle: 'Tab 1', tabId: 't1', textLength: 5, text: 'Hello',
+      bookmarks: [], tabs: [{ title: 'Tab 1', id: 't1' }], hasSuggestions: true,
+    });
+
+    renderDialog({ initialUrl: 'https://docs.google.com/document/d/sugg-doc-2/edit' });
+
+    await screen.findByText('Suggestions accepted');
+    await user.click(screen.getByRole('button', { name: /import entire (document|tab)/i }));
+
+    expect(mockOnImport).toHaveBeenCalledWith(
+      'Hello',
+      expect.objectContaining({ suggestionMode: 'accepted' }),
+      'https://docs.google.com/document/d/sugg-doc-2/edit',
+    );
+  });
+
   // ---- Empty content ----
 
   it('shows alert when document has no text', async () => {

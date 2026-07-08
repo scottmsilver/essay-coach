@@ -31,12 +31,14 @@ export function useGDocChangeDetection(
       return;
     }
 
-    const { docId, tab, sectionIndex } = essay.contentSource;
+    const { docId, tab, sectionIndex, suggestionMode } = essay.contentSource;
 
     async function check() {
       setState((s) => ({ ...s, checking: true }));
       try {
-        const data = await fetchGDocInfo(docId, tab);
+        // Re-read in the same projection the content was imported in, so change
+        // detection doesn't flap between base and accepted text.
+        const data = await fetchGDocInfo(docId, tab, suggestionMode ?? 'base');
         const sections = parseSections(data.text, data.bookmarks);
         const currentContent = sectionIndex < sections.length ? sections[sectionIndex] : '';
         const changed = currentContent !== draft!.content;
