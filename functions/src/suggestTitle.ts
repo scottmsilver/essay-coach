@@ -28,7 +28,7 @@ export const suggestTitle = onCall(
 
     const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: prompt.trim(),
       config: {
         systemInstruction: 'Generate a short, descriptive essay title (3-8 words) based on this assignment prompt. Return only the title, no quotes or explanation.',

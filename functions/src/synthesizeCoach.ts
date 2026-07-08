@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { logger } from 'firebase-functions/v2';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'gemini-3.1-flash-lite';
 
 export const COACH_SYNTHESIS_SYSTEM = `You are a writing coach summarizing the state of a student's essay revision. You receive analysis data from multiple reports (grammar, transitions, prompt adherence, trait evaluation) and produce a concise coaching synthesis.
 

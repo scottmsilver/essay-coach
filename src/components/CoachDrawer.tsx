@@ -47,7 +47,11 @@ export default function CoachDrawer({ entity, presentation, editor, meta }: Prop
   const gdocError = findGDocError(entity);
 
   const reportKeys = REPORT_KEYS.filter((k): k is Exclude<ReportKey, 'essay'> =>
-    k !== 'essay' && (k !== 'prompt' || presentation.hasPrompt)
+    k !== 'essay'
+    && (k !== 'prompt' || presentation.hasPrompt)
+    && (k !== 'coherence' || presentation.hasCoherence)
+    && (k !== 'structure' || presentation.hasStructure)
+    && (k !== 'reasoning' || presentation.hasReasoning)
   );
 
   return (

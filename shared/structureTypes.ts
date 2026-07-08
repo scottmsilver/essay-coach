@@ -1,6 +1,6 @@
 /** Feature flag: gates dispatch + sidebar everywhere it's checked.
  *  Flip to false to pause without removing code. */
-export const STRUCTURE_ENABLED = true;
+export const STRUCTURE_ENABLED = false;
 
 export type ParagraphClassification =
   | 'complete'
@@ -17,6 +17,9 @@ export interface ParagraphComponent {
 
 export interface ParagraphStructure {
   index: number;
+  /** Stable id echoed back by the model (e.g. "p1"). Optional for backward
+   *  compatibility with analyses persisted before ids were introduced. */
+  id?: string;
   classification: ParagraphClassification;
   claim: ParagraphComponent;
   evidence: ParagraphComponent;
