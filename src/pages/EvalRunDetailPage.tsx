@@ -203,7 +203,10 @@ export default function EvalRunDetailPage() {
         { runId: string; itemId: string; winner: PairwiseWinner; note?: string },
         { ok: boolean }
       >(functions, 'recordGoldLabel');
-      await recordGoldLabel({ runId, itemId: item.essayId, winner, note });
+      // httpsCallable serializes `undefined` object values to null, which the
+      // server's "note must be a string if present" validation rejects — omit
+      // the key entirely when there is no note.
+      await recordGoldLabel({ runId, itemId: item.essayId, winner, ...(note ? { note } : {}) });
       notifications.show({
         color: 'green',
         title: 'Gold label recorded',
