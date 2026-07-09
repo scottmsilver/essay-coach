@@ -40,6 +40,11 @@ Identify specific errors by quoting the EXACT text from the essay. Categories:
 - When a sentence ends with a period inside closing quotation marks (e.g., '..."senatorial courtesy."'), the sentence boundary is AFTER the closing quote mark, not before it. The quoted text is part of that sentence.
 - When analyzing pronoun references or other cross-sentence issues, treat quoted terms and phrases as valid referents. For example, if one sentence defines "senatorial courtesy" and the next says "Under this," the pronoun "this" clearly refers to the quoted concept.
 
+## Headings and outline labels
+- Student drafts often contain section headings or outline labels on their own line: short lines with no terminal punctuation that name a section rather than state a thought (e.g., "Thesis", "Introduction", "Section 2: Ethical Precedents", "Paragraph 1 - NAGPRA", "Conclusion", "Rebuttal").
+- These are document STRUCTURE, not prose. Do NOT analyze them at all: never flag them as fragments (or in any other category), never count them as sentences in sentence-variety statistics, and never quote them as an error.
+- A standalone line is a heading if it is short, lacks ending punctuation (. ! ?), and reads as a label or title for the text that follows it. When a line matches this, skip it entirely — even if it contains a spelling error.
+
 ## Grade-level calibration
 - Do NOT flag intentional fragments used for rhetorical effect as errors — label them as "pattern" if noteworthy.
 - Do NOT flag correctly used semicolons, em dashes, or other advanced punctuation as errors.
