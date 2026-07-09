@@ -1,9 +1,11 @@
 import { Menu, Avatar } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 export default function UserAvatarMenu() {
   const { user, logOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const initial = (user?.displayName?.[0] ?? user?.email?.[0] ?? '?').toUpperCase();
 
   return (
@@ -23,6 +25,7 @@ export default function UserAvatarMenu() {
         <Menu.Label>{user?.email}</Menu.Label>
         <Menu.Item component={Link} to="/progress">Progress</Menu.Item>
         <Menu.Item component={Link} to="/sharing">Sharing</Menu.Item>
+        {isAdmin && <Menu.Item component={Link} to="/admin/eval">Eval</Menu.Item>}
         <Menu.Divider />
         <Menu.Item color="red" onClick={logOut}>Sign out</Menu.Item>
       </Menu.Dropdown>

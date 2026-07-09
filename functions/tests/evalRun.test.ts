@@ -97,6 +97,18 @@ describe('runEvalCore', () => {
     expect(Array.isArray(result.failedJudges)).toBe(true);
     expect(result).toHaveProperty('routedCount');
 
+    // verdict must also carry the raw metric values (not just the gate's
+    // pass/reasons), so evalRuns/{id}.verdict has everything
+    // EvalRunDetailPage.tsx needs — deterministic here since both mock
+    // judges always prefer 'A' with fixed dimensional scores.
+    // winOrTieCount = 0 of 2 essays => challengerWinRate = 0.
+    // weightedMean.A === weightedMean.B for every item (identical judge
+    // scores regardless of AB/BA order) => feedbackDelta = 0.
+    // No item has disagreement: true => reliability = 1.
+    expect(result.verdict.challengerWinRate).toBe(0);
+    expect(result.verdict.feedbackDelta).toBe(0);
+    expect(result.verdict.reliability).toBe(1);
+
     expect(deps.writeItem).toHaveBeenCalledTimes(2);
 
     // generate called incumbent (no override) + challenger (with override) per essay
@@ -339,5 +351,25 @@ describe('validateEvalInput', () => {
 
   it('rejects a non-string element in essays, naming its index', () => {
     expect(() => validateEvalInput({ ...base, essays: ['e1', 42 as any, 'e3'] })).toThrow(/index 1/i);
+  });
+
+  it('accepts a valid input with no challengerLabel (optional field)', () => {
+    expect(() => validateEvalInput(base)).not.toThrow();
+  });
+
+  it('accepts a valid string challengerLabel within the length cap', () => {
+    expect(() => validateEvalInput({ ...base, challengerLabel: 'tighter-grammar-v2' })).not.toThrow();
+  });
+
+  it('rejects a non-string challengerLabel', () => {
+    expect(() => validateEvalInput({ ...base, challengerLabel: 42 as any })).toThrow(/challengerLabel/i);
+  });
+
+  it('rejects a challengerLabel over 200 characters', () => {
+    expect(() => validateEvalInput({ ...base, challengerLabel: 'x'.repeat(201) })).toThrow(/challengerLabel/i);
+  });
+
+  it('accepts a challengerLabel of exactly 200 characters', () => {
+    expect(() => validateEvalInput({ ...base, challengerLabel: 'x'.repeat(200) })).not.toThrow();
   });
 });

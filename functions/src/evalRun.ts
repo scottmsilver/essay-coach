@@ -81,11 +81,22 @@ export interface EvalItemDoc {
   routed: boolean;
 }
 
+export interface EvalRunVerdict {
+  pass: boolean;
+  reasons: string[];
+  feedbackDelta: number;
+  challengerWinRate: number;
+  reliability: number;
+}
+
 export interface EvalRunResult {
-  verdict: { pass: boolean; reasons: string[] };
+  verdict: EvalRunVerdict;
   failedJudges: string[];
   routedCount: number;
 }
+
+/** Max length for the optional, purely-cosmetic challengerLabel field. */
+const CHALLENGER_LABEL_MAX_LENGTH = 200;
 
 const EXCERPT_LENGTH = 300;
 
@@ -118,6 +129,7 @@ export function validateEvalInput(input: {
   report: unknown;
   essays: unknown[];
   challengerPromptOverride: unknown;
+  challengerLabel?: unknown;
 }): void {
   if (typeof input.report !== 'string' || !VALID_REPORTS.includes(input.report as ReportKind)) {
     throw new Error(`Invalid report kind: ${String(input.report)}. Must be one of ${VALID_REPORTS.join(', ')}.`);
@@ -136,6 +148,14 @@ export function validateEvalInput(input: {
       throw new Error(`Invalid essay id at index ${index}: expected a string, got ${typeof essayId}.`);
     }
   });
+  if (input.challengerLabel !== undefined) {
+    if (typeof input.challengerLabel !== 'string') {
+      throw new Error(`challengerLabel must be a string if provided, got ${typeof input.challengerLabel}.`);
+    }
+    if (input.challengerLabel.length > CHALLENGER_LABEL_MAX_LENGTH) {
+      throw new Error(`challengerLabel must be at most ${CHALLENGER_LABEL_MAX_LENGTH} characters.`);
+    }
+  }
 }
 
 export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<EvalRunResult> {
@@ -221,7 +241,14 @@ export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<
   // in run-judge.ts for the rerun-based approach used elsewhere).
   const reliability = perItem.length > 0 ? perItem.filter((v) => !v.disagreement).length / perItem.length : 1;
 
-  const verdict = gateVerdict({ feedbackDelta, challengerWinRate, reliability }, input.thresholds ?? DEFAULT_GATE);
+  const gate = gateVerdict({ feedbackDelta, challengerWinRate, reliability }, input.thresholds ?? DEFAULT_GATE);
+
+  // Persist the raw metric values alongside the pass/reasons gate verdict —
+  // downstream consumers (evalRuns/{id}.verdict, EvalRunDetailPage.tsx) need
+  // the actual numbers even on a passing run, when `reasons` is empty and
+  // carries no numeric detail (gateVerdict only embeds a value in `reasons`
+  // when a threshold is violated).
+  const verdict: EvalRunVerdict = { ...gate, feedbackDelta, challengerWinRate, reliability };
 
   return { verdict, failedJudges: Array.from(failedJudgesSet), routedCount };
 }
@@ -341,10 +368,10 @@ export const startEvalRun = onCall(
       throw new HttpsError('permission-denied', 'This action requires admin access');
     }
 
-    const { report, essayIds, challengerPromptOverride } = request.data ?? {};
+    const { report, essayIds, challengerPromptOverride, challengerLabel } = request.data ?? {};
 
     try {
-      validateEvalInput({ report, essays: essayIds, challengerPromptOverride });
+      validateEvalInput({ report, essays: essayIds, challengerPromptOverride, challengerLabel });
     } catch (err) {
       throw new HttpsError('invalid-argument', err instanceof Error ? err.message : String(err));
     }
@@ -396,6 +423,7 @@ export const startEvalRun = onCall(
       report,
       essayIds,
       challengerPromptOverride,
+      config: { challengerLabel: typeof challengerLabel === 'string' ? challengerLabel : '' },
       status: 'generating',
       createdBy: email,
       createdAt: FieldValue.serverTimestamp(),
