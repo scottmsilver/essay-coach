@@ -4,6 +4,7 @@ import { collection, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Badge, Progress, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { showError } from '../utils/dialogs';
 import { db, functions } from '../firebase';
 import EvalComparePicker from '../components/EvalComparePicker';
 import { DEFAULT_GATE } from '../../shared/panel/metrics';
@@ -210,11 +211,9 @@ export default function EvalRunDetailPage() {
         autoClose: 4000,
       });
     } catch (error) {
-      notifications.show({
-        color: 'red',
+      showError({
         title: 'Could not record gold label',
         message: error instanceof Error ? error.message : String(error),
-        autoClose: 6000,
       });
     }
   }

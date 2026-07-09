@@ -12,7 +12,7 @@ import {
   TextInput,
   Textarea,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+import { showError } from '../utils/dialogs';
 import { db, functions } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useEssays } from '../hooks/useEssays';
@@ -174,11 +174,9 @@ export default function EvalRunsPage() {
       });
       navigate(`/admin/eval/${result.data.runId}`);
     } catch (error) {
-      notifications.show({
-        color: 'red',
+      showError({
         title: 'Could not start eval run',
         message: error instanceof Error ? error.message : String(error),
-        autoClose: 6000,
       });
     } finally {
       setSubmitting(false);
