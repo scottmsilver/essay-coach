@@ -12,7 +12,13 @@ export interface OpenAIJudgeOpts {
   dims: string[];
 }
 
-async function callOpenAI(client: Pick<OpenAI, 'chat'>, model: string, prompt: string, retries = 3): Promise<string> {
+async function callOpenAI<T>(
+  client: Pick<OpenAI, 'chat'>,
+  model: string,
+  prompt: string,
+  parse: (raw: string) => T,
+  retries = 3
+): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await client.chat.completions.create({
@@ -20,7 +26,8 @@ async function callOpenAI(client: Pick<OpenAI, 'chat'>, model: string, prompt: s
         max_completion_tokens: 600,
         messages: [{ role: 'user', content: prompt }],
       });
-      return response.choices[0]?.message?.content ?? '';
+      const raw = response.choices[0]?.message?.content ?? '';
+      return parse(raw);
     } catch (err) {
       if (attempt < retries) {
         await sleep(1000 * Math.pow(2, attempt)); // 1s, 2s, 4s
@@ -38,12 +45,10 @@ export function makeOpenAIJudge(opts: OpenAIJudgeOpts): Judge {
     id: `openai:${model}`,
     lab: 'openai',
     async judgeDimensional(prompt: string) {
-      const raw = await callOpenAI(client, model, prompt);
-      return parseDimensional(raw, dims);
+      return callOpenAI(client, model, prompt, (raw) => parseDimensional(raw, dims));
     },
     async judgePairwise(prompt: string) {
-      const raw = await callOpenAI(client, model, prompt);
-      return parsePairwise(raw);
+      return callOpenAI(client, model, prompt, parsePairwise);
     },
   };
 }

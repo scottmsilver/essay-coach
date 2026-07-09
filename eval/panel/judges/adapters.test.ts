@@ -47,6 +47,25 @@ describe('makeAnthropicJudge', () => {
     expect(judge.lab).toBe('anthropic');
     expect(judge.id).toBe('anthropic:claude-opus-4-8');
   });
+
+  it('retries a parse failure with a fresh model call, not just the network call', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({ content: [{ type: 'text', text: 'not json at all' }] })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: '{"correctness":{"score":4,"rationale":"fixed"}}' }],
+      });
+    const judge = makeAnthropicJudge({
+      client: { messages: { create } } as any,
+      model: 'claude-opus-4-8',
+      dims: ['correctness'],
+    });
+
+    const result = await judge.judgeDimensional('PROMPT_TEXT');
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result.dimensions.correctness.score).toBe(4);
+  }, 10000);
 });
 
 describe('makeOpenAIJudge', () => {
@@ -75,6 +94,25 @@ describe('makeOpenAIJudge', () => {
     expect(judge.lab).toBe('openai');
     expect(judge.id).toBe('openai:gpt-5');
   });
+
+  it('retries a parse failure with a fresh model call, not just the network call', async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({ choices: [{ message: { content: 'not json at all' } }] })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: '{"coverage":{"score":2,"rationale":"fixed"}}' } }],
+      });
+    const judge = makeOpenAIJudge({
+      client: { chat: { completions: { create } } } as any,
+      model: 'gpt-5',
+      dims: ['coverage'],
+    });
+
+    const result = await judge.judgeDimensional('PROMPT_TEXT');
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(result.dimensions.coverage.score).toBe(2);
+  }, 10000);
 });
 
 describe('makeGoogleJudge', () => {
@@ -102,4 +140,21 @@ describe('makeGoogleJudge', () => {
     expect(judge.lab).toBe('google');
     expect(judge.id).toBe('google:gemini-2.5-pro');
   });
+
+  it('retries a parse failure with a fresh model call, not just the network call', async () => {
+    const generateContent = vi
+      .fn()
+      .mockResolvedValueOnce({ text: 'not json at all' })
+      .mockResolvedValueOnce({ text: '{"winner":"B","rationale":"fixed"}' });
+    const judge = makeGoogleJudge({
+      client: { models: { generateContent } } as any,
+      model: 'gemini-2.5-pro',
+      dims: [],
+    });
+
+    const result = await judge.judgePairwise('COMPARE_PROMPT');
+
+    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(result.winner).toBe('B');
+  }, 10000);
 });

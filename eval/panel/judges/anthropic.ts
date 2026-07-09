@@ -12,7 +12,13 @@ export interface AnthropicJudgeOpts {
   dims: string[];
 }
 
-async function callAnthropic(client: Pick<Anthropic, 'messages'>, model: string, prompt: string, retries = 3): Promise<string> {
+async function callAnthropic<T>(
+  client: Pick<Anthropic, 'messages'>,
+  model: string,
+  prompt: string,
+  parse: (raw: string) => T,
+  retries = 3
+): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await client.messages.create({
@@ -23,7 +29,8 @@ async function callAnthropic(client: Pick<Anthropic, 'messages'>, model: string,
         messages: [{ role: 'user', content: prompt }],
       } as Anthropic.MessageCreateParamsNonStreaming);
       const block = response.content[0];
-      return block && block.type === 'text' ? block.text : '';
+      const raw = block && block.type === 'text' ? block.text : '';
+      return parse(raw);
     } catch (err) {
       if (attempt < retries) {
         await sleep(1000 * Math.pow(2, attempt)); // 1s, 2s, 4s
@@ -41,12 +48,10 @@ export function makeAnthropicJudge(opts: AnthropicJudgeOpts): Judge {
     id: `anthropic:${model}`,
     lab: 'anthropic',
     async judgeDimensional(prompt: string) {
-      const raw = await callAnthropic(client, model, prompt);
-      return parseDimensional(raw, dims);
+      return callAnthropic(client, model, prompt, (raw) => parseDimensional(raw, dims));
     },
     async judgePairwise(prompt: string) {
-      const raw = await callAnthropic(client, model, prompt);
-      return parsePairwise(raw);
+      return callAnthropic(client, model, prompt, parsePairwise);
     },
   };
 }

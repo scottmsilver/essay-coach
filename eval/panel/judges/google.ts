@@ -12,14 +12,21 @@ export interface GoogleJudgeOpts {
   dims: string[];
 }
 
-async function callGoogle(client: Pick<GoogleGenAI, 'models'>, model: string, prompt: string, retries = 3): Promise<string> {
+async function callGoogle<T>(
+  client: Pick<GoogleGenAI, 'models'>,
+  model: string,
+  prompt: string,
+  parse: (raw: string) => T,
+  retries = 3
+): Promise<T> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await client.models.generateContent({
         model,
         contents: prompt,
       });
-      return response.text ?? '';
+      const raw = response.text ?? '';
+      return parse(raw);
     } catch (err) {
       if (attempt < retries) {
         await sleep(1000 * Math.pow(2, attempt)); // 1s, 2s, 4s
@@ -37,12 +44,10 @@ export function makeGoogleJudge(opts: GoogleJudgeOpts): Judge {
     id: `google:${model}`,
     lab: 'google',
     async judgeDimensional(prompt: string) {
-      const raw = await callGoogle(client, model, prompt);
-      return parseDimensional(raw, dims);
+      return callGoogle(client, model, prompt, (raw) => parseDimensional(raw, dims));
     },
     async judgePairwise(prompt: string) {
-      const raw = await callGoogle(client, model, prompt);
-      return parsePairwise(raw);
+      return callGoogle(client, model, prompt, parsePairwise);
     },
   };
 }
