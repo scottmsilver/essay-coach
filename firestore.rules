@@ -6,9 +6,14 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/shares/$(uid + '_' + request.auth.uid));
     }
 
+    // Convention: config/admins.emails MUST be stored lowercase. This must
+    // match isEmailAdmin()'s normalization in functions/src/admins.ts, which
+    // lowercases the caller's token email before comparing against this same
+    // list — otherwise a mixed-case token email could pass the function gate
+    // but be denied here (or vice versa).
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email in
+        && request.auth.token.email.lower() in
             get(/databases/$(database)/documents/config/admins).data.emails;
     }
 

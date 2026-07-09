@@ -4,9 +4,13 @@
  * Lets an admin attach a human "gold label" verdict (A / B / tie, with an
  * optional note) to a single routed item inside an `evalRuns/{runId}` run.
  * The label is written onto the item doc itself (`goldLabel`) and mirrored
- * into a flat `evalGoldLabels` collection (auto-id) so downstream analysis
- * can query labels across runs without walking every run's items
- * subcollection.
+ * into a flat `evalGoldLabels` collection so downstream analysis can query
+ * labels across runs without walking every run's items subcollection.
+ *
+ * Both writes happen in a single atomic `WriteBatch`, and the mirror doc
+ * uses the deterministic id `${runId}_${itemId}` (not an auto-id) so
+ * relabeling the same item upserts the same mirror row instead of appending
+ * a duplicate, and a failure on either write leaves neither applied.
  *
  * No secrets/model calls here — this is pure Firestore read/write behind the
  * same auth + allowlist + admin gate as `startEvalRun`.
@@ -61,6 +65,14 @@ export const recordGoldLabel = onCall(async (request) => {
     throw new HttpsError('not-found', `Item ${itemId} not found in run ${runId}`);
   }
 
+  const runData = runDoc.data() ?? {};
+  if (typeof runData.report !== 'string') {
+    throw new HttpsError(
+      'failed-precondition',
+      `Eval run ${runId} (evalRuns/${runId}) is missing a valid string "report" field; cannot record gold label mirror.`
+    );
+  }
+
   const ts = new Date().toISOString();
   const goldLabel = {
     winner: winner as Winner,
@@ -69,10 +81,11 @@ export const recordGoldLabel = onCall(async (request) => {
     by: email,
   };
 
-  await itemRef.update({ goldLabel });
+  const batch = db.batch();
+  batch.update(itemRef, { goldLabel });
 
-  const runData = runDoc.data() ?? {};
-  await db.collection('evalGoldLabels').doc().set({
+  const mirrorRef = db.collection('evalGoldLabels').doc(`${runId}_${itemId}`);
+  batch.set(mirrorRef, {
     runId,
     itemId,
     report: runData.report,
@@ -81,6 +94,8 @@ export const recordGoldLabel = onCall(async (request) => {
     ts,
     by: email,
   });
+
+  await batch.commit();
 
   return { ok: true };
 });
