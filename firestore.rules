@@ -47,8 +47,34 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // config/admins: only admins may read the admin-emails list itself
+    // (isAdmin()'s get() call reads it via rules-internal access, which
+    // bypasses these read rules, so this does not create a chicken/egg
+    // problem — see functions/src/evalRun.ts's Track-2 audit notes).
+    match /config/admins {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // config/evalPanel: no client ever reads this (it's only loaded
+    // server-side by functions/src/evalRun.ts's loadEvalPanelConfig) — deny
+    // all client reads.
+    match /config/evalPanel {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // All other config docs (e.g. config/allowlist, read client-side by
+    // src/hooks/useAuth.tsx) keep the original any-authed-user read rule.
+    //
+    // NOTE: Firestore evaluates overlapping `match` blocks with OR semantics
+    // — if ANY matching block's `allow` condition is true, the read is
+    // allowed, regardless of what other matching blocks say. Since this
+    // wildcard also matches `config/admins` and `config/evalPanel`, its own
+    // condition explicitly excludes those doc names so it can't silently
+    // re-open the access the two blocks above just closed off.
     match /config/{doc} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && doc != 'admins' && doc != 'evalPanel';
       allow write: if false;
     }
 

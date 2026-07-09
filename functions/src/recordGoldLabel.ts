@@ -23,6 +23,16 @@ import { isEmailAdmin } from './admins';
 const VALID_WINNERS = ['A', 'B', 'tie'] as const;
 type Winner = (typeof VALID_WINNERS)[number];
 
+/**
+ * Shape guard for ids interpolated into Firestore doc paths (mirrors
+ * functions/src/evalRun.ts's ID_SHAPE for essayIds). Firestore doc path
+ * segments containing `/` are treated as additional path segments rather
+ * than literal characters, so an unguarded runId/itemId like `a/b` could
+ * redirect `evalRuns/{runId}` or its `items/{itemId}` lookup to an
+ * unintended document.
+ */
+const ID_SHAPE = /^[A-Za-z0-9_-]{1,128}$/;
+
 export const recordGoldLabel = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be signed in');
@@ -41,8 +51,14 @@ export const recordGoldLabel = onCall(async (request) => {
   if (typeof runId !== 'string' || runId.length === 0) {
     throw new HttpsError('invalid-argument', 'runId is required.');
   }
+  if (!ID_SHAPE.test(runId)) {
+    throw new HttpsError('invalid-argument', `runId must match ${ID_SHAPE}.`);
+  }
   if (typeof itemId !== 'string' || itemId.length === 0) {
     throw new HttpsError('invalid-argument', 'itemId is required.');
+  }
+  if (!ID_SHAPE.test(itemId)) {
+    throw new HttpsError('invalid-argument', `itemId must match ${ID_SHAPE}.`);
   }
   if (typeof winner !== 'string' || !VALID_WINNERS.includes(winner as Winner)) {
     throw new HttpsError('invalid-argument', `winner must be one of ${VALID_WINNERS.join(', ')}.`);

@@ -119,6 +119,24 @@ describe('recordGoldLabel', () => {
     ).rejects.toThrow('admin');
   });
 
+  it('rejects a runId containing a slash (path-traversal-shaped id)', async () => {
+    await expect(
+      (recordGoldLabel as any)({
+        auth: AUTH,
+        data: { runId: 'a/b', itemId: 'i1', winner: 'A' },
+      })
+    ).rejects.toThrow(/runId/i);
+  });
+
+  it('rejects an itemId containing a slash (path-traversal-shaped id)', async () => {
+    await expect(
+      (recordGoldLabel as any)({
+        auth: AUTH,
+        data: { runId: 'r1', itemId: 'a/b', winner: 'A' },
+      })
+    ).rejects.toThrow(/itemId/i);
+  });
+
   it('rejects an invalid winner value', async () => {
     await expect(
       (recordGoldLabel as any)({

@@ -98,6 +98,21 @@ export interface EvalRunResult {
 /** Max length for the optional, purely-cosmetic challengerLabel field. */
 const CHALLENGER_LABEL_MAX_LENGTH = 200;
 
+/** Max length for challengerPromptOverride (mirrored client-side in EvalRunsPage.tsx's Textarea). */
+const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
+
+/**
+ * Shape guard for ids that get interpolated into Firestore doc paths
+ * (essayIds here via `users/${uid}/essays/${essayId}`; runId/itemId in
+ * recordGoldLabel.ts). Firestore doc path segments containing `/` are
+ * silently treated as *additional path segments* rather than literal
+ * characters, so an id like `../otherUser` or one embedding a `/` could
+ * redirect a lookup to an unintended document. Restricting to
+ * `[A-Za-z0-9_-]` — the character set Firestore auto-ids and this app's own
+ * ids use — rules that out entirely.
+ */
+const ID_SHAPE = /^[A-Za-z0-9_-]{1,128}$/;
+
 const EXCERPT_LENGTH = 300;
 
 /** Generic, safe-to-surface message for eval run failures (see sanitizeEvalRunError). */
@@ -117,6 +132,27 @@ export const EVAL_RUN_GENERIC_ERROR_MESSAGE = 'Eval run failed — see function 
  */
 export function sanitizeEvalRunError(_error: unknown): string {
   return EVAL_RUN_GENERIC_ERROR_MESSAGE;
+}
+
+/**
+ * Redacts secret-shaped substrings from an eval-run failure's detail string
+ * before it reaches `logger.error` (server-side function logs). Even though
+ * this detail never leaves the process (see sanitizeEvalRunError), SDK
+ * errors from the judge panel / analyzers can embed live key material —
+ * Gemini's REST errors put the API key in the request URL's `?key=` query
+ * param, and some SDKs echo raw `Authorization` headers or `api_key` fields
+ * in thrown error messages — and logs are a lower-trust boundary than
+ * in-memory error objects (broader retention, wider read access, more
+ * exporters). Redacting here keeps that material out of logs even though
+ * clients/Firestore never see the raw detail at all.
+ */
+export function redactEvalError(detail: string): string {
+  return detail
+    .replace(/([?&]key=)[^&\s]+/gi, '$1[REDACTED]')
+    .replace(/(sk-[A-Za-z0-9_-]{8,})/g, '[REDACTED]')
+    .replace(/(AIza[A-Za-z0-9_-]{10,})/g, '[REDACTED]')
+    .replace(/(authorization\s*[:=]\s*)\S+/gi, '$1[REDACTED]')
+    .replace(/(api[-_]?key\s*[:=]\s*)\S+/gi, '$1[REDACTED]');
 }
 
 /**
@@ -143,9 +179,15 @@ export function validateEvalInput(input: {
   if (typeof input.challengerPromptOverride !== 'string' || input.challengerPromptOverride.trim().length === 0) {
     throw new Error('challengerPromptOverride must be a non-empty string.');
   }
+  if (input.challengerPromptOverride.length > CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH) {
+    throw new Error(`challengerPromptOverride must be at most ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH} characters.`);
+  }
   input.essays.forEach((essayId, index) => {
     if (typeof essayId !== 'string') {
       throw new Error(`Invalid essay id at index ${index}: expected a string, got ${typeof essayId}.`);
+    }
+    if (!ID_SHAPE.test(essayId)) {
+      throw new Error(`Invalid essay id at index ${index}: must match ${ID_SHAPE}.`);
     }
   });
   if (input.challengerLabel !== undefined) {
@@ -477,7 +519,7 @@ export const startEvalRun = onCall(
       // sanitizeEvalRunError) goes to server logs only. The Firestore doc
       // and the HttpsError returned to the client get a generic message.
       const detail = error instanceof Error ? error.message : String(error);
-      logger.error('startEvalRun failed', { error: detail });
+      logger.error('startEvalRun failed', { error: redactEvalError(detail) });
       const safeMessage = sanitizeEvalRunError(error);
       await runRef.update({
         status: 'error',

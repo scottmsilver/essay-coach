@@ -43,6 +43,12 @@ interface EvalRunSummary {
 
 const MAX_ESSAYS = 20;
 
+// Mirrors CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH in functions/src/evalRun.ts's
+// validateEvalInput — the server is the actual enforcement point; this is
+// just a client-side heads-up so the user doesn't type 20k+ chars only to
+// have startEvalRun reject the whole call.
+const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
+
 function parseRun(doc: any): EvalRunSummary {
   const data = doc.data();
   return {
@@ -232,13 +238,17 @@ export default function EvalRunsPage() {
             />
             <Textarea
               label="Challenger prompt override"
-              description="Paste the full replacement system prompt. Do not import the server prompt constants into the client — paste the text here."
+              description={`Paste the full replacement system prompt. Do not import the server prompt constants into the client — paste the text here. Max ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters.`}
               placeholder="Paste the full challenger system prompt..."
               value={challengerPrompt}
               onChange={(e) => setChallengerPrompt(e.currentTarget.value)}
+              maxLength={CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH}
               autosize
               minRows={6}
             />
+            <Text size="xs" c="dimmed">
+              {challengerPrompt.length.toLocaleString()} / {CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters
+            </Text>
             <Text size="sm" c="dimmed">
               Estimated calls: {essayIds.length} essay(s) × 12 judge calls + {essayIds.length} essay(s) × 2
               generations ≈ <strong>{estimatedCalls}</strong> calls

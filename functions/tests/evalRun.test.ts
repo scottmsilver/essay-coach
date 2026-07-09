@@ -17,6 +17,7 @@ import {
   runEvalCore,
   validateEvalInput,
   sanitizeEvalRunError,
+  redactEvalError,
   EVAL_RUN_GENERIC_ERROR_MESSAGE,
   makeFirestoreGenerate,
   type EvalDeps,
@@ -271,6 +272,44 @@ describe('sanitizeEvalRunError', () => {
   });
 });
 
+describe('redactEvalError', () => {
+  it('redacts a Gemini-style ?key=... query param', () => {
+    const detail =
+      'Gemini request failed: https://generativelanguage.googleapis.com/v1/models/foo:generateContent?key=AIzaXXXXREALSECRETXXXX';
+    const redacted = redactEvalError(detail);
+    expect(redacted).not.toContain('AIzaXXXXREALSECRETXXXX');
+    expect(redacted).toContain('?key=[REDACTED]');
+  });
+
+  it('redacts an sk-... style API key embedded anywhere in the message', () => {
+    const detail = 'OpenAI error: invalid api key sk-abc123def456ghi789';
+    const redacted = redactEvalError(detail);
+    expect(redacted).not.toContain('sk-abc123def456ghi789');
+    expect(redacted).toContain('[REDACTED]');
+  });
+
+  it('redacts a bare AIza... key even without a ?key= prefix', () => {
+    const detail = 'key material leaked: AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+    const redacted = redactEvalError(detail);
+    expect(redacted).not.toContain('AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ012345');
+  });
+
+  it('redacts the token immediately following an Authorization: header label', () => {
+    // Matches the spec's `(authorization\s*[:=]\s*)\S+` pattern, which
+    // redacts the single whitespace-delimited token right after the label
+    // (e.g. a raw bearer token value assigned as `Authorization: <token>`).
+    const detail = 'Request failed, headers: { Authorization: eyJhbGciOiJIUzI1NiJ9.secret.sig }';
+    const redacted = redactEvalError(detail);
+    expect(redacted).not.toContain('eyJhbGciOiJIUzI1NiJ9.secret.sig');
+    expect(redacted.toLowerCase()).toContain('authorization: [redacted]');
+  });
+
+  it('leaves ordinary error text untouched', () => {
+    const detail = 'Essay 5 not found';
+    expect(redactEvalError(detail)).toBe(detail);
+  });
+});
+
 describe('makeFirestoreGenerate', () => {
   it('resolves per-essay metadata by content, not by call order', async () => {
     // Two essays with distinct metadata. If the generate() closure recovered
@@ -351,6 +390,26 @@ describe('validateEvalInput', () => {
 
   it('rejects a non-string element in essays, naming its index', () => {
     expect(() => validateEvalInput({ ...base, essays: ['e1', 42 as any, 'e3'] })).toThrow(/index 1/i);
+  });
+
+  it('rejects an essay id containing a slash (path-traversal-shaped id), naming its index', () => {
+    expect(() => validateEvalInput({ ...base, essays: ['e1', 'a/b'] })).toThrow(/index 1/i);
+  });
+
+  it('accepts essay ids made only of letters, numbers, underscore, and hyphen', () => {
+    expect(() => validateEvalInput({ ...base, essays: ['abc-123_XYZ'] })).not.toThrow();
+  });
+
+  it('rejects a challengerPromptOverride over the 20000-char cap, naming the cap', () => {
+    expect(() =>
+      validateEvalInput({ ...base, challengerPromptOverride: 'x'.repeat(20001) })
+    ).toThrow(/20000/);
+  });
+
+  it('accepts a challengerPromptOverride of exactly the 20000-char cap', () => {
+    expect(() =>
+      validateEvalInput({ ...base, challengerPromptOverride: 'x'.repeat(20000) })
+    ).not.toThrow();
   });
 
   it('accepts a valid input with no challengerLabel (optional field)', () => {
