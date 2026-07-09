@@ -11,7 +11,8 @@
   },
   "include": [
     "*.ts",
-    "providers/*.ts"
+    "providers/*.ts",
+    "panel/**/*.ts"
   ],
   "exclude": [
     "node_modules"

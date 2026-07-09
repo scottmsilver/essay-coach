@@ -7,17 +7,22 @@
     "calibration": "tsx build-calibration.ts",
     "eval": "promptfoo eval",
     "view": "promptfoo view",
-    "judge": "tsx run-judge.ts"
+    "judge": "tsx run-judge.ts",
+    "panel:gate": "tsx panel/panel-gate.ts",
+    "panel:loop": "tsx panel/panel-loop.ts",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@azure/identity": "^4.13.1",
     "@google/genai": "^1.49.0",
     "firebase-admin": "^13.0.0",
+    "openai": "^6.45.0",
     "promptfoo": "^0.121.3"
   },
   "devDependencies": {
     "tsx": "^4.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^2.1.0"
   }
 }
