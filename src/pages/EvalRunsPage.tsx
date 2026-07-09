@@ -117,6 +117,7 @@ export default function EvalRunsPage() {
 
   const [runs, setRuns] = useState<EvalRunSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [report, setReport] = useState<ReportKind>('overall');
   const [essayIds, setEssayIds] = useState<string[]>([]);
@@ -130,10 +131,13 @@ export default function EvalRunsPage() {
       q,
       (snapshot) => {
         setRuns(snapshot.docs.map(parseRun));
+        setLoadError(false);
         setLoading(false);
       },
       (error) => {
+        // Permission-denied must not masquerade as "no runs yet".
         console.error('Failed to load eval runs:', error);
+        setLoadError(true);
         setLoading(false);
       }
     );
@@ -253,6 +257,10 @@ export default function EvalRunsPage() {
           <div className="spinner" />
           <p>Loading eval runs...</p>
         </div>
+      ) : loadError ? (
+        <Text c="red">
+          Couldn't load eval runs — you may not have eval admin access.
+        </Text>
       ) : runs.length === 0 ? (
         <Text c="dimmed">No eval runs yet. Start one above.</Text>
       ) : (
