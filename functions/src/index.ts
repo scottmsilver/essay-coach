@@ -19,3 +19,5 @@ export { analyzeCriteria } from './analyzeCriteria';
 export { analyzeCoherence } from './analyzeCoherence';
 export { analyzeStructure } from './analyzeStructure';
 export { analyzeReasoning } from './analyzeReasoning';
+export { startEvalRun } from './evalRun';
+export { recordGoldLabel } from './recordGoldLabel';
