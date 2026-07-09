@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { ItemVerdict, PairwiseWinner } from './types';
+import type { PairwiseWinner } from './types';
+import type { ItemVerdict } from './aggregate';
 
 export interface GoldLabel {
   itemId: string;
@@ -16,33 +17,41 @@ export function shouldRoute(
   return v.disagreement || v.positionBiasFlag || opts.isNewVariant || opts.rand() < opts.sampleRate;
 }
 
+// Reads and parses an existing gold file. Missing file returns []. A file
+// that exists but cannot be parsed as a JSON array is a corruption signal —
+// silently treating it as empty would cause appendGold to overwrite (and
+// thereby destroy) previously recorded human labels, so we throw instead.
+function readGoldFileOrThrow(path: string): GoldLabel[] {
+  if (!existsSync(path)) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (err) {
+    throw new Error(`Gold file at ${path} exists but is not valid JSON: ${(err as Error).message}`);
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Gold file at ${path} exists but does not contain a JSON array`);
+  }
+
+  return parsed as GoldLabel[];
+}
+
 export function appendGold(path: string, label: GoldLabel): void {
   const dir = dirname(path);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 
-  let existing: GoldLabel[] = [];
-  if (existsSync(path)) {
-    try {
-      existing = JSON.parse(readFileSync(path, 'utf-8'));
-    } catch {
-      existing = [];
-    }
-  }
+  const existing = readGoldFileOrThrow(path);
 
   existing.push(label);
   writeFileSync(path, JSON.stringify(existing, null, 2));
 }
 
 export function readGold(path: string): GoldLabel[] {
-  if (!existsSync(path)) {
-    return [];
-  }
-
-  try {
-    return JSON.parse(readFileSync(path, 'utf-8'));
-  } catch {
-    return [];
-  }
+  return readGoldFileOrThrow(path);
 }
