@@ -136,6 +136,13 @@ export default function JudgePickerPage() {
 
   const handleFile = useCallback(
     (file: File) => {
+      const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+      if (file.size > MAX_FILE_BYTES) {
+        setLoadError(
+          `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Max size is 10 MB.`
+        );
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => loadFromText(String(reader.result ?? ''));
       reader.onerror = () => setLoadError('Failed to read file.');

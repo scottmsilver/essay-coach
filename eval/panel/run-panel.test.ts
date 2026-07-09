@@ -41,4 +41,44 @@ describe('runItem', () => {
     expect(baPrompt.indexOf('FEEDBACK_A_TEXT')).toBeGreaterThanOrEqual(0);
     expect(baPrompt.indexOf('FEEDBACK_B_TEXT')).toBeLessThan(baPrompt.indexOf('FEEDBACK_A_TEXT'));
   });
+
+  it('produces a verdict from survivors and lists the failed judge when one of three judges rejects', async () => {
+    const good1 = mockJudge('good-1');
+    const good2 = mockJudge('good-2');
+    const bad = mockJudge('bad-judge');
+    (bad.judgeDimensional as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('persistent failure'));
+
+    const v = await runItem({
+      report: 'grammar',
+      judges: [good1, bad, good2],
+      essay: 'E',
+      feedbackA: 'A',
+      annotationsA: '[]',
+      feedbackB: 'B',
+      annotationsB: '[]',
+    });
+
+    expect(v).toHaveProperty('majorityWinner');
+    expect(v.failedJudges).toEqual(['bad-judge']);
+  });
+
+  it('rejects naming both failed judge ids when two of three judges reject', async () => {
+    const good = mockJudge('good-1');
+    const bad1 = mockJudge('bad-1');
+    const bad2 = mockJudge('bad-2');
+    (bad1.judgeDimensional as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('persistent failure'));
+    (bad2.judgePairwise as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('persistent failure'));
+
+    await expect(
+      runItem({
+        report: 'grammar',
+        judges: [good, bad1, bad2],
+        essay: 'E',
+        feedbackA: 'A',
+        annotationsA: '[]',
+        feedbackB: 'B',
+        annotationsB: '[]',
+      })
+    ).rejects.toThrow(/bad-1.*bad-2|bad-2.*bad-1/);
+  });
 });
