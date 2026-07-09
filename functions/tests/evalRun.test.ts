@@ -1,6 +1,29 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runEvalCore, validateEvalInput, type EvalDeps, type EvalRunInput, type EvalItemDoc } from '../src/evalRun';
 import type { Judge } from '../../shared/panel/types';
+
+// Mocks for makeFirestoreGenerate's 'overall' branch (buildEvaluationPrompt +
+// evaluateWithGemini), used only by the makeFirestoreGenerate describe block
+// below to verify content-keyed metadata lookup without hitting the network.
+// vi.mock calls are hoisted above imports by vitest, so these apply before
+// '../src/evalRun' (which imports both) is loaded.
+vi.mock('../src/prompt', () => ({
+  buildEvaluationPrompt: vi.fn((args: { assignmentPrompt: string; writingType: string; content: string }) => args),
+}));
+vi.mock('../src/gemini', () => ({
+  evaluateWithGemini: vi.fn(async (_apiKey: string, prompt: unknown) => ({ _promptEcho: prompt, traits: {} })),
+}));
+
+import {
+  runEvalCore,
+  validateEvalInput,
+  sanitizeEvalRunError,
+  EVAL_RUN_GENERIC_ERROR_MESSAGE,
+  makeFirestoreGenerate,
+  type EvalDeps,
+  type EvalRunInput,
+  type EvalItemDoc,
+  type EssayWithMeta,
+} from '../src/evalRun';
 
 // Mirrors shared/panel/run-panel.test.ts's mockJudge style, extended to
 // consistently prefer one *content side* regardless of AB/BA call order
@@ -195,10 +218,97 @@ describe('runEvalCore', () => {
   });
 });
 
+describe('sanitizeEvalRunError', () => {
+  it('never surfaces raw error detail, even when the message embeds key material', async () => {
+    // Simulates a Gemini SDK error whose message embeds the API key in the
+    // request URL (`?key=...`), which is how startEvalRun's catch block
+    // could otherwise leak a secret into the evalRuns doc / HttpsError.
+    const secretError = new Error(
+      'Gemini request failed: https://generativelanguage.googleapis.com/v1/models/foo:generateContent?key=AIzaSECRET'
+    );
+
+    // Exercise the same failure path runEvalCore drives in production: a
+    // deps.generate() throw propagating out of the essay loop.
+    const deps: EvalDeps = {
+      generate: vi.fn(async () => {
+        throw secretError;
+      }),
+      judges: [],
+      writeProgress: vi.fn(async () => {}),
+      writeItem: vi.fn(async () => {}),
+    };
+    const input: EvalRunInput = {
+      report: 'grammar',
+      essays: [{ id: 'e1', content: 'Essay content.' }],
+      challengerPromptOverride: 'OVERRIDE',
+    };
+
+    let caught: unknown;
+    try {
+      await runEvalCore(deps, input);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBe(secretError);
+
+    // This is what startEvalRun's catch block does with the caught error
+    // before writing runDoc.errorMessage / throwing the HttpsError.
+    const safeMessage = sanitizeEvalRunError(caught);
+    expect(safeMessage).not.toContain('AIzaSECRET');
+    expect(safeMessage).toBe(EVAL_RUN_GENERIC_ERROR_MESSAGE);
+  });
+});
+
+describe('makeFirestoreGenerate', () => {
+  it('resolves per-essay metadata by content, not by call order', async () => {
+    // Two essays with distinct metadata. If the generate() closure recovered
+    // metadata from a call-order/index cursor (the old behavior), calling it
+    // out of the "incumbent then challenger, in essay order" pattern — e.g.
+    // essay 2 twice before essay 1 is ever seen — would silently attach the
+    // wrong essay's assignmentPrompt/writingType. Keying by content instead
+    // makes the result depend only on the content argument, not call order.
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+      { id: 'e2', content: 'Essay two content.', assignmentPrompt: 'Prompt TWO', writingType: 'argumentative' },
+    ];
+
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+
+    // Deliberately out-of-order / repeated calls relative to essays' array
+    // order: essay 2 twice, then essay 1. A call-order cursor (essayIndex =
+    // floor(callIndex / 2)) would map these three calls to essays[0],
+    // essays[0], essays[1] — i.e. every call but the first would get the
+    // wrong essay's metadata.
+    const first = await generate('overall', 'Essay two content.');
+    const second = await generate('overall', 'Essay two content.');
+    const third = await generate('overall', 'Essay one content.');
+
+    const firstArgs = JSON.parse(first.feedback)._promptEcho;
+    const secondArgs = JSON.parse(second.feedback)._promptEcho;
+    const thirdArgs = JSON.parse(third.feedback)._promptEcho;
+
+    expect(firstArgs.assignmentPrompt).toBe('Prompt TWO');
+    expect(secondArgs.assignmentPrompt).toBe('Prompt TWO');
+    expect(thirdArgs.assignmentPrompt).toBe('Prompt ONE');
+  });
+
+  it('throws a clear error when generate() is called with content that matches no loaded essay', async () => {
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+    ];
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+
+    await expect(generate('overall', 'Content that was never loaded.')).rejects.toThrow(/no essay metadata found/i);
+  });
+});
+
 describe('validateEvalInput', () => {
+  // essays here are essayIds as the real onCall wrapper passes them
+  // (validateEvalInput({ report, essays: essayIds, challengerPromptOverride })
+  // in startEvalRun) — i.e. an array of string ids, not essay content objects.
   const base = {
     report: 'grammar' as const,
-    essays: [{ id: 'e1', content: 'x' }],
+    essays: ['e1'],
     challengerPromptOverride: 'override text',
   };
 
@@ -207,7 +317,7 @@ describe('validateEvalInput', () => {
   });
 
   it('rejects more than 20 essays, naming the 20 cap', () => {
-    const essays = Array.from({ length: 21 }, (_, i) => ({ id: `e${i}`, content: 'x' }));
+    const essays = Array.from({ length: 21 }, (_, i) => `e${i}`);
     expect(() => validateEvalInput({ ...base, essays })).toThrow(/20/);
   });
 
@@ -225,5 +335,9 @@ describe('validateEvalInput', () => {
 
   it('rejects a whitespace-only challengerPromptOverride', () => {
     expect(() => validateEvalInput({ ...base, challengerPromptOverride: '   ' })).toThrow(/override/i);
+  });
+
+  it('rejects a non-string element in essays, naming its index', () => {
+    expect(() => validateEvalInput({ ...base, essays: ['e1', 42 as any, 'e3'] })).toThrow(/index 1/i);
   });
 });

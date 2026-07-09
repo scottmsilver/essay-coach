@@ -89,6 +89,25 @@ export interface EvalRunResult {
 
 const EXCERPT_LENGTH = 300;
 
+/** Generic, safe-to-surface message for eval run failures (see sanitizeEvalRunError). */
+export const EVAL_RUN_GENERIC_ERROR_MESSAGE = 'Eval run failed — see function logs';
+
+/**
+ * Sanitizes an eval-run failure for anything that leaves this process: the
+ * `evalRuns/{id}` Firestore doc's errorMessage field and the HttpsError
+ * thrown back to the client. SDK errors from the judge panel / analyzers
+ * (Gemini, OpenAI, Anthropic) can embed key material in their message — e.g.
+ * Gemini's REST errors include the request URL with `?key=<API key>`, and
+ * some SDKs echo raw auth headers/bodies in thrown errors — so the *full*
+ * error detail must only ever reach logger.error (server-side function
+ * logs), mirroring functions/src/submitEssay.ts's generic-message pattern.
+ * Callers are responsible for logging the raw error separately; this
+ * function never returns any part of it.
+ */
+export function sanitizeEvalRunError(_error: unknown): string {
+  return EVAL_RUN_GENERIC_ERROR_MESSAGE;
+}
+
 /**
  * Validates a startEvalRun request. Throws a plain Error naming the specific
  * rule violated (report enum / 1..20 essay cap / non-empty override) so both
@@ -112,6 +131,11 @@ export function validateEvalInput(input: {
   if (typeof input.challengerPromptOverride !== 'string' || input.challengerPromptOverride.trim().length === 0) {
     throw new Error('challengerPromptOverride must be a non-empty string.');
   }
+  input.essays.forEach((essayId, index) => {
+    if (typeof essayId !== 'string') {
+      throw new Error(`Invalid essay id at index ${index}: expected a string, got ${typeof essayId}.`);
+    }
+  });
 }
 
 export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<EvalRunResult> {
@@ -127,6 +151,11 @@ export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<
   for (let i = 0; i < essays.length; i++) {
     const essay = essays[i];
 
+    // deps.generate is called incumbent-then-challenger per essay here, but
+    // no implementation of generate() (see makeFirestoreGenerate below) may
+    // rely on that order or call count — it must resolve any per-essay
+    // context solely from the (report, essayContent, override) arguments it
+    // receives on each call.
     const incumbent = await deps.generate(report, essay.content);
     const challenger = await deps.generate(report, essay.content, challengerPromptOverride);
 
@@ -199,7 +228,7 @@ export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<
 
 // ── Firestore-backed generate() ─────────────────────────────────────────
 
-interface EssayWithMeta extends EvalEssayInput {
+export interface EssayWithMeta extends EvalEssayInput {
   assignmentPrompt: string;
   writingType: string;
 }
@@ -207,26 +236,24 @@ interface EssayWithMeta extends EvalEssayInput {
 /**
  * Builds the `generate` dep that calls the real Task-3 analyzers.
  *
- * runEvalCore calls `generate()` exactly twice per essay, in essay order
- * (incumbent then challenger), before moving to the next essay — see the
- * loop above. That fixed, documented calling contract (both this closure and
- * runEvalCore live in this file) lets us recover per-essay metadata
- * (assignmentPrompt/writingType, needed only by the 'overall' analyzer)
- * without changing the generate() signature specified by the plan, which
- * takes only the essay content string.
+ * Recovers per-essay metadata (assignmentPrompt/writingType, needed only by
+ * the 'overall' analyzer) by looking it up from the essay *content* the
+ * closure is called with, rather than from a call-order/index cursor. This
+ * is deliberately independent of how many times or in what order
+ * runEvalCore calls generate() per essay — see the comment at that call
+ * site. Edge case: two essays/drafts with byte-identical content will share
+ * metadata (whichever was inserted into the Map); acceptable for eval runs,
+ * which only use this metadata to build the prompt, not to identify essays.
  */
-function makeFirestoreGenerate(params: {
+export function makeFirestoreGenerate(params: {
   report: ReportKind;
   essays: EssayWithMeta[];
   apiKey: string;
 }): EvalDeps['generate'] {
   const { report, essays, apiKey } = params;
-  let callIndex = 0;
+  const metaByContent = new Map<string, EssayWithMeta>(essays.map((e) => [e.content, e]));
 
   return async (_report, essayContent, override) => {
-    const essayIndex = Math.floor(callIndex / 2);
-    callIndex++;
-    const essay = essays[essayIndex];
     const opts = override ? { systemPromptOverride: override } : undefined;
 
     if (report === 'grammar') {
@@ -240,6 +267,13 @@ function makeFirestoreGenerate(params: {
     }
 
     // 'overall'
+    const essay = metaByContent.get(essayContent);
+    if (!essay) {
+      throw new Error(
+        'makeFirestoreGenerate: no essay metadata found for the given content. The generate() closure is keyed ' +
+          'by essay content, so this indicates the content passed in does not match any loaded essay.'
+      );
+    }
     const prompt = buildEvaluationPrompt({
       assignmentPrompt: essay.assignmentPrompt,
       writingType: essay.writingType,
@@ -411,14 +445,18 @@ export const startEvalRun = onCall(
 
       return { runId: runRef.id };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error('startEvalRun failed', { error: message });
+      // Full detail (which may embed API key material — see
+      // sanitizeEvalRunError) goes to server logs only. The Firestore doc
+      // and the HttpsError returned to the client get a generic message.
+      const detail = error instanceof Error ? error.message : String(error);
+      logger.error('startEvalRun failed', { error: detail });
+      const safeMessage = sanitizeEvalRunError(error);
       await runRef.update({
         status: 'error',
-        errorMessage: message,
+        errorMessage: safeMessage,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      throw new HttpsError('internal', `Eval run failed: ${message}`);
+      throw new HttpsError('internal', safeMessage);
     }
   }
 );
