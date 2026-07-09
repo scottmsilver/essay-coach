@@ -1,13 +1,13 @@
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { Judge, ReportKind } from './types';
-import { runItem } from './run-panel';
-import type { ItemVerdict } from './aggregate';
-import { gateVerdict, DEFAULT_GATE, type GateThresholds } from './metrics';
+import type { Judge, ReportKind } from '../../shared/panel/types';
+import { runItem } from '../../shared/panel/run-panel';
+import type { ItemVerdict } from '../../shared/panel/aggregate';
+import { gateVerdict, DEFAULT_GATE, type GateThresholds } from '../../shared/panel/metrics';
 import { shouldRoute } from './picker-store';
-import { RUBRICS } from './rubrics';
-import { buildPanel } from './judges';
+import { RUBRICS } from '../../shared/panel/rubrics';
+import { buildPanel } from '../../shared/panel/judges';
 
 export interface GateItem {
   id: string;

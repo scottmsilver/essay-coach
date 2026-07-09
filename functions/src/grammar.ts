@@ -238,13 +238,14 @@ export async function analyzeGrammarWithGemini(
   apiKey: string,
   content: string,
   progressRef?: DocumentReference,
+  opts?: { systemPromptOverride?: string },
 ): Promise<GrammarAnalysis> {
   const prompt = buildGrammarPrompt(content);
 
   const outputText = await streamGeminiJson({
     apiKey,
     contents: prompt,
-    systemInstruction: GRAMMAR_SYSTEM_PROMPT,
+    systemInstruction: opts?.systemPromptOverride || GRAMMAR_SYSTEM_PROMPT,
     responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
     progressRef,
     statusField: 'grammarStatus',

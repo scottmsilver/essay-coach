@@ -184,16 +184,20 @@ export async function analyzeTransitionsWithGemini(
   content: string,
   progressRef?: DocumentReference,
   previousAnalysis?: TransitionAnalysis | null,
+  opts?: { systemPromptOverride?: string },
 ): Promise<TransitionAnalysis> {
   // Split sentences with Gemma 3 4B (falls back to regex)
   const sentences = await splitEssayIntoSentences(content, apiKey);
   const formatted = formatSentencesForPrompt(sentences);
   const prompt = buildTransitionPrompt(formatted);
 
+  // systemPromptOverride applies ONLY to this main analysis (pass 1) call.
+  // The contextual-recheck pass (pass 2, below) always uses its own fixed
+  // RECHECK_SYSTEM_PROMPT and is never affected by the override.
   const outputText = await streamGeminiJson({
     apiKey,
     contents: prompt,
-    systemInstruction: TRANSITION_SYSTEM_PROMPT,
+    systemInstruction: opts?.systemPromptOverride || TRANSITION_SYSTEM_PROMPT,
     responseSchema: TRANSITION_SCHEMA,
     progressRef,
     statusField: 'transitionStatus',

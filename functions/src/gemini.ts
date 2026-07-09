@@ -57,11 +57,12 @@ export async function evaluateWithGemini(
   userPrompt: string,
   progressRef?: DocumentReference,
   model?: string,
+  opts?: { systemPromptOverride?: string },
 ): Promise<Record<string, unknown>> {
   const outputText = await streamGeminiJson({
     apiKey,
     contents: userPrompt,
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: opts?.systemPromptOverride || SYSTEM_PROMPT,
     responseSchema: EVALUATION_SCHEMA,
     progressRef,
     statusField: 'evaluationStatus',

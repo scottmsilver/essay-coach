@@ -10,6 +10,9 @@ import ProgressPage from './pages/ProgressPage';
 import SharingPage from './pages/SharingPage';
 import ClipboardDebugPage from './pages/ClipboardDebugPage';
 import EditEssayPage from './pages/EditEssayPage';
+import JudgePickerPage from './pages/JudgePickerPage';
+import EvalRunsPage from './pages/EvalRunsPage';
+import EvalRunDetailPage from './pages/EvalRunDetailPage';
 
 export default function App() {
   return (
@@ -47,6 +50,9 @@ export default function App() {
             <Route path="/user/:ownerUid/essay/:essayId/revise" element={<EssayPage />} />
             <Route path="/sharing" element={<SharingPage />} />
             <Route path="/debug/clipboard" element={<ClipboardDebugPage />} />
+            <Route path="/judge-picker" element={<JudgePickerPage />} />
+            <Route path="/admin/eval" element={<EvalRunsPage />} />
+            <Route path="/admin/eval/:runId" element={<EvalRunDetailPage />} />
           </Route>
         </Routes>
       </AuthProvider>

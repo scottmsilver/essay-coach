@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { PairwiseWinner } from './types';
-import type { ItemVerdict } from './aggregate';
+import type { PairwiseWinner } from '../../shared/panel/types';
+import type { ItemVerdict } from '../../shared/panel/aggregate';
 
 export interface GoldLabel {
   itemId: string;
