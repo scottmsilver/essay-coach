@@ -17,5 +17,9 @@
   "include": [
     "src",
     "../shared"
+  ],
+  "exclude": [
+    "../shared/panel/judges",
+    "src/shared/panel/judges"
   ]
 }

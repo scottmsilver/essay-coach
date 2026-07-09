@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { writeFileSync, readFileSync } from 'fs';
 import { shouldRoute, appendGold, readGold } from './picker-store';
-import type { ItemVerdict } from './aggregate';
+import type { ItemVerdict } from '../../shared/panel/aggregate';
 
 const verdict = (over: Partial<ItemVerdict> = {}): ItemVerdict => ({ weightedMean: { A: 3, B: 3 }, majorityWinner: 'tie', positionBiasFlag: false, disagreement: false, perJudgePairwise: [], ...over });
 

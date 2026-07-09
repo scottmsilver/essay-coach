@@ -1,10 +1,10 @@
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { Judge, ReportKind } from './types';
-import { runItem } from './run-panel';
-import { RUBRICS } from './rubrics';
-import { buildPanel } from './judges';
+import type { Judge, ReportKind } from '../../shared/panel/types';
+import { runItem } from '../../shared/panel/run-panel';
+import { RUBRICS } from '../../shared/panel/rubrics';
+import { buildPanel } from '../../shared/panel/judges';
 
 export interface LoopItem {
   id: string;

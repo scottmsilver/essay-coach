@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { fBeta, type Edit } from './errant';
-import { buildPanel } from './judges';
+import { fBeta, type Edit } from '../../shared/panel/errant';
+import { buildPanel } from '../../shared/panel/judges';
 
 /**
  * Score a model's extracted edits against gold edits, micro-averaged across

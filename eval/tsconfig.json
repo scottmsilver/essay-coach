@@ -7,12 +7,25 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "."
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@anthropic-ai/sdk": [
+        "node_modules/@anthropic-ai/sdk"
+      ],
+      "openai": [
+        "node_modules/openai"
+      ],
+      "@google/genai": [
+        "node_modules/@google/genai"
+      ]
+    }
   },
   "include": [
     "*.ts",
     "providers/*.ts",
-    "panel/**/*.ts"
+    "panel/**/*.ts",
+    "../shared/panel/**/*.ts"
   ],
   "exclude": [
     "node_modules"

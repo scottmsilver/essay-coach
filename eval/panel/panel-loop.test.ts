@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runLoop } from './panel-loop';
-import type { Judge } from './types';
+import type { Judge } from '../../shared/panel/types';
 
 describe('runLoop', () => {
   it('ranks a clearly-better variant above a clearly-worse one', async () => {

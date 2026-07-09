@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runGate } from './panel-gate';
-import type { Judge } from './types';
+import type { Judge } from '../../shared/panel/types';
 
 const judge = (winner: 'A'|'B'): Judge => ({
   id: winner, lab: 'anthropic',
