@@ -17,12 +17,5 @@
   "include": [
     "src",
     "../shared"
-  ],
-  "exclude": [
-    // Temporary: judges/ imports openai/@anthropic-ai/@google SDKs that functions
-    // doesn't depend on yet. REMOVE when evalRun lands and adds those deps
-    // to functions/package.json (eval-cockpit plan, Task 4).
-    "../shared/panel/judges",
-    "src/shared/panel/judges"
   ]
 }
