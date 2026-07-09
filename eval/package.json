@@ -8,6 +8,8 @@
     "eval": "promptfoo eval",
     "view": "promptfoo view",
     "judge": "tsx run-judge.ts",
+    "panel:gate": "tsx panel/panel-gate.ts",
+    "panel:loop": "tsx panel/panel-loop.ts",
     "test": "vitest run"
   },
   "dependencies": {
