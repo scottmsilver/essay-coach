@@ -28,37 +28,11 @@ done
 # Parses "export { foo } from './bar'" lines to build the canonical function list.
 ALL_FUNCTIONS=$(grep -oP "export\s*\{\s*\K[^}]+" src/index.ts | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort -u | tr '\n' ' ' | xargs)
 
-# --- Dependency map: which source files affect which functions ---
-# If a shared file changes, all functions that import it (transitively) get deployed.
-declare -A FILE_TO_FUNCTIONS=(
-  ["src/submitEssay.ts"]="submitEssay"
-  ["src/resubmitDraft.ts"]="resubmitDraft"
-  ["src/analyzeTransitions.ts"]="analyzeTransitions"
-  ["src/analyzeGrammar.ts"]="analyzeGrammar"
-  ["src/analyzePromptAdherence.ts"]="analyzePromptAdherence"
-  ["src/deleteAccount.ts"]="deleteAccount"
-  ["src/devSignIn.ts"]="devSignIn"
-  ["src/shareEssays.ts"]="shareEssays"
-  ["src/unshareEssays.ts"]="unshareEssays"
-  ["src/removeSharedWithMe.ts"]="removeSharedWithMe"
-  ["src/evaluateEssay.ts"]="evaluateEssay"
-  ["src/prompt.ts"]="submitEssay resubmitDraft onDraftCreated"
-  ["src/gemini.ts"]="submitEssay resubmitDraft onDraftCreated"
-  ["src/streamGemini.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence evaluateEssay onDraftCreated"
-  ["src/transitions.ts"]="analyzeTransitions onDraftCreated"
-  ["src/sentenceSplitter.ts"]="analyzeTransitions onDraftCreated"
-  ["src/grammar.ts"]="analyzeGrammar onDraftCreated"
-  ["src/promptAdherence.ts"]="analyzePromptAdherence onDraftCreated"
-  ["src/duplication.ts"]="analyzeDuplication onDraftCreated"
-  ["src/analyzeDuplication.ts"]="analyzeDuplication"
-  ["src/resolveEssayOwner.ts"]="resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence"
-  ["src/allowlist.ts"]="submitEssay resubmitDraft analyzeTransitions analyzeGrammar analyzePromptAdherence shareEssays unshareEssays removeSharedWithMe suggestTitle"
-  ["src/validation.ts"]="submitEssay resubmitDraft"
-  ["src/onDraftCreated.ts"]="onDraftCreated"
-  ["src/suggestTitle.ts"]="suggestTitle"
-  # index.ts changes affect all functions (new exports, etc.)
-  ["src/index.ts"]="__ALL__"
-)
+# --- Dependency resolution ---
+# scripts/changed-functions.ts derives the real import graph with esbuild
+# (metafile) and maps changed files to affected functions — ../shared included.
+# No hand-maintained map: files are picked up because they're imported.
+# (A hand map here once silently skipped src/gdocResolver.ts — 2026-07-08.)
 
 # Files that trigger a full deploy if changed
 FULL_DEPLOY_FILES=("package.json" "package-lock.json" "tsconfig.json" "firebase.json")
@@ -74,9 +48,16 @@ if $FORCE_ALL || [[ -z "$LAST_SHA" ]]; then
     echo "No previous deploy marker found. Deploying all functions."
   fi
   DEPLOY_TARGETS="$ALL_FUNCTIONS"
+elif ! git -C .. cat-file -e "$LAST_SHA^{commit}" 2>/dev/null; then
+  # Marker points at a commit that no longer exists (rebase/gc). A failed diff
+  # must NOT read as "no changes" — deploy everything instead.
+  echo "⚠️  Deploy marker $LAST_SHA is not a valid commit — deploying all functions."
+  DEPLOY_TARGETS="$ALL_FUNCTIONS"
 else
-  # Get changed files since last deploy
-  CHANGED_FILES=$(git diff --name-only "$LAST_SHA" -- . 2>/dev/null || echo "")
+  # Get changed files since last deploy — from the REPO ROOT so ../shared
+  # changes are seen too (paths come back repo-root-relative). Root
+  # firebase.json is included: it configures functions deployment.
+  CHANGED_FILES=$(git -C .. diff --name-only "$LAST_SHA" -- functions shared firebase.json)
 
   if [[ -z "$CHANGED_FILES" ]]; then
     echo "No changes since last deploy ($LAST_SHA). Nothing to do."
@@ -100,22 +81,14 @@ else
   if $NEED_FULL; then
     DEPLOY_TARGETS="$ALL_FUNCTIONS"
   else
-    # Map changed files to affected functions
-    DEPLOY_SET=""
-    while IFS= read -r file; do
-      # Strip "functions/" prefix if present (from repo root)
-      file="${file#functions/}"
-      mapped="${FILE_TO_FUNCTIONS[$file]:-}"
-      if [[ "$mapped" == "__ALL__" ]]; then
-        DEPLOY_SET="$ALL_FUNCTIONS"
-        break
-      elif [[ -n "$mapped" ]]; then
-        DEPLOY_SET="$DEPLOY_SET $mapped"
-      fi
-    done <<< "$CHANGED_FILES"
-
-    # Deduplicate
-    DEPLOY_TARGETS=$(echo "$DEPLOY_SET" | tr ' ' '\n' | sort -u | tr '\n' ' ' | xargs)
+    # Map changed files to affected functions via the real import graph.
+    # On resolver failure, fall back to deploying everything (never skip silently).
+    if DEPLOY_TARGETS=$(echo "$CHANGED_FILES" | npx tsx scripts/changed-functions.ts); then
+      :
+    else
+      echo "⚠️  changed-functions.ts failed — deploying ALL functions to be safe."
+      DEPLOY_TARGETS="$ALL_FUNCTIONS"
+    fi
   fi
 fi
 
