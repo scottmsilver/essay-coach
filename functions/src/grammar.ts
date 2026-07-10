@@ -238,7 +238,7 @@ export async function analyzeGrammarWithGemini(
   apiKey: string,
   content: string,
   progressRef?: DocumentReference,
-  opts?: { systemPromptOverride?: string },
+  opts?: { systemPromptOverride?: string; modelOverride?: string },
 ): Promise<GrammarAnalysis> {
   const prompt = buildGrammarPrompt(content);
 
@@ -250,6 +250,7 @@ export async function analyzeGrammarWithGemini(
     progressRef,
     statusField: 'grammarStatus',
     generatingMessage: 'Analyzing grammar...',
+    model: opts?.modelOverride,
   });
 
   return JSON.parse(outputText) as GrammarAnalysis;
