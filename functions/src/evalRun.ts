@@ -52,8 +52,14 @@ export interface EvalEssayInput {
   content: string;
 }
 
+/** The challenger-side overrides passed to `generate()` — either or both may be set. */
+export interface ChallengerOverrides {
+  promptOverride?: string;
+  modelOverride?: string;
+}
+
 export interface EvalDeps {
-  generate: (report: ReportKind, essay: string, override?: string) => Promise<{ feedback: string; annotations: string }>;
+  generate: (report: ReportKind, essay: string, challenger?: ChallengerOverrides) => Promise<{ feedback: string; annotations: string }>;
   judges: Judge[];
   writeProgress: (p: { done: number; total: number; message: string }) => Promise<void>;
   writeItem: (itemId: string, item: EvalItemDoc) => Promise<void>;
@@ -63,7 +69,8 @@ export interface EvalDeps {
 export interface EvalRunInput {
   report: ReportKind;
   essays: EvalEssayInput[];
-  challengerPromptOverride: string;
+  challengerPromptOverride?: string;
+  challengerModelOverride?: string;
   thresholds?: GateThresholds;
 }
 
@@ -100,6 +107,14 @@ const CHALLENGER_LABEL_MAX_LENGTH = 200;
 
 /** Max length for challengerPromptOverride (mirrored client-side in EvalRunsPage.tsx's Textarea). */
 const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
+
+/**
+ * Shape guard for challengerModelOverride — a Gemini model id (e.g.
+ * `gemini-3.5-flash`), never interpolated into a path but still worth
+ * constraining since it flows into the `@google/genai` SDK call. Mirrored
+ * client-side in EvalRunsPage.tsx's model TextInput.
+ */
+const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]{1,100}$/;
 
 /**
  * Shape guard for ids that get interpolated into Firestore doc paths
@@ -164,7 +179,8 @@ export function redactEvalError(detail: string): string {
 export function validateEvalInput(input: {
   report: unknown;
   essays: unknown[];
-  challengerPromptOverride: unknown;
+  challengerPromptOverride?: unknown;
+  challengerModelOverride?: unknown;
   challengerLabel?: unknown;
 }): void {
   if (typeof input.report !== 'string' || !VALID_REPORTS.includes(input.report as ReportKind)) {
@@ -176,12 +192,34 @@ export function validateEvalInput(input: {
   if (input.essays.length > MAX_ESSAYS) {
     throw new Error(`Too many essays: ${input.essays.length}. The maximum is ${MAX_ESSAYS} essays per run.`);
   }
-  if (typeof input.challengerPromptOverride !== 'string' || input.challengerPromptOverride.trim().length === 0) {
-    throw new Error('challengerPromptOverride must be a non-empty string.');
+
+  const { challengerPromptOverride, challengerModelOverride } = input;
+
+  if (challengerPromptOverride !== undefined) {
+    if (typeof challengerPromptOverride !== 'string') {
+      throw new Error(`challengerPromptOverride must be a string if provided, got ${typeof challengerPromptOverride}.`);
+    }
+    if (challengerPromptOverride.length > CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH) {
+      throw new Error(`challengerPromptOverride must be at most ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH} characters.`);
+    }
   }
-  if (input.challengerPromptOverride.length > CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH) {
-    throw new Error(`challengerPromptOverride must be at most ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH} characters.`);
+  if (challengerModelOverride !== undefined) {
+    if (typeof challengerModelOverride !== 'string') {
+      throw new Error(`challengerModelOverride must be a string if provided, got ${typeof challengerModelOverride}.`);
+    }
+    if (challengerModelOverride.length > 0 && !CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModelOverride)) {
+      throw new Error(
+        `challengerModelOverride must match ${CHALLENGER_MODEL_OVERRIDE_SHAPE} (letters, numbers, '.', '_', ':', '-'; 1-100 characters).`
+      );
+    }
   }
+
+  const hasPromptOverride = typeof challengerPromptOverride === 'string' && challengerPromptOverride.trim().length > 0;
+  const hasModelOverride = typeof challengerModelOverride === 'string' && challengerModelOverride.trim().length > 0;
+  if (!hasPromptOverride && !hasModelOverride) {
+    throw new Error('Provide a challenger prompt override, a challenger model override, or both.');
+  }
+
   input.essays.forEach((essayId, index) => {
     if (typeof essayId !== 'string') {
       throw new Error(`Invalid essay id at index ${index}: expected a string, got ${typeof essayId}.`);
@@ -201,12 +239,16 @@ export function validateEvalInput(input: {
 }
 
 export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<EvalRunResult> {
-  const { report, essays, challengerPromptOverride } = input;
+  const { report, essays, challengerPromptOverride, challengerModelOverride } = input;
   const rand = deps.rand ?? Math.random;
   const total = essays.length;
   const failedJudgesSet = new Set<string>();
   const perItem: Awaited<ReturnType<typeof runItem>>[] = [];
   let routedCount = 0;
+  const challengerOverrides: ChallengerOverrides = {
+    promptOverride: challengerPromptOverride,
+    modelOverride: challengerModelOverride,
+  };
 
   await deps.writeProgress({ done: 0, total, message: `Starting eval run over ${total} essay(s)...` });
 
@@ -216,10 +258,14 @@ export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<
     // deps.generate is called incumbent-then-challenger per essay here, but
     // no implementation of generate() (see makeFirestoreGenerate below) may
     // rely on that order or call count — it must resolve any per-essay
-    // context solely from the (report, essayContent, override) arguments it
-    // receives on each call.
+    // context solely from the (report, essayContent, challenger) arguments it
+    // receives on each call. Incumbent gets no third argument at all (not
+    // even an empty object) so implementations can distinguish "incumbent,
+    // no overrides" from "challenger, overrides present but both fields
+    // undefined" — though validateEvalInput guarantees the latter never
+    // actually happens with both fields empty.
     const incumbent = await deps.generate(report, essay.content);
-    const challenger = await deps.generate(report, essay.content, challengerPromptOverride);
+    const challenger = await deps.generate(report, essay.content, challengerOverrides);
 
     const verdict = await runItem({
       report,
@@ -322,8 +368,15 @@ export function makeFirestoreGenerate(params: {
   const { report, essays, apiKey } = params;
   const metaByContent = new Map<string, EssayWithMeta>(essays.map((e) => [e.content, e]));
 
-  return async (_report, essayContent, override) => {
-    const opts = override ? { systemPromptOverride: override } : undefined;
+  return async (_report, essayContent, challenger) => {
+    // grammar/transitions accept both overrides through their own widened
+    // `opts` (systemPromptOverride + modelOverride — see analyzeGrammarWithGemini
+    // / analyzeTransitionsWithGemini). 'overall' below routes modelOverride
+    // through evaluateWithGemini's existing dedicated `model` parameter
+    // instead, rather than growing a second, competing override mechanism.
+    const opts = challenger
+      ? { systemPromptOverride: challenger.promptOverride, modelOverride: challenger.modelOverride }
+      : undefined;
 
     if (report === 'grammar') {
       const analysis = await analyzeGrammarWithGemini(apiKey, essayContent, undefined, opts);
@@ -348,7 +401,13 @@ export function makeFirestoreGenerate(params: {
       writingType: essay.writingType,
       content: essayContent,
     });
-    const analysis = await evaluateWithGemini(apiKey, prompt, undefined, undefined, opts);
+    const analysis = await evaluateWithGemini(
+      apiKey,
+      prompt,
+      undefined,
+      challenger?.modelOverride,
+      opts ? { systemPromptOverride: opts.systemPromptOverride } : undefined
+    );
     return { feedback: JSON.stringify(analysis, null, 2), annotations: extractOverallAnnotations(analysis) };
   };
 }
@@ -410,10 +469,10 @@ export const startEvalRun = onCall(
       throw new HttpsError('permission-denied', 'This action requires admin access');
     }
 
-    const { report, essayIds, challengerPromptOverride, challengerLabel } = request.data ?? {};
+    const { report, essayIds, challengerPromptOverride, challengerModelOverride, challengerLabel } = request.data ?? {};
 
     try {
-      validateEvalInput({ report, essays: essayIds, challengerPromptOverride, challengerLabel });
+      validateEvalInput({ report, essays: essayIds, challengerPromptOverride, challengerModelOverride, challengerLabel });
     } catch (err) {
       throw new HttpsError('invalid-argument', err instanceof Error ? err.message : String(err));
     }
@@ -464,8 +523,11 @@ export const startEvalRun = onCall(
     await runRef.set({
       report,
       essayIds,
-      challengerPromptOverride,
-      config: { challengerLabel: typeof challengerLabel === 'string' ? challengerLabel : '' },
+      config: {
+        challengerPromptOverride: typeof challengerPromptOverride === 'string' ? challengerPromptOverride : '',
+        challengerModelOverride: typeof challengerModelOverride === 'string' ? challengerModelOverride : '',
+        challengerLabel: typeof challengerLabel === 'string' ? challengerLabel : '',
+      },
       status: 'generating',
       createdBy: email,
       createdAt: FieldValue.serverTimestamp(),
@@ -502,6 +564,7 @@ export const startEvalRun = onCall(
           report: report as ReportKind,
           essays: essays.map(({ id, content }) => ({ id, content })),
           challengerPromptOverride,
+          challengerModelOverride,
         }
       );
 

@@ -116,7 +116,7 @@ describe('runEvalCore', () => {
     expect(deps.generate).toHaveBeenCalledTimes(4);
     const generateMock = deps.generate as ReturnType<typeof vi.fn>;
     expect(generateMock.mock.calls[0][2]).toBeUndefined();
-    expect(generateMock.mock.calls[1][2]).toBe('CHALLENGER PROMPT');
+    expect(generateMock.mock.calls[1][2]).toEqual({ promptOverride: 'CHALLENGER PROMPT', modelOverride: undefined });
 
     // progress is monotonic and ends at total (2)
     const doneValues = (deps.writeProgress as ReturnType<typeof vi.fn>).mock.calls.map(
@@ -128,6 +128,40 @@ describe('runEvalCore', () => {
     }
     expect(doneValues[0]).toBe(0);
     expect(doneValues[doneValues.length - 1]).toBe(2);
+  });
+
+  it('model-only challenger: incumbent call gets no third argument, challenger call gets {modelOverride} with promptOverride undefined', async () => {
+    const deps = makeDeps();
+    const input: EvalRunInput = {
+      report: 'grammar',
+      essays: [{ id: 'e1', content: 'Essay one content.' }],
+      challengerModelOverride: 'gemini-3.5-flash',
+    };
+
+    await runEvalCore(deps, input);
+
+    const generateMock = deps.generate as ReturnType<typeof vi.fn>;
+    expect(generateMock.mock.calls[0][2]).toBeUndefined();
+    expect(generateMock.mock.calls[1][2]).toEqual({ promptOverride: undefined, modelOverride: 'gemini-3.5-flash' });
+  });
+
+  it('both overrides: challenger call receives both promptOverride and modelOverride', async () => {
+    const deps = makeDeps();
+    const input: EvalRunInput = {
+      report: 'grammar',
+      essays: [{ id: 'e1', content: 'Essay one content.' }],
+      challengerPromptOverride: 'CHALLENGER PROMPT',
+      challengerModelOverride: 'gemini-3.5-flash',
+    };
+
+    await runEvalCore(deps, input);
+
+    const generateMock = deps.generate as ReturnType<typeof vi.fn>;
+    expect(generateMock.mock.calls[0][2]).toBeUndefined();
+    expect(generateMock.mock.calls[1][2]).toEqual({
+      promptOverride: 'CHALLENGER PROMPT',
+      modelOverride: 'gemini-3.5-flash',
+    });
   });
 
   it('routes an item when the panel disagrees (forced-disagreement verdict), even with a low rand()', async () => {
@@ -380,12 +414,54 @@ describe('validateEvalInput', () => {
     expect(() => validateEvalInput({ ...base, report: 'bogus' as any })).toThrow(/report/i);
   });
 
-  it('rejects an empty challengerPromptOverride', () => {
+  it('rejects an empty challengerPromptOverride (and no model override to fall back on)', () => {
     expect(() => validateEvalInput({ ...base, challengerPromptOverride: '' })).toThrow(/override/i);
   });
 
-  it('rejects a whitespace-only challengerPromptOverride', () => {
+  it('rejects a whitespace-only challengerPromptOverride (and no model override to fall back on)', () => {
     expect(() => validateEvalInput({ ...base, challengerPromptOverride: '   ' })).toThrow(/override/i);
+  });
+
+  it('rejects when neither challengerPromptOverride nor challengerModelOverride is provided', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'] })
+    ).toThrow('Provide a challenger prompt override, a challenger model override, or both.');
+  });
+
+  it('accepts a model-only input with no challengerPromptOverride at all', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'gemini-3.5-flash' })
+    ).not.toThrow();
+  });
+
+  it('accepts an input with both a challengerPromptOverride and a challengerModelOverride', () => {
+    expect(() =>
+      validateEvalInput({ ...base, challengerModelOverride: 'gemini-3.5-flash' })
+    ).not.toThrow();
+  });
+
+  it('rejects a malformed challengerModelOverride, naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'bad model!' })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('rejects a non-string challengerModelOverride, naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 42 as any })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('accepts a challengerModelOverride made of letters, numbers, dots, underscores, colons, and hyphens', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'gemini-3.5_flash.preview:v2' })
+    ).not.toThrow();
+  });
+
+  it('rejects a challengerModelOverride over 100 characters', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(101) })
+    ).toThrow(/challengerModelOverride/);
   });
 
   it('rejects a non-string element in essays, naming its index', () => {

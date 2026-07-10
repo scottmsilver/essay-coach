@@ -184,16 +184,17 @@ export async function analyzeTransitionsWithGemini(
   content: string,
   progressRef?: DocumentReference,
   previousAnalysis?: TransitionAnalysis | null,
-  opts?: { systemPromptOverride?: string },
+  opts?: { systemPromptOverride?: string; modelOverride?: string },
 ): Promise<TransitionAnalysis> {
   // Split sentences with Gemma 3 4B (falls back to regex)
   const sentences = await splitEssayIntoSentences(content, apiKey);
   const formatted = formatSentencesForPrompt(sentences);
   const prompt = buildTransitionPrompt(formatted);
 
-  // systemPromptOverride applies ONLY to this main analysis (pass 1) call.
-  // The contextual-recheck pass (pass 2, below) always uses its own fixed
-  // RECHECK_SYSTEM_PROMPT and is never affected by the override.
+  // systemPromptOverride and modelOverride apply ONLY to this main analysis
+  // (pass 1) call. The contextual-recheck pass (pass 2, below) always uses
+  // its own fixed RECHECK_SYSTEM_PROMPT and the default generator model, and
+  // is never affected by either override.
   const outputText = await streamGeminiJson({
     apiKey,
     contents: prompt,
@@ -202,6 +203,7 @@ export async function analyzeTransitionsWithGemini(
     progressRef,
     statusField: 'transitionStatus',
     generatingMessage: 'Analyzing transitions...',
+    model: opts?.modelOverride,
   });
 
   let analysis = JSON.parse(outputText) as TransitionAnalysis;

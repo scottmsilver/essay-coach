@@ -41,6 +41,10 @@ interface EvalRunDoc {
   errorMessage?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  // Persisted by startEvalRun under config (functions/src/evalRun.ts's
+  // runRef.set() call) — each may be '' when the run was started without it.
+  challengerLabel?: string;
+  challengerModelOverride?: string;
 }
 
 interface EvalItem {
@@ -80,6 +84,8 @@ function parseRun(snapshot: any): EvalRunDoc {
     errorMessage: data.errorMessage,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
+    challengerLabel: data.config?.challengerLabel,
+    challengerModelOverride: data.config?.challengerModelOverride,
   };
 }
 
@@ -240,7 +246,7 @@ export default function EvalRunDetailPage() {
 
   return (
     <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
         <h2>Eval Run</h2>
         <Badge
           color={run.status === 'complete' ? (run.verdict?.pass ? 'green' : 'red') : run.status === 'error' ? 'red' : 'blue'}
@@ -249,6 +255,11 @@ export default function EvalRunDetailPage() {
           {run.status === 'complete' ? (run.verdict?.pass ? 'PASS' : 'FAIL') : run.status}
         </Badge>
       </div>
+
+      <Text size="sm" c="dimmed" style={{ marginBottom: 20 }}>
+        {run.report} · {run.challengerLabel || '—'}
+        {run.challengerModelOverride ? ` · model: ${run.challengerModelOverride}` : ''}
+      </Text>
 
       {stalled && (
         <div

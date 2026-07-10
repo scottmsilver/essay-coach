@@ -55,6 +55,34 @@ describe('systemPromptOverride', () => {
       const callArgs = mockStreamGeminiJson.mock.calls[0][0];
       expect(callArgs.systemInstruction).toBe(GRAMMAR_SYSTEM_PROMPT);
     });
+
+    it('passes modelOverride through as streamGeminiJson\'s model option, leaving systemInstruction at its default', async () => {
+      await analyzeGrammarWithGemini('key', 'Some essay content.', undefined, {
+        modelOverride: 'gemini-3.5-flash',
+      });
+
+      const callArgs = mockStreamGeminiJson.mock.calls[0][0];
+      expect(callArgs.model).toBe('gemini-3.5-flash');
+      expect(callArgs.systemInstruction).toBe(GRAMMAR_SYSTEM_PROMPT);
+    });
+
+    it('passes both systemPromptOverride and modelOverride through together', async () => {
+      await analyzeGrammarWithGemini('key', 'Some essay content.', undefined, {
+        systemPromptOverride: 'OVERRIDDEN GRAMMAR PROMPT',
+        modelOverride: 'gemini-3.5-flash',
+      });
+
+      const callArgs = mockStreamGeminiJson.mock.calls[0][0];
+      expect(callArgs.model).toBe('gemini-3.5-flash');
+      expect(callArgs.systemInstruction).toBe('OVERRIDDEN GRAMMAR PROMPT');
+    });
+
+    it('leaves model undefined (so streamGeminiJson falls back to its default) when no modelOverride is passed', async () => {
+      await analyzeGrammarWithGemini('key', 'Some essay content.');
+
+      const callArgs = mockStreamGeminiJson.mock.calls[0][0];
+      expect(callArgs.model).toBeUndefined();
+    });
   });
 
   describe('analyzeTransitionsWithGemini', () => {
@@ -133,6 +161,42 @@ describe('systemPromptOverride', () => {
       const callArgs = mockStreamGeminiJson.mock.calls[0][0];
       expect(callArgs.systemInstruction).toBe(TRANSITION_SYSTEM_PROMPT);
       expect(callArgs.contents).toBe(expectedContents);
+    });
+
+    it('passes modelOverride through as the main pass\'s model option only', async () => {
+      await analyzeTransitionsWithGemini('', essay, undefined, null, {
+        modelOverride: 'gemini-3.5-flash',
+      });
+
+      expect(mockStreamGeminiJson).toHaveBeenCalledTimes(1);
+      const callArgs = mockStreamGeminiJson.mock.calls[0][0];
+      expect(callArgs.model).toBe('gemini-3.5-flash');
+      expect(callArgs.systemInstruction).toBe(TRANSITION_SYSTEM_PROMPT);
+    });
+
+    it('does NOT apply modelOverride to the contextual-recheck pass', async () => {
+      // Force a flagged "weak" transition on pass 1 so pass 2 (recheck) fires.
+      mockStreamGeminiJson
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            sentenceTransitions: [
+              { paragraph: 1, fromSentence: 1, toSentence: 2, quality: 'weak', comment: 'Abrupt.' },
+            ],
+            paragraphTransitions: [],
+            summary: 'ok',
+          }),
+        )
+        .mockResolvedValueOnce(JSON.stringify({ results: [] }));
+
+      await analyzeTransitionsWithGemini('', essay, undefined, null, {
+        modelOverride: 'gemini-3.5-flash',
+      });
+
+      expect(mockStreamGeminiJson).toHaveBeenCalledTimes(2);
+      const mainCallArgs = mockStreamGeminiJson.mock.calls[0][0];
+      const recheckCallArgs = mockStreamGeminiJson.mock.calls[1][0];
+      expect(mainCallArgs.model).toBe('gemini-3.5-flash');
+      expect(recheckCallArgs.model).toBeUndefined();
     });
   });
 

@@ -33,9 +33,10 @@ interface EvalRunSummary {
   status: RunStatus;
   progress?: { done: number; total: number; message: string };
   verdict?: { pass: boolean; reasons: string[] };
-  // Persisted by startEvalRun as config.challengerLabel (functions/src/evalRun.ts's
-  // runRef.set() call) — may be '' when the run was started without a label.
+  // Persisted by startEvalRun under config (functions/src/evalRun.ts's
+  // runRef.set() call) — each may be '' when the run was started without it.
   challengerLabel?: string;
+  challengerModelOverride?: string;
   createdAt?: Date;
   createdBy?: string;
   errorMessage?: string;
@@ -49,6 +50,11 @@ const MAX_ESSAYS = 20;
 // have startEvalRun reject the whole call.
 const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
 
+// Mirrors CHALLENGER_MODEL_OVERRIDE_SHAPE in functions/src/evalRun.ts's
+// validateEvalInput — same client-side-heads-up rationale as the prompt
+// length cap above; the server is the real enforcement point.
+const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]{1,100}$/;
+
 function parseRun(doc: any): EvalRunSummary {
   const data = doc.data();
   return {
@@ -59,6 +65,7 @@ function parseRun(doc: any): EvalRunSummary {
     progress: data.progress,
     verdict: data.verdict,
     challengerLabel: data.config?.challengerLabel,
+    challengerModelOverride: data.config?.challengerModelOverride,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
     createdBy: data.createdBy,
     errorMessage: data.errorMessage,
@@ -129,7 +136,11 @@ export default function EvalRunsPage() {
   const [essayIds, setEssayIds] = useState<string[]>([]);
   const [challengerLabel, setChallengerLabel] = useState('');
   const [challengerPrompt, setChallengerPrompt] = useState('');
+  const [challengerModel, setChallengerModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const modelOverrideValid =
+    challengerModel.trim().length === 0 || CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModel.trim());
 
   useEffect(() => {
     const q = query(collection(db, 'evalRuns'), orderBy('createdAt', 'desc'));
@@ -166,21 +177,34 @@ export default function EvalRunsPage() {
   const canSubmit =
     essayIds.length > 0 &&
     essayIds.length <= MAX_ESSAYS &&
-    challengerPrompt.trim().length > 0 &&
+    (challengerPrompt.trim().length > 0 || challengerModel.trim().length > 0) &&
+    modelOverrideValid &&
     !submitting;
 
   async function handleRun() {
     setSubmitting(true);
     try {
       const startEvalRun = httpsCallable<
-        { report: ReportKind; essayIds: string[]; challengerLabel?: string; challengerPromptOverride: string },
+        {
+          report: ReportKind;
+          essayIds: string[];
+          challengerLabel?: string;
+          challengerPromptOverride: string;
+          challengerModelOverride?: string;
+        },
         { runId: string }
       >(functions, 'startEvalRun');
+      const trimmedModel = challengerModel.trim();
       const result = await startEvalRun({
         report,
         essayIds,
         challengerLabel: challengerLabel.trim() || undefined,
         challengerPromptOverride: challengerPrompt,
+        // httpsCallable serializes `undefined` object values to null, which
+        // the server's "must be a string if provided" validation rejects —
+        // omit the key entirely when there's no model override (same
+        // pattern as handlePick's `note` field in EvalRunDetailPage.tsx).
+        ...(trimmedModel ? { challengerModelOverride: trimmedModel } : {}),
       });
       navigate(`/admin/eval/${result.data.runId}`);
     } catch (error) {
@@ -238,7 +262,7 @@ export default function EvalRunsPage() {
             />
             <Textarea
               label="Challenger prompt override"
-              description={`Paste the full replacement system prompt. Do not import the server prompt constants into the client — paste the text here. Max ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters.`}
+              description={`Optional — leave empty to keep the production prompt and compare models only. Do not import the server prompt constants into the client — paste the text here. Max ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters.`}
               placeholder="Paste the full challenger system prompt..."
               value={challengerPrompt}
               onChange={(e) => setChallengerPrompt(e.currentTarget.value)}
@@ -249,6 +273,14 @@ export default function EvalRunsPage() {
             <Text size="xs" c="dimmed">
               {challengerPrompt.length.toLocaleString()} / {CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters
             </Text>
+            <TextInput
+              label="Challenger model"
+              description="Optional — leave empty to keep the production model and compare prompts only."
+              placeholder="e.g. gemini-3.5-flash — leave empty to keep the production model"
+              value={challengerModel}
+              onChange={(e) => setChallengerModel(e.currentTarget.value)}
+              error={!modelOverrideValid ? 'Only letters, numbers, \'.\', \'_\', \':\', \'-\' — up to 100 characters.' : undefined}
+            />
             <Text size="sm" c="dimmed">
               Estimated calls: {essayIds.length} essay(s) × 12 judge calls + {essayIds.length} essay(s) × 2
               generations ≈ <strong>{estimatedCalls}</strong> calls
@@ -296,6 +328,7 @@ export default function EvalRunsPage() {
                 <div>
                   <Text fw={700} style={{ fontFamily: 'var(--font-ui)' }}>
                     {REPORT_LABELS[run.report] ?? run.report} · {run.challengerLabel || '—'}
+                    {run.challengerModelOverride ? ` · model: ${run.challengerModelOverride}` : ''}
                   </Text>
                   <Text size="xs" c="dimmed">
                     {run.essayIds.length} essay{run.essayIds.length === 1 ? '' : 's'}
