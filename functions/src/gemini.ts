@@ -1,6 +1,7 @@
 import { SYSTEM_PROMPT } from './prompt';
 import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
+import type { GenerateJsonFn } from './openRouterGenerate';
 
 export const EVALUATION_SCHEMA = {
   type: 'object' as const,
@@ -57,18 +58,30 @@ export async function evaluateWithGemini(
   userPrompt: string,
   progressRef?: DocumentReference,
   model?: string,
-  opts?: { systemPromptOverride?: string },
+  opts?: { systemPromptOverride?: string; generateJson?: GenerateJsonFn },
 ): Promise<Record<string, unknown>> {
-  const outputText = await streamGeminiJson({
-    apiKey,
-    contents: userPrompt,
-    systemInstruction: opts?.systemPromptOverride || SYSTEM_PROMPT,
-    responseSchema: EVALUATION_SCHEMA,
-    progressRef,
-    statusField: 'evaluationStatus',
-    generatingMessage: 'Writing feedback...',
-    model,
-  });
+  const systemInstruction = opts?.systemPromptOverride || SYSTEM_PROMPT;
+
+  // When an OpenRouter-backed generateJson is injected (eval cockpit
+  // challenger running a non-Gemini model — see evalRun.ts's startEvalRun),
+  // it takes over this main 'overall' generation call entirely instead of
+  // streamGeminiJson, using the exact same system prompt / schema.
+  const outputText = opts?.generateJson
+    ? await opts.generateJson({
+        contents: userPrompt,
+        systemInstruction,
+        responseSchema: EVALUATION_SCHEMA,
+      })
+    : await streamGeminiJson({
+        apiKey,
+        contents: userPrompt,
+        systemInstruction,
+        responseSchema: EVALUATION_SCHEMA,
+        progressRef,
+        statusField: 'evaluationStatus',
+        generatingMessage: 'Writing feedback...',
+        model,
+      });
 
   return JSON.parse(outputText);
 }

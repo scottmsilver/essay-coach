@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { collection, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -167,6 +167,11 @@ export default function EvalRunDetailPage() {
   const [items, setItems] = useState<EvalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  // Click-to-expand inspection panel: which item's full incumbent/challenger
+  // feedback is currently shown below its row. Not blind (unlike
+  // EvalComparePicker's gold-labeling flow) — this is plain inspection, so
+  // both sides are labeled by their real identity.
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!runId) return;
@@ -432,50 +437,107 @@ export default function EvalRunDetailPage() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {items.map((item) => (
-              <Table.Tr key={item.id}>
-                <Table.Td>
-                  <Text size="sm">{truncate(item.essayExcerpt)}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge variant="light" color={item.majorityWinner === 'tie' ? 'gray' : 'blue'}>
-                    {item.majorityWinner}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" style={{ fontFamily: 'var(--font-ui)', fontVariantNumeric: 'tabular-nums' }}>
-                    {item.weightedMean.A.toFixed(2)} / {item.weightedMean.B.toFixed(2)}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {item.disagreement && (
-                      <Badge size="xs" color="orange" variant="light">
-                        disagreement
+            {items.map((item) => {
+              const expanded = expandedItemId === item.id;
+              return (
+                <Fragment key={item.id}>
+                  <Table.Tr
+                    onClick={() => setExpandedItemId(expanded ? null : item.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <Table.Td>
+                      <Text size="sm">{truncate(item.essayExcerpt)}</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" color={item.majorityWinner === 'tie' ? 'gray' : 'blue'}>
+                        {item.majorityWinner}
                       </Badge>
-                    )}
-                    {item.positionBiasFlag && (
-                      <Badge size="xs" color="orange" variant="light">
-                        position bias
-                      </Badge>
-                    )}
-                  </div>
-                </Table.Td>
-                <Table.Td>{item.routed ? '●' : ''}</Table.Td>
-                <Table.Td>
-                  {item.goldLabel ? (
-                    <Text size="sm">
-                      {item.goldLabel.winner}
-                      {item.goldLabel.note ? ` — ${item.goldLabel.note}` : ''}
-                    </Text>
-                  ) : (
-                    <Text size="sm" c="dimmed">
-                      —
-                    </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" style={{ fontFamily: 'var(--font-ui)', fontVariantNumeric: 'tabular-nums' }}>
+                        {item.weightedMean.A.toFixed(2)} / {item.weightedMean.B.toFixed(2)}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {item.disagreement && (
+                          <Badge size="xs" color="orange" variant="light">
+                            disagreement
+                          </Badge>
+                        )}
+                        {item.positionBiasFlag && (
+                          <Badge size="xs" color="orange" variant="light">
+                            position bias
+                          </Badge>
+                        )}
+                      </div>
+                    </Table.Td>
+                    <Table.Td>{item.routed ? '●' : ''}</Table.Td>
+                    <Table.Td>
+                      {item.goldLabel ? (
+                        <Text size="sm">
+                          {item.goldLabel.winner}
+                          {item.goldLabel.note ? ` — ${item.goldLabel.note}` : ''}
+                        </Text>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          —
+                        </Text>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>
+                  {expanded && (
+                    <Table.Tr>
+                      <Table.Td colSpan={6} style={{ padding: 0 }}>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: 16,
+                            padding: 16,
+                            background: 'var(--color-surface-warm)',
+                          }}
+                        >
+                          {(
+                            [
+                              ['Incumbent (production)', item.incumbentFeedback],
+                              ['Challenger', item.challengerFeedback],
+                            ] as const
+                          ).map(([label, feedback]) => (
+                            <div
+                              key={label}
+                              style={{
+                                background: 'var(--color-surface)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 10,
+                                padding: 16,
+                              }}
+                            >
+                              <Text fw={700} size="sm" style={{ fontFamily: 'var(--font-ui)', marginBottom: 8 }}>
+                                {label}
+                              </Text>
+                              <pre
+                                style={{
+                                  margin: 0,
+                                  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)',
+                                  fontSize: 12,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                  maxHeight: 320,
+                                  overflowY: 'auto',
+                                }}
+                              >
+                                {feedback}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      </Table.Td>
+                    </Table.Tr>
                   )}
-                </Table.Td>
-              </Table.Tr>
-            ))}
+                </Fragment>
+              );
+            })}
           </Table.Tbody>
         </Table>
       </div>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Judge } from '../../shared/panel/types';
 
 // Mocks for makeFirestoreGenerate's 'overall' branch (buildEvaluationPrompt +
@@ -13,18 +13,84 @@ vi.mock('../src/gemini', () => ({
   evaluateWithGemini: vi.fn(async (_apiKey: string, prompt: unknown) => ({ _promptEcho: prompt, traits: {} })),
 }));
 
+// Mocks for the startEvalRun onCall wrapper describe block below (mirrors
+// submitEssay.test.ts's pattern). onCall is a passthrough so the handler can
+// be invoked directly; HttpsError keeps a `.code` field so both these tests
+// and resolveChallengerGeneration's tests above (which throw the real
+// HttpsError from src/evalRun.ts, constructed against this same mock) can
+// assert on it. defineSecret's returned `.value()` is driven by
+// mockSecretValues, keyed by the exact secret name each defineSecret(...)
+// call in src/evalRun.ts uses (GEMINI_API_KEY / OPENAI_API_KEY /
+// ANTHROPIC_API_KEY / OPENROUTER_API_KEY).
+const mockSecretValues: Record<string, string> = {
+  GEMINI_API_KEY: 'fake-gemini-key',
+  OPENAI_API_KEY: 'fake-openai-key',
+  ANTHROPIC_API_KEY: 'fake-anthropic-key',
+  OPENROUTER_API_KEY: 'fake-openrouter-key',
+};
+
+vi.mock('firebase-functions/v2/https', () => ({
+  onCall: (_opts: any, handler: any) => handler,
+  HttpsError: class HttpsError extends Error {
+    constructor(public code: string, message: string) { super(message); }
+  },
+}));
+
+vi.mock('firebase-functions/v2', () => ({
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+
+vi.mock('firebase-functions/params', () => ({
+  defineSecret: (name: string) => ({ value: () => mockSecretValues[name] }),
+}));
+
+const mockAllowlistGet = vi.fn();
+const mockAdminsGet = vi.fn();
+const mockEssayDocGet = vi.fn();
+const mockRunDocSet = vi.fn().mockResolvedValue(undefined);
+const mockRunDoc = vi.fn(() => ({
+  id: 'run123',
+  set: mockRunDocSet,
+  update: vi.fn().mockResolvedValue(undefined),
+  collection: () => ({ doc: () => ({ set: vi.fn().mockResolvedValue(undefined) }) }),
+}));
+
+vi.mock('firebase-admin/firestore', () => ({
+  getFirestore: () => ({
+    doc: (path: string) => {
+      if (path === 'config/allowlist') return { get: mockAllowlistGet };
+      if (path === 'config/admins') return { get: mockAdminsGet };
+      // users/{uid}/essays/{essayId} — only reached if the fail-closed
+      // OpenRouter check below doesn't skip essay loading as intended.
+      return {
+        get: mockEssayDocGet,
+        collection: () => ({ where: () => ({ limit: () => ({ get: vi.fn() }) }) }),
+      };
+    },
+    collection: (name: string) => {
+      if (name === 'evalRuns') return { doc: mockRunDoc };
+      return { doc: vi.fn() };
+    },
+  }),
+  FieldValue: { serverTimestamp: () => 'SERVER_TIMESTAMP' },
+}));
+
 import {
   runEvalCore,
   validateEvalInput,
   sanitizeEvalRunError,
   redactEvalError,
+  resolveChallengerGeneration,
+  OPENROUTER_MODEL_PREFIX,
   EVAL_RUN_GENERIC_ERROR_MESSAGE,
   makeFirestoreGenerate,
+  startEvalRun,
   type EvalDeps,
   type EvalRunInput,
   type EvalItemDoc,
   type EssayWithMeta,
 } from '../src/evalRun';
+import { evaluateWithGemini } from '../src/gemini';
 
 // Mirrors shared/panel/run-panel.test.ts's mockJudge style, extended to
 // consistently prefer one *content side* regardless of AB/BA call order
@@ -385,6 +451,83 @@ describe('makeFirestoreGenerate', () => {
 
     await expect(generate('overall', 'Content that was never loaded.')).rejects.toThrow(/no essay metadata found/i);
   });
+
+  it('for "overall", a challenger generateJson takes precedence over modelOverride: evaluateWithGemini gets generateJson in opts and an undefined model', async () => {
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+    ];
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+    const fakeGenerateJson = vi.fn(async () => '{}');
+
+    await generate('overall', 'Essay one content.', {
+      promptOverride: 'CHALLENGER PROMPT',
+      modelOverride: 'openrouter/anthropic/claude-x',
+      generateJson: fakeGenerateJson,
+    });
+
+    const mockEvaluate = evaluateWithGemini as unknown as ReturnType<typeof vi.fn>;
+    const lastCall = mockEvaluate.mock.calls[mockEvaluate.mock.calls.length - 1];
+    // evaluateWithGemini(apiKey, prompt, progressRef, model, opts)
+    const [, , , model, opts] = lastCall;
+    expect(model).toBeUndefined();
+    expect(opts).toMatchObject({ systemPromptOverride: 'CHALLENGER PROMPT', generateJson: fakeGenerateJson });
+  });
+
+  it('for "overall", modelOverride still reaches evaluateWithGemini when no generateJson is present', async () => {
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+    ];
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+
+    await generate('overall', 'Essay one content.', { modelOverride: 'gemini-3.5-flash' });
+
+    const mockEvaluate = evaluateWithGemini as unknown as ReturnType<typeof vi.fn>;
+    const lastCall = mockEvaluate.mock.calls[mockEvaluate.mock.calls.length - 1];
+    const [, , , model] = lastCall;
+    expect(model).toBe('gemini-3.5-flash');
+  });
+});
+
+describe('resolveChallengerGeneration', () => {
+  it('passes non-openrouter model overrides through unchanged, with no generateJson', () => {
+    const result = resolveChallengerGeneration('gemini-3.5-flash', 'sk-or-should-be-unused');
+    expect(result).toEqual({ modelOverride: 'gemini-3.5-flash' });
+  });
+
+  it('passes undefined through unchanged when no model override was given', () => {
+    const result = resolveChallengerGeneration(undefined, 'sk-or-some-key');
+    expect(result).toEqual({ modelOverride: undefined });
+  });
+
+  it('builds a generateJson and clears modelOverride for an openrouter/-prefixed override when the secret is set', () => {
+    const result = resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, 'sk-or-realkey');
+    expect(result.modelOverride).toBeUndefined();
+    expect(typeof result.generateJson).toBe('function');
+  });
+
+  it('throws HttpsError(failed-precondition) naming OPENROUTER_API_KEY when the secret is unset for an openrouter/-prefixed override', () => {
+    let caught: any;
+    try {
+      resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, '');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+  });
+
+  it('throws the same error when the secret value is undefined', () => {
+    let caught: any;
+    try {
+      resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, undefined);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+  });
 });
 
 describe('validateEvalInput', () => {
@@ -458,9 +601,37 @@ describe('validateEvalInput', () => {
     ).not.toThrow();
   });
 
-  it('rejects a challengerModelOverride over 100 characters', () => {
+  it('rejects a challengerModelOverride over 120 characters', () => {
     expect(() =>
-      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(101) })
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(121) })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('accepts a challengerModelOverride of exactly 120 characters', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(120) })
+    ).not.toThrow();
+  });
+
+  it('accepts an openrouter/vendor/model challengerModelOverride', () => {
+    expect(() =>
+      validateEvalInput({
+        report: 'grammar',
+        essays: ['e1'],
+        challengerModelOverride: 'openrouter/anthropic/claude-x',
+      })
+    ).not.toThrow();
+  });
+
+  it('rejects an empty middle segment (a//b), naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'a//b' })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('rejects a bare "openrouter/" with no model segment, naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'openrouter/' })
     ).toThrow(/challengerModelOverride/);
   });
 
@@ -506,5 +677,80 @@ describe('validateEvalInput', () => {
 
   it('accepts a challengerLabel of exactly 200 characters', () => {
     expect(() => validateEvalInput({ ...base, challengerLabel: 'x'.repeat(200) })).not.toThrow();
+  });
+});
+
+describe('startEvalRun (onCall wrapper)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSecretValues.GEMINI_API_KEY = 'fake-gemini-key';
+    mockSecretValues.OPENAI_API_KEY = 'fake-openai-key';
+    mockSecretValues.ANTHROPIC_API_KEY = 'fake-anthropic-key';
+    mockAllowlistGet.mockResolvedValue({ exists: true, data: () => ({ emails: ['test@gmail.com'] }) });
+    mockAdminsGet.mockResolvedValue({ exists: true, data: () => ({ emails: ['test@gmail.com'] }) });
+    mockRunDocSet.mockResolvedValue(undefined);
+  });
+
+  const authedRequest = (data: Record<string, unknown>) => ({
+    auth: { uid: 'u1', token: { email: 'test@gmail.com' } },
+    data,
+  });
+
+  // Regression test for the bug this task fixes: resolveChallengerGeneration()
+  // used to run AFTER the evalRuns/{id} doc was created with status
+  // 'generating', outside the try/catch that flips it to 'error' — so an
+  // openrouter/-prefixed model with a missing OPENROUTER_API_KEY threw
+  // failed-precondition and stranded the run doc in 'generating' forever.
+  // It's now hoisted to right after validateEvalInput, before any Firestore
+  // reads/writes, so this path must reject WITHOUT ever creating a run doc
+  // (and, as a bonus consequence of the hoist, without reading essays either).
+  it('rejects with failed-precondition and creates no run doc when an openrouter/ model is used with an empty OPENROUTER_API_KEY', async () => {
+    mockSecretValues.OPENROUTER_API_KEY = '';
+
+    let caught: any;
+    try {
+      await (startEvalRun as any)(
+        authedRequest({
+          report: 'overall',
+          essayIds: ['essay1'],
+          challengerModelOverride: `${OPENROUTER_MODEL_PREFIX}anthropic/claude-3-opus`,
+        })
+      );
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+
+    // The whole point of the fix: no evalRuns/{id} doc ever gets created (and
+    // hence never gets stranded in 'generating').
+    expect(mockRunDocSet).not.toHaveBeenCalled();
+    // Bonus: the fail-closed check now runs before essay loading too, so the
+    // per-essay Firestore reads never happen on this path either.
+    expect(mockEssayDocGet).not.toHaveBeenCalled();
+  });
+
+  it('rejects the same way when OPENROUTER_API_KEY is undefined rather than empty-string', async () => {
+    delete mockSecretValues.OPENROUTER_API_KEY;
+
+    let caught: any;
+    try {
+      await (startEvalRun as any)(
+        authedRequest({
+          report: 'overall',
+          essayIds: ['essay1'],
+          challengerModelOverride: `${OPENROUTER_MODEL_PREFIX}anthropic/claude-3-opus`,
+        })
+      );
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(mockRunDocSet).not.toHaveBeenCalled();
+    expect(mockEssayDocGet).not.toHaveBeenCalled();
   });
 });

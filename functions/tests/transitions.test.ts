@@ -90,6 +90,49 @@ describe('analyzeTransitionsWithGemini', () => {
     expect(result.sentences!['0']).toEqual(['First sentence.', 'Second sentence.']);
   });
 
+  it('uses an injected generateJson for the main (pass 1) call, but pass 2 (contextual recheck) always uses native streamGeminiJson', async () => {
+    const { analyzeTransitionsWithGemini } = await import('../src/transitions');
+
+    // Gemma sentence splitting (native, always) — one paragraph, two sentences.
+    mockGenerateContent.mockResolvedValue({
+      text: JSON.stringify([['First sentence.', 'Second sentence.']]),
+    });
+
+    const pass1Result = {
+      sentenceTransitions: [
+        { paragraph: 1, fromSentence: 1, toSentence: 2, quality: 'weak', comment: 'Unclear link.' },
+      ],
+      paragraphTransitions: [],
+      summary: 'Pass 1 summary.',
+    };
+    const fakeGenerateJson = vi.fn(async (opts: { contents: string; systemInstruction: string; responseSchema: object }) => {
+      expect(opts.systemInstruction).toContain('transitions');
+      return JSON.stringify(pass1Result);
+    });
+
+    // Pass 2 (contextual recheck) — always native Gemini, since the flagged
+    // transition above triggers it.
+    const recheckResult = {
+      results: [{ id: '¶1-S1-S2', verdict: 'upgrade', newQuality: 'adequate', reason: 'Broader context resolves it.' }],
+    };
+    mockGenerateContentStream.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { candidates: [{ content: { parts: [{ text: JSON.stringify(recheckResult) }] } }] };
+      },
+    });
+
+    const result = await analyzeTransitionsWithGemini('fake-key', 'First sentence. Second sentence.', undefined, null, {
+      generateJson: fakeGenerateJson,
+    });
+
+    expect(fakeGenerateJson).toHaveBeenCalledTimes(1);
+    // Exactly one call: the pass-2 recheck. If pass 1 had (incorrectly) also
+    // gone through streamGeminiJson, this would be 2.
+    expect(mockGenerateContentStream).toHaveBeenCalledTimes(1);
+    expect(result.sentenceTransitions[0].quality).toBe('adequate');
+    expect(result.sentenceTransitions[0].comment).toBe('Broader context resolves it.');
+  });
+
   it('falls back to regex sentences when Gemma fails', async () => {
     const { analyzeTransitionsWithGemini } = await import('../src/transitions');
 

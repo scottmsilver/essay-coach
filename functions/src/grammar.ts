@@ -1,5 +1,6 @@
 import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
+import type { GenerateJsonFn } from './openRouterGenerate';
 
 // ── Types (canonical definitions in shared/grammarTypes.ts) ──────────────
 export type { GrammarIssue, GrammarIssueCategory, GrammarAnalysis } from '../../shared/grammarTypes';
@@ -238,20 +239,31 @@ export async function analyzeGrammarWithGemini(
   apiKey: string,
   content: string,
   progressRef?: DocumentReference,
-  opts?: { systemPromptOverride?: string; modelOverride?: string },
+  opts?: { systemPromptOverride?: string; modelOverride?: string; generateJson?: GenerateJsonFn },
 ): Promise<GrammarAnalysis> {
   const prompt = buildGrammarPrompt(content);
+  const systemInstruction = opts?.systemPromptOverride || GRAMMAR_SYSTEM_PROMPT;
 
-  const outputText = await streamGeminiJson({
-    apiKey,
-    contents: prompt,
-    systemInstruction: opts?.systemPromptOverride || GRAMMAR_SYSTEM_PROMPT,
-    responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
-    progressRef,
-    statusField: 'grammarStatus',
-    generatingMessage: 'Analyzing grammar...',
-    model: opts?.modelOverride,
-  });
+  // When an OpenRouter-backed generateJson is injected (eval cockpit
+  // challenger running a non-Gemini model — see evalRun.ts's startEvalRun),
+  // it takes over this main analysis call entirely instead of streamGeminiJson.
+  // The prompt/schema fed to it are identical to the production Gemini path.
+  const outputText = opts?.generateJson
+    ? await opts.generateJson({
+        contents: prompt,
+        systemInstruction,
+        responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
+      })
+    : await streamGeminiJson({
+        apiKey,
+        contents: prompt,
+        systemInstruction,
+        responseSchema: GRAMMAR_ANALYSIS_SCHEMA,
+        progressRef,
+        statusField: 'grammarStatus',
+        generatingMessage: 'Analyzing grammar...',
+        model: opts?.modelOverride,
+      });
 
   return JSON.parse(outputText) as GrammarAnalysis;
 }

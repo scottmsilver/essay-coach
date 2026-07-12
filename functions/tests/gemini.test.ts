@@ -61,4 +61,30 @@ describe('evaluateWithGemini', () => {
     });
     await expect(evaluateWithGemini('fake-key', 'evaluate this')).rejects.toThrow();
   });
+
+  it('uses an injected generateJson instead of native streamGeminiJson when present (eval cockpit OpenRouter challenger)', async () => {
+    const mockEvaluation = {
+      traits: {
+        ideas: { score: 4, feedback: 'Good', revisionPriority: null, annotations: [] },
+        organization: { score: 3, feedback: 'OK', revisionPriority: 1, annotations: [] },
+        voice: { score: 5, feedback: 'Great', revisionPriority: null, annotations: [] },
+        wordChoice: { score: 3, feedback: 'Needs work', revisionPriority: 2, annotations: [] },
+        sentenceFluency: { score: 4, feedback: 'Solid', revisionPriority: null, annotations: [] },
+        conventions: { score: 2, feedback: 'Fix', revisionPriority: 3, annotations: [] },
+        presentation: { score: 4, feedback: 'Fine', revisionPriority: null, annotations: [] },
+      },
+      overallFeedback: 'Via challenger.',
+      revisionPlan: [],
+      comparisonToPrevious: null,
+    };
+    const fakeGenerateJson = vi.fn(async () => JSON.stringify(mockEvaluation));
+
+    const result = await evaluateWithGemini('fake-key', 'evaluate this', undefined, undefined, {
+      generateJson: fakeGenerateJson,
+    });
+
+    expect(result).toEqual(mockEvaluation);
+    expect(fakeGenerateJson).toHaveBeenCalledTimes(1);
+    expect(mockGenerateContentStream).not.toHaveBeenCalled();
+  });
 });
