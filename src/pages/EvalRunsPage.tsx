@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import {
+  Autocomplete,
   Badge,
   Button,
   MultiSelect,
@@ -139,6 +140,32 @@ export default function EvalRunsPage() {
   const [challengerModel, setChallengerModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Populated once (best-effort) from listEvalModels — the Challenger model
+  // field stays a free-typed Autocomplete even if this never resolves, so a
+  // failure here must never block or error out the form (see the catch
+  // below: silent fallback to empty suggestions, no error toast).
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const listEvalModels = httpsCallable<Record<string, never>, { models: string[] }>(functions, 'listEvalModels');
+    listEvalModels({})
+      .then((result) => {
+        if (!cancelled) setModelOptions(result.data.models);
+      })
+      .catch((error) => {
+        // Convenience-only feature — fall back to free text, no user-facing error.
+        console.error('Failed to load eval models:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const modelOverrideValid =
     challengerModel.trim().length === 0 || CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModel.trim());
 
@@ -273,12 +300,16 @@ export default function EvalRunsPage() {
             <Text size="xs" c="dimmed">
               {challengerPrompt.length.toLocaleString()} / {CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters
             </Text>
-            <TextInput
+            <Autocomplete
               label="Challenger model"
               description="Optional — leave empty to keep the production model and compare prompts only."
-              placeholder="e.g. gemini-3.5-flash — leave empty to keep the production model"
+              placeholder={
+                modelsLoading ? 'Loading models…' : 'e.g. gemini-3.5-flash — leave empty to keep the production model'
+              }
+              data={modelOptions}
+              limit={15}
               value={challengerModel}
-              onChange={(e) => setChallengerModel(e.currentTarget.value)}
+              onChange={setChallengerModel}
               error={!modelOverrideValid ? 'Only letters, numbers, \'.\', \'_\', \':\', \'-\' — up to 100 characters.' : undefined}
             />
             <Text size="sm" c="dimmed">
