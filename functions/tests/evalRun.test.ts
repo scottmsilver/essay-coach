@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Judge } from '../../shared/panel/types';
 
 // Mocks for makeFirestoreGenerate's 'overall' branch (buildEvaluationPrompt +
@@ -13,6 +13,68 @@ vi.mock('../src/gemini', () => ({
   evaluateWithGemini: vi.fn(async (_apiKey: string, prompt: unknown) => ({ _promptEcho: prompt, traits: {} })),
 }));
 
+// Mocks for the startEvalRun onCall wrapper describe block below (mirrors
+// submitEssay.test.ts's pattern). onCall is a passthrough so the handler can
+// be invoked directly; HttpsError keeps a `.code` field so both these tests
+// and resolveChallengerGeneration's tests above (which throw the real
+// HttpsError from src/evalRun.ts, constructed against this same mock) can
+// assert on it. defineSecret's returned `.value()` is driven by
+// mockSecretValues, keyed by the exact secret name each defineSecret(...)
+// call in src/evalRun.ts uses (GEMINI_API_KEY / OPENAI_API_KEY /
+// ANTHROPIC_API_KEY / OPENROUTER_API_KEY).
+const mockSecretValues: Record<string, string> = {
+  GEMINI_API_KEY: 'fake-gemini-key',
+  OPENAI_API_KEY: 'fake-openai-key',
+  ANTHROPIC_API_KEY: 'fake-anthropic-key',
+  OPENROUTER_API_KEY: 'fake-openrouter-key',
+};
+
+vi.mock('firebase-functions/v2/https', () => ({
+  onCall: (_opts: any, handler: any) => handler,
+  HttpsError: class HttpsError extends Error {
+    constructor(public code: string, message: string) { super(message); }
+  },
+}));
+
+vi.mock('firebase-functions/v2', () => ({
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+
+vi.mock('firebase-functions/params', () => ({
+  defineSecret: (name: string) => ({ value: () => mockSecretValues[name] }),
+}));
+
+const mockAllowlistGet = vi.fn();
+const mockAdminsGet = vi.fn();
+const mockEssayDocGet = vi.fn();
+const mockRunDocSet = vi.fn().mockResolvedValue(undefined);
+const mockRunDoc = vi.fn(() => ({
+  id: 'run123',
+  set: mockRunDocSet,
+  update: vi.fn().mockResolvedValue(undefined),
+  collection: () => ({ doc: () => ({ set: vi.fn().mockResolvedValue(undefined) }) }),
+}));
+
+vi.mock('firebase-admin/firestore', () => ({
+  getFirestore: () => ({
+    doc: (path: string) => {
+      if (path === 'config/allowlist') return { get: mockAllowlistGet };
+      if (path === 'config/admins') return { get: mockAdminsGet };
+      // users/{uid}/essays/{essayId} — only reached if the fail-closed
+      // OpenRouter check below doesn't skip essay loading as intended.
+      return {
+        get: mockEssayDocGet,
+        collection: () => ({ where: () => ({ limit: () => ({ get: vi.fn() }) }) }),
+      };
+    },
+    collection: (name: string) => {
+      if (name === 'evalRuns') return { doc: mockRunDoc };
+      return { doc: vi.fn() };
+    },
+  }),
+  FieldValue: { serverTimestamp: () => 'SERVER_TIMESTAMP' },
+}));
+
 import {
   runEvalCore,
   validateEvalInput,
@@ -22,6 +84,7 @@ import {
   OPENROUTER_MODEL_PREFIX,
   EVAL_RUN_GENERIC_ERROR_MESSAGE,
   makeFirestoreGenerate,
+  startEvalRun,
   type EvalDeps,
   type EvalRunInput,
   type EvalItemDoc,
@@ -614,5 +677,80 @@ describe('validateEvalInput', () => {
 
   it('accepts a challengerLabel of exactly 200 characters', () => {
     expect(() => validateEvalInput({ ...base, challengerLabel: 'x'.repeat(200) })).not.toThrow();
+  });
+});
+
+describe('startEvalRun (onCall wrapper)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSecretValues.GEMINI_API_KEY = 'fake-gemini-key';
+    mockSecretValues.OPENAI_API_KEY = 'fake-openai-key';
+    mockSecretValues.ANTHROPIC_API_KEY = 'fake-anthropic-key';
+    mockAllowlistGet.mockResolvedValue({ exists: true, data: () => ({ emails: ['test@gmail.com'] }) });
+    mockAdminsGet.mockResolvedValue({ exists: true, data: () => ({ emails: ['test@gmail.com'] }) });
+    mockRunDocSet.mockResolvedValue(undefined);
+  });
+
+  const authedRequest = (data: Record<string, unknown>) => ({
+    auth: { uid: 'u1', token: { email: 'test@gmail.com' } },
+    data,
+  });
+
+  // Regression test for the bug this task fixes: resolveChallengerGeneration()
+  // used to run AFTER the evalRuns/{id} doc was created with status
+  // 'generating', outside the try/catch that flips it to 'error' — so an
+  // openrouter/-prefixed model with a missing OPENROUTER_API_KEY threw
+  // failed-precondition and stranded the run doc in 'generating' forever.
+  // It's now hoisted to right after validateEvalInput, before any Firestore
+  // reads/writes, so this path must reject WITHOUT ever creating a run doc
+  // (and, as a bonus consequence of the hoist, without reading essays either).
+  it('rejects with failed-precondition and creates no run doc when an openrouter/ model is used with an empty OPENROUTER_API_KEY', async () => {
+    mockSecretValues.OPENROUTER_API_KEY = '';
+
+    let caught: any;
+    try {
+      await (startEvalRun as any)(
+        authedRequest({
+          report: 'overall',
+          essayIds: ['essay1'],
+          challengerModelOverride: `${OPENROUTER_MODEL_PREFIX}anthropic/claude-3-opus`,
+        })
+      );
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+
+    // The whole point of the fix: no evalRuns/{id} doc ever gets created (and
+    // hence never gets stranded in 'generating').
+    expect(mockRunDocSet).not.toHaveBeenCalled();
+    // Bonus: the fail-closed check now runs before essay loading too, so the
+    // per-essay Firestore reads never happen on this path either.
+    expect(mockEssayDocGet).not.toHaveBeenCalled();
+  });
+
+  it('rejects the same way when OPENROUTER_API_KEY is undefined rather than empty-string', async () => {
+    delete mockSecretValues.OPENROUTER_API_KEY;
+
+    let caught: any;
+    try {
+      await (startEvalRun as any)(
+        authedRequest({
+          report: 'overall',
+          essayIds: ['essay1'],
+          challengerModelOverride: `${OPENROUTER_MODEL_PREFIX}anthropic/claude-3-opus`,
+        })
+      );
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(mockRunDocSet).not.toHaveBeenCalled();
+    expect(mockEssayDocGet).not.toHaveBeenCalled();
   });
 });

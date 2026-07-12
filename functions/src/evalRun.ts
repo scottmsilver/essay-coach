@@ -553,6 +553,20 @@ export const startEvalRun = onCall(
       throw new HttpsError('invalid-argument', err instanceof Error ? err.message : String(err));
     }
 
+    // Resolved as early as possible — right after input validation and
+    // BEFORE any Firestore reads/writes (essay lookups, run-doc creation).
+    // resolveChallengerGeneration() throws HttpsError('failed-precondition')
+    // when an `openrouter/`-prefixed challengerModelOverride is requested but
+    // OPENROUTER_API_KEY is unset/empty; doing this fail-closed check up
+    // front means that path never strands a run doc in 'generating' (there
+    // is no run doc yet) and never wastes essay reads on a request that's
+    // going to be rejected anyway.
+    const { modelOverride: challengerModelOverrideForCore, generateJson: challengerGenerateJson } =
+      resolveChallengerGeneration(
+        typeof challengerModelOverride === 'string' ? challengerModelOverride : undefined,
+        openrouterApiKey.value()
+      );
+
     const db = getFirestore();
     const uid = request.auth.uid;
 
@@ -620,16 +634,13 @@ export const startEvalRun = onCall(
 
     const generate = makeFirestoreGenerate({ report: report as ReportKind, essays, apiKey: geminiApiKey.value() });
 
-    // When challengerModelOverride is an `openrouter/vendor/model` id, the
+    // challengerModelOverrideForCore/challengerGenerateJson were resolved up
+    // front (see above, right after validateEvalInput) — when
+    // challengerModelOverride is an `openrouter/vendor/model` id, the
     // challenger's generation runs through OpenRouter instead of native
     // Gemini. The ORIGINAL (prefixed) challengerModelOverride is still what
-    // gets persisted to the run doc's config below, so the UI can keep
+    // was persisted to the run doc's config above, so the UI can keep
     // showing what was actually requested.
-    const { modelOverride: challengerModelOverrideForCore, generateJson: challengerGenerateJson } =
-      resolveChallengerGeneration(
-        typeof challengerModelOverride === 'string' ? challengerModelOverride : undefined,
-        openrouterApiKey.value()
-      );
 
     try {
       const result = await runEvalCore(
