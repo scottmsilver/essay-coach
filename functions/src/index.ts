@@ -21,3 +21,4 @@ export { analyzeStructure } from './analyzeStructure';
 export { analyzeReasoning } from './analyzeReasoning';
 export { startEvalRun } from './evalRun';
 export { recordGoldLabel } from './recordGoldLabel';
+export { listEvalModels } from './listEvalModels';
