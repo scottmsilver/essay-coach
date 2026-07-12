@@ -32,8 +32,20 @@ vi.mock('firebase-functions/v2/https', () => ({
 // not to match any of redactEvalError's patterns.
 const FAKE_API_KEY = 'AIzaSyFAKEKEY1234567890abcdefghijk';
 
+// Per-secret-name mutable values so tests can independently control
+// GEMINI_API_KEY vs OPENROUTER_API_KEY (e.g. to exercise "secret unset ->
+// skip silently" without also breaking the Gemini fetch path). Defaults:
+// Gemini configured, OpenRouter unset — matches the pre-OpenRouter test
+// baseline (a single fetch call, Gemini models only) unless a test opts in.
+const { secretValues } = vi.hoisted(() => ({
+  secretValues: {
+    GEMINI_API_KEY: 'AIzaSyFAKEKEY1234567890abcdefghijk',
+    OPENROUTER_API_KEY: '',
+  } as Record<string, string>,
+}));
+
 vi.mock('firebase-functions/params', () => ({
-  defineSecret: () => ({ value: () => FAKE_API_KEY }),
+  defineSecret: (name: string) => ({ value: () => secretValues[name] }),
 }));
 
 const { mockLoggerError } = vi.hoisted(() => ({ mockLoggerError: vi.fn() }));
@@ -62,11 +74,20 @@ function modelsResponse(models: Array<{ name: string; supportedGenerationMethods
   };
 }
 
+function openRouterModelsResponse(ids: string[]) {
+  return {
+    ok: true,
+    json: async () => ({ data: ids.map((id) => ({ id })) }),
+  };
+}
+
 describe('listEvalModels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsEmailAllowed.mockResolvedValue(true);
     mockIsEmailAdmin.mockResolvedValue(true);
+    secretValues.GEMINI_API_KEY = FAKE_API_KEY;
+    secretValues.OPENROUTER_API_KEY = '';
   });
 
   it('throws unauthenticated when no auth', async () => {
@@ -188,5 +209,67 @@ describe('listEvalModels', () => {
     expect(caught).toBeDefined();
     expect(caught.code).toBe('unavailable');
     expect(caught.message).not.toContain(API_KEY);
+  });
+
+  it('skips the OpenRouter fetch silently when OPENROUTER_API_KEY is unset (empty string)', async () => {
+    secretValues.OPENROUTER_API_KEY = '';
+    mockFetch.mockResolvedValueOnce(
+      modelsResponse([{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }])
+    );
+
+    const result = await (listEvalModels as any)({ auth: AUTH, data: {} });
+
+    expect(result).toEqual({ models: ['gemini-2.5-flash'] });
+    // Only the Gemini models.list call — no OpenRouter fetch at all.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('merges OpenRouter models when OPENROUTER_API_KEY is set, Gemini-native first then openrouter/', async () => {
+    secretValues.OPENROUTER_API_KEY = 'sk-or-fakekey';
+    mockFetch
+      .mockResolvedValueOnce(
+        modelsResponse([{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }])
+      )
+      .mockResolvedValueOnce(openRouterModelsResponse(['anthropic/claude-3-opus', 'openai/gpt-5']));
+
+    const result = await (listEvalModels as any)({ auth: AUTH, data: {} });
+
+    expect(result).toEqual({
+      models: ['gemini-2.5-flash', 'openrouter/anthropic/claude-3-opus', 'openrouter/openai/gpt-5'],
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [openrouterUrl, openrouterInit] = mockFetch.mock.calls[1];
+    expect(openrouterUrl).toBe('https://openrouter.ai/api/v1/models');
+    expect(openrouterInit.headers.Authorization).toBe('Bearer sk-or-fakekey');
+  });
+
+  it('bounds OpenRouter entries at 400 even when the upstream catalog is larger', async () => {
+    secretValues.OPENROUTER_API_KEY = 'sk-or-fakekey';
+    const manyIds = Array.from({ length: 450 }, (_, i) => `vendor/model-${String(i).padStart(3, '0')}`);
+    mockFetch
+      .mockResolvedValueOnce(modelsResponse([]))
+      .mockResolvedValueOnce(openRouterModelsResponse(manyIds));
+
+    const result = await (listEvalModels as any)({ auth: AUTH, data: {} });
+
+    expect(result.models).toHaveLength(400);
+    expect(result.models.every((m: string) => m.startsWith('openrouter/'))).toBe(true);
+  });
+
+  it('a failing OpenRouter fetch still raises a generic HttpsError(unavailable), key redacted', async () => {
+    secretValues.OPENROUTER_API_KEY = 'sk-or-fakekey';
+    mockFetch
+      .mockResolvedValueOnce(modelsResponse([]))
+      .mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'server error' });
+
+    let caught: any;
+    try {
+      await (listEvalModels as any)({ auth: AUTH, data: {} });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('unavailable');
   });
 });

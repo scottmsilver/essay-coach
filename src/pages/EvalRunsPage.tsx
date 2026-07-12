@@ -53,8 +53,11 @@ const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
 
 // Mirrors CHALLENGER_MODEL_OVERRIDE_SHAPE in functions/src/evalRun.ts's
 // validateEvalInput — same client-side-heads-up rationale as the prompt
-// length cap above; the server is the real enforcement point.
-const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]{1,100}$/;
+// length cap above; the server is the real enforcement point. Matches
+// either a bare Gemini model id (e.g. `gemini-3.5-flash`) or an
+// `openrouter/vendor/model` id (up to 3 total '/'-separated segments).
+const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]+(\/[a-zA-Z0-9._:-]+){0,2}$/;
+const CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH = 120;
 
 function parseRun(doc: any): EvalRunSummary {
   const data = doc.data();
@@ -167,7 +170,9 @@ export default function EvalRunsPage() {
   }, []);
 
   const modelOverrideValid =
-    challengerModel.trim().length === 0 || CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModel.trim());
+    challengerModel.trim().length === 0 ||
+    (challengerModel.trim().length <= CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH &&
+      CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModel.trim()));
 
   useEffect(() => {
     const q = query(collection(db, 'evalRuns'), orderBy('createdAt', 'desc'));
@@ -302,15 +307,21 @@ export default function EvalRunsPage() {
             </Text>
             <Autocomplete
               label="Challenger model"
-              description="Optional — leave empty to keep the production model and compare prompts only."
+              description="Optional — leave empty to keep the production model and compare prompts only. gemini-* runs natively; openrouter/vendor/model runs via OpenRouter."
               placeholder={
-                modelsLoading ? 'Loading models…' : 'e.g. gemini-3.5-flash — leave empty to keep the production model'
+                modelsLoading
+                  ? 'Loading models…'
+                  : 'e.g. gemini-3.5-flash or openrouter/anthropic/claude-3-opus — leave empty to keep the production model'
               }
               data={modelOptions}
-              limit={15}
+              limit={20}
               value={challengerModel}
               onChange={setChallengerModel}
-              error={!modelOverrideValid ? 'Only letters, numbers, \'.\', \'_\', \':\', \'-\' — up to 100 characters.' : undefined}
+              error={
+                !modelOverrideValid
+                  ? 'Only letters, numbers, \'.\', \'_\', \':\', \'-\', up to 3 \'/\'-separated segments — up to 120 characters.'
+                  : undefined
+              }
             />
             <Text size="sm" c="dimmed">
               Estimated calls: {essayIds.length} essay(s) × 12 judge calls + {essayIds.length} essay(s) × 2

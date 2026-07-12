@@ -1,6 +1,7 @@
 import { streamGeminiJson } from './streamGemini';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { splitSentences, splitParagraphs, splitSentencesAI } from './sentenceSplitter';
+import type { GenerateJsonFn } from './openRouterGenerate';
 
 export const TRANSITION_SYSTEM_PROMPT = `You analyze transitions between consecutive sentences and between paragraphs in student essays.
 
@@ -63,6 +64,11 @@ export type { SentenceTransition, ParagraphTransition, TransitionAnalysis } from
  * Uses Gemma 3 4B (free via Gemini API) when apiKey is provided, with regex fallback.
  * Returns both the formatted prompt text and the sentence arrays for storage.
  */
+// Preprocessing infrastructure, not the model under test: sentence splitting
+// always uses the native Gemini path (splitSentencesAI, via streamGemini's
+// underlying model) regardless of any injected `generateJson` — the eval
+// cockpit's OpenRouter challenger swaps out the MAIN transition-analysis
+// generation call below, not this upstream tokenization step.
 export async function splitEssayIntoSentences(content: string, apiKey?: string): Promise<Record<string, string[]>> {
   const paragraphs = splitParagraphs(content);
   const raw = apiKey
@@ -184,27 +190,38 @@ export async function analyzeTransitionsWithGemini(
   content: string,
   progressRef?: DocumentReference,
   previousAnalysis?: TransitionAnalysis | null,
-  opts?: { systemPromptOverride?: string; modelOverride?: string },
+  opts?: { systemPromptOverride?: string; modelOverride?: string; generateJson?: GenerateJsonFn },
 ): Promise<TransitionAnalysis> {
-  // Split sentences with Gemma 3 4B (falls back to regex)
+  // Split sentences with Gemma 3 4B (falls back to regex) — always native
+  // Gemini, never affected by opts.generateJson (see the comment on
+  // splitEssayIntoSentences above).
   const sentences = await splitEssayIntoSentences(content, apiKey);
   const formatted = formatSentencesForPrompt(sentences);
   const prompt = buildTransitionPrompt(formatted);
+  const systemInstruction = opts?.systemPromptOverride || TRANSITION_SYSTEM_PROMPT;
 
-  // systemPromptOverride and modelOverride apply ONLY to this main analysis
-  // (pass 1) call. The contextual-recheck pass (pass 2, below) always uses
-  // its own fixed RECHECK_SYSTEM_PROMPT and the default generator model, and
-  // is never affected by either override.
-  const outputText = await streamGeminiJson({
-    apiKey,
-    contents: prompt,
-    systemInstruction: opts?.systemPromptOverride || TRANSITION_SYSTEM_PROMPT,
-    responseSchema: TRANSITION_SCHEMA,
-    progressRef,
-    statusField: 'transitionStatus',
-    generatingMessage: 'Analyzing transitions...',
-    model: opts?.modelOverride,
-  });
+  // systemPromptOverride, modelOverride, and generateJson apply ONLY to this
+  // main analysis (pass 1) call. The contextual-recheck pass (pass 2, below)
+  // always uses its own fixed RECHECK_SYSTEM_PROMPT and the default native
+  // Gemini generator (streamGeminiJson) — it is NEVER routed through an
+  // injected generateJson, even when the challenger model is an OpenRouter
+  // model, so the recheck stays on the same trusted model across every run.
+  const outputText = opts?.generateJson
+    ? await opts.generateJson({
+        contents: prompt,
+        systemInstruction,
+        responseSchema: TRANSITION_SCHEMA,
+      })
+    : await streamGeminiJson({
+        apiKey,
+        contents: prompt,
+        systemInstruction,
+        responseSchema: TRANSITION_SCHEMA,
+        progressRef,
+        statusField: 'transitionStatus',
+        generatingMessage: 'Analyzing transitions...',
+        model: opts?.modelOverride,
+      });
 
   let analysis = JSON.parse(outputText) as TransitionAnalysis;
   analysis.sentences = sentences;

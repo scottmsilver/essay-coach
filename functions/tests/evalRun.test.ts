@@ -18,6 +18,8 @@ import {
   validateEvalInput,
   sanitizeEvalRunError,
   redactEvalError,
+  resolveChallengerGeneration,
+  OPENROUTER_MODEL_PREFIX,
   EVAL_RUN_GENERIC_ERROR_MESSAGE,
   makeFirestoreGenerate,
   type EvalDeps,
@@ -25,6 +27,7 @@ import {
   type EvalItemDoc,
   type EssayWithMeta,
 } from '../src/evalRun';
+import { evaluateWithGemini } from '../src/gemini';
 
 // Mirrors shared/panel/run-panel.test.ts's mockJudge style, extended to
 // consistently prefer one *content side* regardless of AB/BA call order
@@ -385,6 +388,83 @@ describe('makeFirestoreGenerate', () => {
 
     await expect(generate('overall', 'Content that was never loaded.')).rejects.toThrow(/no essay metadata found/i);
   });
+
+  it('for "overall", a challenger generateJson takes precedence over modelOverride: evaluateWithGemini gets generateJson in opts and an undefined model', async () => {
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+    ];
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+    const fakeGenerateJson = vi.fn(async () => '{}');
+
+    await generate('overall', 'Essay one content.', {
+      promptOverride: 'CHALLENGER PROMPT',
+      modelOverride: 'openrouter/anthropic/claude-x',
+      generateJson: fakeGenerateJson,
+    });
+
+    const mockEvaluate = evaluateWithGemini as unknown as ReturnType<typeof vi.fn>;
+    const lastCall = mockEvaluate.mock.calls[mockEvaluate.mock.calls.length - 1];
+    // evaluateWithGemini(apiKey, prompt, progressRef, model, opts)
+    const [, , , model, opts] = lastCall;
+    expect(model).toBeUndefined();
+    expect(opts).toMatchObject({ systemPromptOverride: 'CHALLENGER PROMPT', generateJson: fakeGenerateJson });
+  });
+
+  it('for "overall", modelOverride still reaches evaluateWithGemini when no generateJson is present', async () => {
+    const essays: EssayWithMeta[] = [
+      { id: 'e1', content: 'Essay one content.', assignmentPrompt: 'Prompt ONE', writingType: 'narrative' },
+    ];
+    const generate = makeFirestoreGenerate({ report: 'overall', essays, apiKey: 'fake-key' });
+
+    await generate('overall', 'Essay one content.', { modelOverride: 'gemini-3.5-flash' });
+
+    const mockEvaluate = evaluateWithGemini as unknown as ReturnType<typeof vi.fn>;
+    const lastCall = mockEvaluate.mock.calls[mockEvaluate.mock.calls.length - 1];
+    const [, , , model] = lastCall;
+    expect(model).toBe('gemini-3.5-flash');
+  });
+});
+
+describe('resolveChallengerGeneration', () => {
+  it('passes non-openrouter model overrides through unchanged, with no generateJson', () => {
+    const result = resolveChallengerGeneration('gemini-3.5-flash', 'sk-or-should-be-unused');
+    expect(result).toEqual({ modelOverride: 'gemini-3.5-flash' });
+  });
+
+  it('passes undefined through unchanged when no model override was given', () => {
+    const result = resolveChallengerGeneration(undefined, 'sk-or-some-key');
+    expect(result).toEqual({ modelOverride: undefined });
+  });
+
+  it('builds a generateJson and clears modelOverride for an openrouter/-prefixed override when the secret is set', () => {
+    const result = resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, 'sk-or-realkey');
+    expect(result.modelOverride).toBeUndefined();
+    expect(typeof result.generateJson).toBe('function');
+  });
+
+  it('throws HttpsError(failed-precondition) naming OPENROUTER_API_KEY when the secret is unset for an openrouter/-prefixed override', () => {
+    let caught: any;
+    try {
+      resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, '');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+  });
+
+  it('throws the same error when the secret value is undefined', () => {
+    let caught: any;
+    try {
+      resolveChallengerGeneration(`${OPENROUTER_MODEL_PREFIX}anthropic/claude-x`, undefined);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe('failed-precondition');
+    expect(caught.message).toContain('OPENROUTER_API_KEY');
+  });
 });
 
 describe('validateEvalInput', () => {
@@ -458,9 +538,37 @@ describe('validateEvalInput', () => {
     ).not.toThrow();
   });
 
-  it('rejects a challengerModelOverride over 100 characters', () => {
+  it('rejects a challengerModelOverride over 120 characters', () => {
     expect(() =>
-      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(101) })
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(121) })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('accepts a challengerModelOverride of exactly 120 characters', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'x'.repeat(120) })
+    ).not.toThrow();
+  });
+
+  it('accepts an openrouter/vendor/model challengerModelOverride', () => {
+    expect(() =>
+      validateEvalInput({
+        report: 'grammar',
+        essays: ['e1'],
+        challengerModelOverride: 'openrouter/anthropic/claude-x',
+      })
+    ).not.toThrow();
+  });
+
+  it('rejects an empty middle segment (a//b), naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'a//b' })
+    ).toThrow(/challengerModelOverride/);
+  });
+
+  it('rejects a bare "openrouter/" with no model segment, naming the field', () => {
+    expect(() =>
+      validateEvalInput({ report: 'grammar', essays: ['e1'], challengerModelOverride: 'openrouter/' })
     ).toThrow(/challengerModelOverride/);
   });
 

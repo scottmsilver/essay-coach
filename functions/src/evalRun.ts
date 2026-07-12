@@ -24,6 +24,7 @@ import { buildEvaluationPrompt } from './prompt';
 import { evaluateWithGemini } from './gemini';
 import { analyzeGrammarWithGemini } from './grammar';
 import { analyzeTransitionsWithGemini } from './transitions';
+import { makeOpenRouterGenerateJson, type GenerateJsonFn } from './openRouterGenerate';
 // NOTE: imported via the `functions/src/shared -> ../../shared` symlink
 // (not `../../shared/panel/...`) so that judges/index.ts's third-party SDK
 // imports (@anthropic-ai/sdk, openai, @google/genai) resolve against
@@ -38,6 +39,43 @@ import { buildPanel } from './shared/panel/judges';
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 const openaiApiKey = defineSecret('OPENAI_API_KEY');
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
+const openrouterApiKey = defineSecret('OPENROUTER_API_KEY');
+
+/** Prefix identifying a challengerModelOverride that should run through
+ * OpenRouter's OpenAI-compatible API instead of natively via @google/genai —
+ * see startEvalRun's wiring and functions/src/openRouterGenerate.ts. */
+export const OPENROUTER_MODEL_PREFIX = 'openrouter/';
+
+/**
+ * Resolves startEvalRun's OpenRouter wiring: given the raw
+ * challengerModelOverride submitted by the caller and the current value of
+ * the OPENROUTER_API_KEY secret, decides whether the challenger should run
+ * through OpenRouter and, if so, builds its injectable `generateJson` and
+ * clears `modelOverride` (an `openrouter/vendor/model` id is never a valid
+ * Gemini model id, so it must never reach the native Gemini path).
+ *
+ * Extracted out of startEvalRun's onCall handler body so this branching +
+ * validation logic is directly unit-testable without mocking Firestore/auth
+ * (see functions/tests/evalRun.test.ts). Throws HttpsError('failed-precondition')
+ * naming OPENROUTER_API_KEY when an openrouter/-prefixed override is
+ * requested but the secret is unset/empty.
+ */
+export function resolveChallengerGeneration(
+  challengerModelOverride: string | undefined,
+  openrouterKey: string | undefined
+): { modelOverride: string | undefined; generateJson?: GenerateJsonFn } {
+  if (!challengerModelOverride || !challengerModelOverride.startsWith(OPENROUTER_MODEL_PREFIX)) {
+    return { modelOverride: challengerModelOverride };
+  }
+  if (!openrouterKey) {
+    throw new HttpsError(
+      'failed-precondition',
+      'OPENROUTER_API_KEY secret is not configured — required to run an openrouter/ challenger model.'
+    );
+  }
+  const strippedModel = challengerModelOverride.slice(OPENROUTER_MODEL_PREFIX.length);
+  return { modelOverride: undefined, generateJson: makeOpenRouterGenerateJson(openrouterKey, strippedModel) };
+}
 
 const MAX_ESSAYS = 20;
 const VALID_REPORTS: ReportKind[] = ['overall', 'grammar', 'transitions'];
@@ -52,10 +90,16 @@ export interface EvalEssayInput {
   content: string;
 }
 
-/** The challenger-side overrides passed to `generate()` — either or both may be set. */
+/** The challenger-side overrides passed to `generate()` — any subset may be
+ * set. When `generateJson` is present it takes precedence over
+ * `modelOverride` for the analyzers (grammar/transitions/overall main
+ * generation call): the caller (startEvalRun) is responsible for NOT setting
+ * both `generateJson` and a Gemini-path `modelOverride` at once — see
+ * makeFirestoreGenerate below. */
 export interface ChallengerOverrides {
   promptOverride?: string;
   modelOverride?: string;
+  generateJson?: GenerateJsonFn;
 }
 
 export interface EvalDeps {
@@ -71,6 +115,13 @@ export interface EvalRunInput {
   essays: EvalEssayInput[];
   challengerPromptOverride?: string;
   challengerModelOverride?: string;
+  /** Set by startEvalRun when challengerModelOverride is an
+   * `openrouter/vendor/model` id — routes the challenger's generation
+   * through OpenRouter instead of native Gemini. When this is set,
+   * startEvalRun omits challengerModelOverride from this input entirely (it
+   * only ever reaches here as the ORIGINAL, prefixed string for display/
+   * Firestore config purposes — never as the model fed to the Gemini path). */
+  challengerGenerateJson?: GenerateJsonFn;
   thresholds?: GateThresholds;
 }
 
@@ -109,12 +160,18 @@ const CHALLENGER_LABEL_MAX_LENGTH = 200;
 const CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH = 20000;
 
 /**
- * Shape guard for challengerModelOverride — a Gemini model id (e.g.
- * `gemini-3.5-flash`), never interpolated into a path but still worth
- * constraining since it flows into the `@google/genai` SDK call. Mirrored
- * client-side in EvalRunsPage.tsx's model TextInput.
+ * Shape guard for challengerModelOverride — either a bare Gemini model id
+ * (e.g. `gemini-3.5-flash`, never interpolated into a path but still worth
+ * constraining since it flows into the `@google/genai` SDK call) OR an
+ * `openrouter/vendor/model` id (up to 3 total segments, e.g.
+ * `openrouter/anthropic/claude-3-opus`) that startEvalRun routes through
+ * OpenRouter instead — see OPENROUTER_MODEL_PREFIX. Length is checked
+ * separately below rather than folded into the regex, since the segment
+ * structure makes an inline `{1,120}` bound awkward to express correctly.
+ * Mirrored client-side in EvalRunsPage.tsx's model Autocomplete.
  */
-const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]{1,100}$/;
+const CHALLENGER_MODEL_OVERRIDE_SHAPE = /^[a-zA-Z0-9._:-]+(\/[a-zA-Z0-9._:-]+){0,2}$/;
+const CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH = 120;
 
 /**
  * Shape guard for ids that get interpolated into Firestore doc paths
@@ -207,9 +264,14 @@ export function validateEvalInput(input: {
     if (typeof challengerModelOverride !== 'string') {
       throw new Error(`challengerModelOverride must be a string if provided, got ${typeof challengerModelOverride}.`);
     }
+    if (challengerModelOverride.length > 0 && challengerModelOverride.length > CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH) {
+      throw new Error(
+        `challengerModelOverride must be at most ${CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH} characters.`
+      );
+    }
     if (challengerModelOverride.length > 0 && !CHALLENGER_MODEL_OVERRIDE_SHAPE.test(challengerModelOverride)) {
       throw new Error(
-        `challengerModelOverride must match ${CHALLENGER_MODEL_OVERRIDE_SHAPE} (letters, numbers, '.', '_', ':', '-'; 1-100 characters).`
+        `challengerModelOverride must match ${CHALLENGER_MODEL_OVERRIDE_SHAPE} (letters, numbers, '.', '_', ':', '-', up to 3 '/'-separated segments; max ${CHALLENGER_MODEL_OVERRIDE_MAX_LENGTH} characters).`
       );
     }
   }
@@ -239,7 +301,7 @@ export function validateEvalInput(input: {
 }
 
 export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<EvalRunResult> {
-  const { report, essays, challengerPromptOverride, challengerModelOverride } = input;
+  const { report, essays, challengerPromptOverride, challengerModelOverride, challengerGenerateJson } = input;
   const rand = deps.rand ?? Math.random;
   const total = essays.length;
   const failedJudgesSet = new Set<string>();
@@ -248,6 +310,7 @@ export async function runEvalCore(deps: EvalDeps, input: EvalRunInput): Promise<
   const challengerOverrides: ChallengerOverrides = {
     promptOverride: challengerPromptOverride,
     modelOverride: challengerModelOverride,
+    ...(challengerGenerateJson ? { generateJson: challengerGenerateJson } : {}),
   };
 
   await deps.writeProgress({ done: 0, total, message: `Starting eval run over ${total} essay(s)...` });
@@ -369,13 +432,26 @@ export function makeFirestoreGenerate(params: {
   const metaByContent = new Map<string, EssayWithMeta>(essays.map((e) => [e.content, e]));
 
   return async (_report, essayContent, challenger) => {
-    // grammar/transitions accept both overrides through their own widened
-    // `opts` (systemPromptOverride + modelOverride — see analyzeGrammarWithGemini
-    // / analyzeTransitionsWithGemini). 'overall' below routes modelOverride
-    // through evaluateWithGemini's existing dedicated `model` parameter
-    // instead, rather than growing a second, competing override mechanism.
+    // grammar/transitions accept all three overrides through their own
+    // widened `opts` (systemPromptOverride + modelOverride + generateJson —
+    // see analyzeGrammarWithGemini / analyzeTransitionsWithGemini). 'overall'
+    // below routes modelOverride through evaluateWithGemini's existing
+    // dedicated `model` parameter instead, rather than growing a second,
+    // competing override mechanism — but generateJson still flows through
+    // its opts object like the other two analyzers.
+    //
+    // When generateJson is present, it takes precedence over modelOverride:
+    // the challenger's generation is fully delegated to the injected
+    // function (e.g. OpenRouter — see openRouterGenerate.ts), so modelOverride
+    // (which may hold an `openrouter/vendor/model` id, not a valid Gemini
+    // model) must never also be threaded down the native Gemini path.
+    const usingGenerateJson = !!challenger?.generateJson;
     const opts = challenger
-      ? { systemPromptOverride: challenger.promptOverride, modelOverride: challenger.modelOverride }
+      ? {
+          systemPromptOverride: challenger.promptOverride,
+          modelOverride: usingGenerateJson ? undefined : challenger.modelOverride,
+          generateJson: challenger.generateJson,
+        }
       : undefined;
 
     if (report === 'grammar') {
@@ -405,8 +481,8 @@ export function makeFirestoreGenerate(params: {
       apiKey,
       prompt,
       undefined,
-      challenger?.modelOverride,
-      opts ? { systemPromptOverride: opts.systemPromptOverride } : undefined
+      usingGenerateJson ? undefined : challenger?.modelOverride,
+      opts ? { systemPromptOverride: opts.systemPromptOverride, generateJson: opts.generateJson } : undefined
     );
     return { feedback: JSON.stringify(analysis, null, 2), annotations: extractOverallAnnotations(analysis) };
   };
@@ -454,7 +530,7 @@ export const startEvalRun = onCall(
   {
     timeoutSeconds: 1800,
     memory: '1GiB',
-    secrets: [geminiApiKey, openaiApiKey, anthropicApiKey],
+    secrets: [geminiApiKey, openaiApiKey, anthropicApiKey, openrouterApiKey],
   },
   async (request) => {
     if (!request.auth) {
@@ -544,6 +620,17 @@ export const startEvalRun = onCall(
 
     const generate = makeFirestoreGenerate({ report: report as ReportKind, essays, apiKey: geminiApiKey.value() });
 
+    // When challengerModelOverride is an `openrouter/vendor/model` id, the
+    // challenger's generation runs through OpenRouter instead of native
+    // Gemini. The ORIGINAL (prefixed) challengerModelOverride is still what
+    // gets persisted to the run doc's config below, so the UI can keep
+    // showing what was actually requested.
+    const { modelOverride: challengerModelOverrideForCore, generateJson: challengerGenerateJson } =
+      resolveChallengerGeneration(
+        typeof challengerModelOverride === 'string' ? challengerModelOverride : undefined,
+        openrouterApiKey.value()
+      );
+
     try {
       const result = await runEvalCore(
         {
@@ -564,7 +651,8 @@ export const startEvalRun = onCall(
           report: report as ReportKind,
           essays: essays.map(({ id, content }) => ({ id, content })),
           challengerPromptOverride,
-          challengerModelOverride,
+          challengerModelOverride: challengerModelOverrideForCore,
+          challengerGenerateJson,
         }
       );
 

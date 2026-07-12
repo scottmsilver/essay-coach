@@ -124,4 +124,33 @@ describe('analyzeGrammarWithGemini', () => {
     await analyzeGrammarWithGemini('fake-key', 'Test essay.', mockRef);
     expect(mockRef.update).toHaveBeenCalled();
   });
+
+  it('uses an injected generateJson instead of streamGeminiJson (native Gemini) for the main grammar call', async () => {
+    const { analyzeGrammarWithGemini } = await import('../src/grammar');
+
+    const mockAnalysis = {
+      commaSplices: { locations: [] }, runOnSentences: { locations: [] },
+      fragments: { locations: [] }, subjectVerbAgreement: { locations: [] },
+      pronounReference: { locations: [] }, verbTenseConsistency: { locations: [] },
+      parallelStructure: { locations: [] }, punctuationErrors: { locations: [] },
+      missingCommas: { locations: [] },
+      sentenceVariety: { avgLength: 10, distribution: { simple: 1, compound: 0, complex: 0, compoundComplex: 0 }, comment: 'From OpenRouter.' },
+      activePassiveVoice: { activeCount: 1, passiveCount: 0, passiveInstances: [] },
+      modifierPlacement: { issues: [] }, wordiness: { instances: [] },
+      summary: { totalErrors: 0, errorsByCategory: { commaSplices: 0, runOnSentences: 0, fragments: 0, subjectVerbAgreement: 0, pronounReference: 0, verbTenseConsistency: 0, parallelStructure: 0, punctuationErrors: 0, missingCommas: 0 }, overallComment: 'Via challenger model.', strengthAreas: [], priorityFixes: [] },
+    };
+
+    const fakeGenerateJson = vi.fn(async (opts: { contents: string; systemInstruction: string; responseSchema: object }) => {
+      expect(opts.contents).toContain('Test essay.');
+      expect(opts.systemInstruction).toContain('grammar');
+      return JSON.stringify(mockAnalysis);
+    });
+
+    const result = await analyzeGrammarWithGemini('fake-key', 'Test essay.', undefined, { generateJson: fakeGenerateJson });
+
+    expect(result.summary.overallComment).toBe('Via challenger model.');
+    expect(fakeGenerateJson).toHaveBeenCalledTimes(1);
+    // Native Gemini streaming must never be invoked when generateJson is injected.
+    expect(mockGenerateContentStream).not.toHaveBeenCalled();
+  });
 });
