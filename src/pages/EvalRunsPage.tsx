@@ -140,6 +140,7 @@ export default function EvalRunsPage() {
   const [essayIds, setEssayIds] = useState<string[]>([]);
   const [challengerLabel, setChallengerLabel] = useState('');
   const [challengerPrompt, setChallengerPrompt] = useState('');
+  const [showPromptOverride, setShowPromptOverride] = useState(false);
   const [challengerModel, setChallengerModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -286,32 +287,13 @@ export default function EvalRunsPage() {
             <Text size="xs" c="dimmed">
               {essayIds.length} / {MAX_ESSAYS} essays selected
             </Text>
-            <TextInput
-              label="Challenger label"
-              placeholder="e.g. tighter-grammar-v2"
-              value={challengerLabel}
-              onChange={(e) => setChallengerLabel(e.currentTarget.value)}
-            />
-            <Textarea
-              label="Challenger prompt override"
-              description={`Optional — leave empty to keep the production prompt and compare models only. Do not import the server prompt constants into the client — paste the text here. Max ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters.`}
-              placeholder="Paste the full challenger system prompt..."
-              value={challengerPrompt}
-              onChange={(e) => setChallengerPrompt(e.currentTarget.value)}
-              maxLength={CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH}
-              autosize
-              minRows={6}
-            />
-            <Text size="xs" c="dimmed">
-              {challengerPrompt.length.toLocaleString()} / {CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters
-            </Text>
             <Autocomplete
               label="Challenger model"
-              description="Optional — leave empty to keep the production model and compare prompts only. gemini-* runs natively; openrouter/vendor/model runs via OpenRouter."
+              description="The model to compare against production, with the same production prompt. gemini-* runs natively; openrouter/vendor/model runs via OpenRouter."
               placeholder={
                 modelsLoading
                   ? 'Loading models…'
-                  : 'e.g. gemini-3.5-flash or openrouter/anthropic/claude-3-opus — leave empty to keep the production model'
+                  : 'e.g. gemini-3.5-flash or openrouter/anthropic/claude-sonnet-5'
               }
               data={modelOptions}
               limit={20}
@@ -323,6 +305,39 @@ export default function EvalRunsPage() {
                   : undefined
               }
             />
+            <TextInput
+              label="Challenger label"
+              placeholder="e.g. sonnet-5-vs-prod"
+              value={challengerLabel}
+              onChange={(e) => setChallengerLabel(e.currentTarget.value)}
+            />
+            <div>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                onClick={() => setShowPromptOverride((v) => !v)}
+              >
+                {showPromptOverride ? 'Hide' : 'Advanced:'} prompt override (optional)
+                {!showPromptOverride && challengerPrompt.trim() ? ' — set' : ''}
+              </Button>
+            </div>
+            {showPromptOverride && (
+              <>
+                <Textarea
+                  label="Challenger prompt override"
+                  description={`Only for prompt experiments — leave empty to keep the production prompt. Paste the replacement system prompt text (don't import server constants into the client). Max ${CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters.`}
+                  placeholder="Paste the full challenger system prompt..."
+                  value={challengerPrompt}
+                  onChange={(e) => setChallengerPrompt(e.currentTarget.value)}
+                  maxLength={CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH}
+                  autosize
+                  minRows={6}
+                />
+                <Text size="xs" c="dimmed">
+                  {challengerPrompt.length.toLocaleString()} / {CHALLENGER_PROMPT_OVERRIDE_MAX_LENGTH.toLocaleString()} characters
+                </Text>
+              </>
+            )}
             <Text size="sm" c="dimmed">
               Estimated calls: {essayIds.length} essay(s) × 12 judge calls + {essayIds.length} essay(s) × 2
               generations ≈ <strong>{estimatedCalls}</strong> calls

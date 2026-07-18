@@ -421,13 +421,17 @@ export default function EvalRunDetailPage() {
         </div>
       )}
 
-      <Text fw={700} style={{ fontFamily: 'var(--font-ui)', marginBottom: 12 }}>
+      <Text fw={700} style={{ fontFamily: 'var(--font-ui)', marginBottom: 2 }}>
         Items ({items.length})
+      </Text>
+      <Text size="xs" c="dimmed" style={{ marginBottom: 12 }}>
+        Click a row to compare the two feedback outputs side by side.
       </Text>
       <div style={{ overflowX: 'auto' }}>
         <Table striped highlightOnHover verticalSpacing="sm">
           <Table.Thead>
             <Table.Tr>
+              <Table.Th style={{ width: 32 }} aria-label="Expand" />
               <Table.Th>Essay</Table.Th>
               <Table.Th>Winner</Table.Th>
               <Table.Th>Mean A / B</Table.Th>
@@ -445,6 +449,11 @@ export default function EvalRunDetailPage() {
                     onClick={() => setExpandedItemId(expanded ? null : item.id)}
                     style={{ cursor: 'pointer' }}
                   >
+                    <Table.Td>
+                      <Text size="sm" c="dimmed" aria-hidden style={{ userSelect: 'none' }}>
+                        {expanded ? '▾' : '▸'}
+                      </Text>
+                    </Table.Td>
                     <Table.Td>
                       <Text size="sm">{truncate(item.essayExcerpt)}</Text>
                     </Table.Td>
@@ -488,7 +497,7 @@ export default function EvalRunDetailPage() {
                   </Table.Tr>
                   {expanded && (
                     <Table.Tr>
-                      <Table.Td colSpan={6} style={{ padding: 0 }}>
+                      <Table.Td colSpan={7} style={{ padding: 0 }}>
                         <div
                           style={{
                             display: 'grid',
